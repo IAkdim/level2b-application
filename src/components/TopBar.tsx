@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { supabase } from "@/lib/supabaseClient"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,9 @@ import {
 } from "@/components/ui/popover"
 import { Settings, User, LogOut } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from "react"
+
+
 
 interface Notification {
   id: string
@@ -74,6 +78,7 @@ const mockNotifications: Notification[] = [
 
 export function TopBar() {
   const unreadCount = mockNotifications.filter((n) => !n.read).length
+  const [user, setUser] = useState<any>(null)
 
   const getNotificationIcon = (type: Notification["type"]) => {
     const baseClasses = "h-2 w-2 rounded-full"
@@ -89,6 +94,24 @@ export function TopBar() {
     }
   }
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        // Fetch from your public.users table
+        const { data, error } = await supabase
+          .from("users")
+          .select("full_name, avatar_url, email")
+          .eq("id", session.user.id)
+          .single()
+
+        if (!error) setUser(data)
+      }
+    }
+
+    fetchUser()
+  }, [])
   return (
     <TooltipProvider>
       <div className="h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -204,16 +227,27 @@ export function TopBar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="" alt="User" />
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarImage
+                      src={user?.avatar_url || ""}
+                      alt={user?.full_name || ""}
+                    />
+                    <AvatarFallback>
+                      {user?.full_name
+                        ? user.full_name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase()
+                        : "?"}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">John Doe</p>
-                    <p className="text-xs text-muted-foreground">john@company.com</p>
+                    <p className="text-sm font-medium">{user?.full_name || ""}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email || ""}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -226,7 +260,13 @@ export function TopBar() {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={async () => {
+                    await supabase.auth.signOut()
+                    window.location.href = "/login"
+                  }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
