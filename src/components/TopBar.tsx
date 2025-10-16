@@ -1,4 +1,4 @@
-import { Bell, Search, HelpCircle } from "lucide-react"
+import { Bell, Search, HelpCircle, Building2, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,9 +18,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Settings, User, LogOut } from "lucide-react"
+import { Settings, User, LogOut, Plus } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState, useEffect } from "react"
+import { useOrganization } from "@/contexts/OrganizationContext"
+import { OrganizationSelector } from "@/components/OrganizationSelector"
 
 
 
@@ -79,6 +81,8 @@ const mockNotifications: Notification[] = [
 export function TopBar() {
   const unreadCount = mockNotifications.filter((n) => !n.read).length
   const [user, setUser] = useState<any>(null)
+  const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
+  const { selectedOrg, userOrgs, setOrganization } = useOrganization()
 
   const getNotificationIcon = (type: Notification["type"]) => {
     const baseClasses = "h-2 w-2 rounded-full"
@@ -116,11 +120,41 @@ export function TopBar() {
     <TooltipProvider>
       <div className="h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-full items-center justify-between px-6">
-          {/* Left side - could add breadcrumbs here */}
+          {/* Left side - Organization Selector */}
           <div className="flex items-center gap-4">
-            <h2 className="text-sm font-semibold text-muted-foreground">
-              AI Email Outreach Platform
-            </h2>
+            {selectedOrg && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 h-8 px-3">
+                    <Building2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">{selectedOrg.name}</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {userOrgs.map((userOrg) => (
+                    <DropdownMenuItem
+                      key={userOrg.org_id}
+                      onClick={() => setOrganization(userOrg.organization)}
+                      className={selectedOrg.id === userOrg.org_id ? "bg-accent" : ""}
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      <div className="flex flex-col">
+                        <span>{userOrg.organization.name}</span>
+                        <span className="text-xs text-muted-foreground">{userOrg.role}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Manage Organizations
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Right side - Actions */}
@@ -275,6 +309,9 @@ export function TopBar() {
           </div>
         </div>
       </div>
+
+      {/* Organization Selector Dialog */}
+      <OrganizationSelector open={orgSelectorOpen} onOpenChange={setOrgSelectorOpen} />
     </TooltipProvider>
   )
 }

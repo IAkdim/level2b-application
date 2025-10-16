@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FcGoogle } from "react-icons/fc"
-import { useAuthRedirect } from "@/hooks/useAuthRedirect"
 
 export function Login() {
   const navigate = useNavigate()
@@ -12,7 +11,6 @@ export function Login() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const isNavigating = useRef(false)
-  const { getRedirectPath } = useAuthRedirect()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -25,7 +23,8 @@ export function Login() {
       setError(error.message)
     } else {
       isNavigating.current = true
-      navigate(getRedirectPath(), { replace: true })
+      // Redirect to organization selection page
+      navigate("/select-organization", { replace: true })
     }
   }
 

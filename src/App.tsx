@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react"
 import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { OrganizationProvider } from "@/contexts/OrganizationContext"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -13,9 +14,11 @@ const Templates = lazy(() => import("@/pages/Templates").then(m => ({ default: m
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
+const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
 const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
+const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
 
 const queryClient = new QueryClient()
 
@@ -32,11 +35,22 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+        <OrganizationProvider>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+
+              {/* Organization selection - requires auth but not org */}
+              <Route
+                path="/select-organization"
+                element={
+                  <ProtectedRoute requireOrganization={false}>
+                    <SelectOrganization />
+                  </ProtectedRoute>
+                }
+              />
 
             {/* Protected app routes */}
             <Route
@@ -60,6 +74,7 @@ function App() {
                             <Route path="/meetings" element={<Meetings />} />
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/configuration" element={<Configuration />} />
+                            <Route path="/organization" element={<OrganizationManagement />} />
                           </Routes>
                         </Suspense>
                       </main>
@@ -68,8 +83,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </OrganizationProvider>
       </Router>
     </QueryClientProvider>
   )
