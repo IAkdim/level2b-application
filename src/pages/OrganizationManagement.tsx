@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -216,35 +215,35 @@ export function OrganizationManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Organization Management</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-3xl font-bold tracking-tight">Organization Management</h1>
+        <p className="text-muted-foreground mt-1">
           Manage your organization settings and members
         </p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general">
-            <Building2 className="h-4 w-4 mr-2" />
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="bg-muted/50">
+          <TabsTrigger value="general" className="gap-2">
+            <Building2 className="h-4 w-4" />
             General
           </TabsTrigger>
-          <TabsTrigger value="members">
-            <Users className="h-4 w-4 mr-2" />
+          <TabsTrigger value="members" className="gap-2">
+            <Users className="h-4 w-4" />
             Members ({members.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Details</CardTitle>
-              <CardDescription>
+        <TabsContent value="general" className="space-y-6 mt-6">
+          <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div>
+              <h2 className="text-lg font-semibold">Organization Details</h2>
+              <p className="text-sm text-muted-foreground">
                 Update your organization name and view organization information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label htmlFor="org-name">Organization Name</Label>
                 <div className="flex gap-2">
@@ -293,37 +292,39 @@ export function OrganizationManagement() {
                   readOnly
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="members" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>
+        <TabsContent value="members" className="space-y-6 mt-6">
+          <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div>
+              <h2 className="text-lg font-semibold">Team Members</h2>
+              <p className="text-sm text-muted-foreground">
                 Manage who has access to this organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div className="space-y-4">
               {!canManageMembers && (
-                <div className="mb-4 p-3 bg-muted rounded-md">
-                  <p className="text-sm text-muted-foreground">
+                <div className="p-3 bg-amber-500/10 dark:bg-amber-500/20 rounded-lg border border-amber-500/20">
+                  <p className="text-sm text-amber-900 dark:text-amber-200">
                     Only owners and admins can manage members
                   </p>
                 </div>
               )}
 
-              <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-dashed">
+              <div className="p-4 bg-primary/5 dark:bg-primary/10 rounded-lg border border-primary/20">
                 <div className="flex items-start gap-3">
-                  <UserPlus className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <UserPlus className="h-4 w-4 text-primary" />
+                  </div>
                   <div className="flex-1">
-                    <h4 className="font-medium">Invite New Members</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <h4 className="font-medium text-sm">Invite New Members</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
                       Share your Organization ID with team members so they can join:
                     </p>
                     <div className="flex gap-2 mt-3">
-                      <code className="flex-1 px-3 py-2 bg-background rounded border font-mono text-sm">
+                      <code className="flex-1 px-3 py-2 bg-background rounded-md border font-mono text-xs">
                         {selectedOrg.id}
                       </code>
                       <Button variant="outline" size="sm" onClick={handleCopyOrgId}>
@@ -338,8 +339,9 @@ export function OrganizationManagement() {
               </div>
 
               {loading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading members...</div>
+                <div className="text-center py-12 text-muted-foreground">Loading members...</div>
               ) : (
+                <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -410,9 +412,10 @@ export function OrganizationManagement() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

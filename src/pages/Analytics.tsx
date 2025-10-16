@@ -59,78 +59,80 @@ const templatePerformance = [
 
 export function Analytics() {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-gray-500">
+          <p className="text-muted-foreground mt-1">
             Detailleerde insights in je email campaign prestaties
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm">
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" size="sm">
             <CalendarDays className="mr-2 h-4 w-4" />
             Date Range
           </Button>
-          <Button>
+          <Button size="sm">
             <Download className="mr-2 h-4 w-4" />
             Export Report
           </Button>
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics - Keep cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricsData.map((metric) => (
-          <Card key={metric.label}>
+          <Card key={metric.label} className="border-border/40 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{metric.label}</CardTitle>
-              <metric.icon className="h-4 w-4 text-gray-500" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">{metric.label}</CardTitle>
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <metric.icon className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{metric.value}</div>
-              <p className={`text-xs ${
-                metric.changeType === "positive" 
-                  ? "text-green-600" 
-                  : metric.changeType === "negative" 
-                  ? "text-red-600" 
-                  : "text-gray-600"
-              }`}>
-                {metric.change} from last month
-              </p>
+              <div className="flex items-center gap-1 mt-1">
+                <span className={`text-xs font-medium ${
+                  metric.changeType === "positive"
+                    ? "text-green-600 dark:text-green-500"
+                    : metric.changeType === "negative"
+                    ? "text-red-600 dark:text-red-500"
+                    : "text-muted-foreground"
+                }`}>
+                  {metric.change}
+                </span>
+                <span className="text-xs text-muted-foreground">from last month</span>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Email Performance Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Email Performance Over Time</CardTitle>
-            <CardDescription>
-              Emails sent, opened, and replied over the last 6 months
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center justify-center bg-muted/10 rounded-lg border-2 border-dashed border-muted">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 mx-auto text-gray-500 mb-3" />
-                <p className="text-gray-500">Chart component would go here</p>
-                <p className="text-sm text-gray-500">
-                  Integration with charts library (Chart.js, Recharts, etc.)
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Email Performance Chart - Remove heavy card, use section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Email Performance Over Time</h2>
+          <p className="text-sm text-muted-foreground">Emails sent, opened, and replied over the last 6 months</p>
+        </div>
+        <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-border/40">
+          <div className="text-center">
+            <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">Chart component would go here</p>
+            <p className="text-sm text-muted-foreground">
+              Integration with charts library (Chart.js, Recharts, etc.)
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {/* Conversion Funnel */}
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        {/* Conversion Funnel - Keep card for interactive data */}
+        <Card className="border-border/40 shadow-sm">
           <CardHeader>
             <CardTitle>Conversion Funnel</CardTitle>
             <CardDescription>
@@ -138,29 +140,29 @@ export function Analytics() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/20">
                 <span className="font-medium">Emails Sent</span>
-                <span className="font-bold text-blue-600">12,847</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">12,847</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+              <div className="flex justify-between items-center p-3 bg-green-500/10 dark:bg-green-500/20 rounded-lg border border-green-500/20">
                 <span className="font-medium">Emails Opened</span>
-                <span className="font-bold text-green-600">4,394 (34.2%)</span>
+                <span className="font-bold text-green-600 dark:text-green-400">4,394 (34.2%)</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+              <div className="flex justify-between items-center p-3 bg-yellow-500/10 dark:bg-yellow-500/20 rounded-lg border border-yellow-500/20">
                 <span className="font-medium">Replies Received</span>
-                <span className="font-bold text-yellow-600">1,644 (12.8%)</span>
+                <span className="font-bold text-yellow-600 dark:text-yellow-400">1,644 (12.8%)</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+              <div className="flex justify-between items-center p-3 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg border border-purple-500/20">
                 <span className="font-medium">Meetings Booked</span>
-                <span className="font-bold text-purple-600">287 (2.2%)</span>
+                <span className="font-bold text-purple-600 dark:text-purple-400">287 (2.2%)</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* ROI Analysis */}
-        <Card>
+        {/* ROI Analysis - Keep card */}
+        <Card className="border-border/40 shadow-sm">
           <CardHeader>
             <CardTitle>ROI Analysis</CardTitle>
             <CardDescription>
@@ -170,25 +172,25 @@ export function Analytics() {
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm">Total Investment</span>
+                <span className="text-sm text-muted-foreground">Total Investment</span>
                 <span className="font-medium">$2,450</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Revenue Generated</span>
+                <span className="text-sm text-muted-foreground">Revenue Generated</span>
                 <span className="font-medium">$12,340</span>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t">
+              <div className="flex justify-between items-center pt-3 border-t">
                 <span className="font-medium">Total ROI</span>
-                <span className="font-bold text-green-600">404%</span>
+                <span className="font-bold text-green-600 dark:text-green-500">404%</span>
               </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Cost per meeting</span>
-                  <span>$8.54</span>
+              <div className="mt-4 pt-3 border-t space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Cost per meeting</span>
+                  <span className="font-medium">$8.54</span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Revenue per meeting</span>
-                  <span>$43.00</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Revenue per meeting</span>
+                  <span className="font-medium">$43.00</span>
                 </div>
               </div>
             </div>
@@ -196,15 +198,13 @@ export function Analytics() {
         </Card>
       </div>
 
-      {/* Campaign Performance Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Campaign Performance</CardTitle>
-          <CardDescription>
-            Detailed breakdown of each email campaign
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {/* Campaign Performance Table - Remove card, use subtle section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Campaign Performance</h2>
+          <p className="text-sm text-muted-foreground">Detailed breakdown of each email campaign</p>
+        </div>
+        <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -243,18 +243,16 @@ export function Analytics() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Template Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Template Performance</CardTitle>
-          <CardDescription>
-            Compare performance across different email templates
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {/* Template Performance - Remove card, use subtle section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Template Performance</h2>
+          <p className="text-sm text-muted-foreground">Compare performance across different email templates</p>
+        </div>
+        <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -289,8 +287,8 @@ export function Analytics() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

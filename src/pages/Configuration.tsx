@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -421,25 +421,25 @@ export function Configuration() {
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Configuration</h1>
-          <p className="text-gray-500">
+          <p className="text-muted-foreground mt-1">
             Beheer je account instellingen en voorkeuren
           </p>
         </div>
-        <Button onClick={handleSaveSettings}>
+        <Button onClick={handleSaveSettings} size="sm">
           <Save className="mr-2 h-4 w-4" />
           Save Changes
         </Button>
       </div>
 
       <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Settings Navigation */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
+        {/* Settings Navigation - Keep card for navigation */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card className="border-border/40 shadow-sm">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -448,12 +448,12 @@ export function Configuration() {
                   <TabsTrigger
                     key={section.id}
                     value={section.id}
-                    className="w-full justify-start px-4 py-3 data-[state=active]:bg-muted"
+                    className="w-full justify-start px-4 py-3 data-[state=active]:bg-muted rounded-none first:rounded-t-md last:rounded-b-md"
                   >
                     <div className="flex items-center space-x-3">
                       <section.icon className="h-4 w-4" />
                       <div className="text-left">
-                        <div className="font-medium">{section.title}</div>
+                        <div className="font-medium text-sm">{section.title}</div>
                         <div className="text-xs text-muted-foreground">
                           {section.description}
                         </div>
@@ -465,16 +465,16 @@ export function Configuration() {
             </CardContent>
           </Card>
 
-          {/* Security Notice */}
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <Shield className="mr-2 h-4 w-4" />
+          {/* Security Notice - Keep card for important info */}
+          <Card className="border-border/40 shadow-sm bg-muted/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Shield className="h-4 w-4" />
                 Security
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 API keys en gevoelige instellingen worden veilig beheerd op server-side.
                 Klanten hebben geen toegang tot deze configuraties.
               </p>
@@ -482,54 +482,46 @@ export function Configuration() {
           </Card>
         </div>
 
-        {/* Settings Content */}
+        {/* Settings Content - Remove cards, use sections */}
         <div className="lg:col-span-3">
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Settings</CardTitle>
-                <CardDescription>Personal information and preferences</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderProfileSettings()}
-              </CardContent>
-            </Card>
+          <TabsContent value="profile" className="mt-0">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+              <div>
+                <h2 className="text-lg font-semibold">Profile Settings</h2>
+                <p className="text-sm text-muted-foreground">Personal information and preferences</p>
+              </div>
+              {renderProfileSettings()}
+            </div>
           </TabsContent>
 
-          <TabsContent value="email">
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Settings</CardTitle>
-                <CardDescription>Email signature and sending preferences</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderEmailSettings()}
-              </CardContent>
-            </Card>
+          <TabsContent value="email" className="mt-0">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+              <div>
+                <h2 className="text-lg font-semibold">Email Settings</h2>
+                <p className="text-sm text-muted-foreground">Email signature and sending preferences</p>
+              </div>
+              {renderEmailSettings()}
+            </div>
           </TabsContent>
 
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>Alert preferences and timing</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderNotificationSettings()}
-              </CardContent>
-            </Card>
+          <TabsContent value="notifications" className="mt-0">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+              <div>
+                <h2 className="text-lg font-semibold">Notifications</h2>
+                <p className="text-sm text-muted-foreground">Alert preferences and timing</p>
+              </div>
+              {renderNotificationSettings()}
+            </div>
           </TabsContent>
 
-          <TabsContent value="campaigns">
-            <Card>
-              <CardHeader>
-                <CardTitle>Campaign Settings</CardTitle>
-                <CardDescription>Default campaign behavior and limits</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderCampaignSettings()}
-              </CardContent>
-            </Card>
+          <TabsContent value="campaigns" className="mt-0">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+              <div>
+                <h2 className="text-lg font-semibold">Campaign Settings</h2>
+                <p className="text-sm text-muted-foreground">Default campaign behavior and limits</p>
+              </div>
+              {renderCampaignSettings()}
+            </div>
           </TabsContent>
         </div>
       </Tabs>

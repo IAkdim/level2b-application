@@ -1,6 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Mail, Users, Calendar, TrendingUp } from "lucide-react"
+import { Mail, Users, Calendar, TrendingUp, ArrowUpRight } from "lucide-react"
 
 export function Dashboard() {
   const stats = [
@@ -15,7 +15,7 @@ export function Dashboard() {
       name: "Active Leads",
       value: "1,429",
       change: "+3.2%",
-      changeType: "positive", 
+      changeType: "positive",
       icon: Users,
     },
     {
@@ -35,100 +35,115 @@ export function Dashboard() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight inline-block">Dashboard</h1>
-        <div className="h-1 w-20 bg-brand-600 rounded mt-2" />
-        <p className="text-gray-500 mt-2">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
           Overzicht van je AI emailer prestaties
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Grid - Keep cards for metrics */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.name}>
+          <Card key={stat.name} className="border-border/40 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.name}</CardTitle>
-              <stat.icon className="h-4 w-4 text-gray-500" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.name}</CardTitle>
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <stat.icon className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className={`text-xs ${
-                stat.changeType === "positive" ? "text-green-600" : "text-red-600"
-              }`}>
-                {stat.change} from last month
-              </p>
+              <div className="flex items-center gap-1 mt-1">
+                <span className={`text-xs font-medium ${
+                  stat.changeType === "positive" ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"
+                }`}>
+                  {stat.change}
+                </span>
+                <span className="text-xs text-muted-foreground">from last month</span>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Laatste updates van je email campaigns
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex h-2 w-2 rounded-full bg-green-500"></div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    Email sent to John Doe
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    2 minutes ago
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="flex h-2 w-2 rounded-full bg-blue-500"></div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    Reply received from Sarah Wilson
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    5 minutes ago
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="flex h-2 w-2 rounded-full bg-purple-500"></div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    Meeting scheduled with Mike Johnson  
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    15 minutes ago
-                  </p>
-                </div>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Recent Activity - Use subtle background instead of heavy card */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Recent Activity</h2>
+              <p className="text-sm text-muted-foreground">Laatste updates van je email campaigns</p>
+            </div>
+            <Button variant="ghost" size="sm" className="gap-1">
+              View all
+              <ArrowUpRight className="h-3 w-3" />
+            </Button>
+          </div>
+
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4 border border-border/40">
+            <div className="flex items-start gap-4 p-3 bg-background rounded-md hover:bg-accent/50 transition-colors">
+              <div className="flex h-2 w-2 rounded-full bg-green-500 mt-2"></div>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  Email sent to John Doe
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  2 minutes ago
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-start gap-4 p-3 bg-background rounded-md hover:bg-accent/50 transition-colors">
+              <div className="flex h-2 w-2 rounded-full bg-blue-500 mt-2"></div>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  Reply received from Sarah Wilson
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  5 minutes ago
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-3 bg-background rounded-md hover:bg-accent/50 transition-colors">
+              <div className="flex h-2 w-2 rounded-full bg-purple-500 mt-2"></div>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  Meeting scheduled with Mike Johnson
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  15 minutes ago
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>
-              Snelle acties voor je workflow
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full">
-              Generate New Template
-            </Button>
-            <Button variant="outline" className="w-full">
-              Import Leads
-            </Button>
-            <Button variant="outline" className="w-full">
-              View Analytics
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Quick Actions - Keep card but refined */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Quick Actions</h2>
+            <p className="text-sm text-muted-foreground">Snelle acties voor je workflow</p>
+          </div>
+
+          <Card className="border-border/40 shadow-sm">
+            <CardContent className="pt-6 space-y-3">
+              <Button className="w-full justify-start gap-2">
+                <Mail className="h-4 w-4" />
+                Generate New Template
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Users className="h-4 w-4" />
+                Import Leads
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <TrendingUp className="h-4 w-4" />
+                View Analytics
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
