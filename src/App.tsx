@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
+import { ThemeProvider } from "@/contexts/ThemeContext"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -34,10 +35,11 @@ function PageLoader() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <OrganizationProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+      <ThemeProvider>
+        <Router>
+          <OrganizationProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
@@ -83,10 +85,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            </Routes>
-          </Suspense>
-        </OrganizationProvider>
-      </Router>
+              </Routes>
+            </Suspense>
+          </OrganizationProvider>
+        </Router>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

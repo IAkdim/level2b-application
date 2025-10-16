@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, Bell, Mail, Shield, Save, User } from "lucide-react"
+import { useTheme } from "@/contexts/ThemeContext"
 
 interface ConfigSection {
   id: string
@@ -44,7 +45,7 @@ const configSections: ConfigSection[] = [
 
 export function Configuration() {
   const [selectedSection, setSelectedSection] = useState("profile")
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system")
+  const { theme, setTheme } = useTheme()
   const [settings, setSettings] = useState({
     profile: {
       name: "John Doe",
@@ -75,38 +76,6 @@ export function Configuration() {
       excludeWeekends: true
     }
   })
-
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | "system" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-      applyTheme(savedTheme)
-    } else {
-      applyTheme("system")
-    }
-  }, [])
-
-  // Apply theme based on selection
-  const applyTheme = (newTheme: "light" | "dark" | "system") => {
-    const root = document.documentElement
-
-    if (newTheme === "system") {
-      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-      root.classList.toggle("dark", isDark)
-    } else if (newTheme === "dark") {
-      root.classList.add("dark")
-    } else {
-      root.classList.remove("dark")
-    }
-
-    localStorage.setItem("theme", newTheme)
-  }
-
-  const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
-    setTheme(newTheme)
-    applyTheme(newTheme)
-  }
 
   const handleSaveSettings = () => {
     // Here you would save to your backend
@@ -179,7 +148,7 @@ export function Configuration() {
         <h4 className="font-medium mb-3">Appearance</h4>
         <div className="space-y-2">
           <Label htmlFor="theme-select">Theme</Label>
-          <Select value={theme} onValueChange={handleThemeChange}>
+          <Select value={theme} onValueChange={(value: "light" | "dark" | "system") => setTheme(value)}>
             <SelectTrigger id="theme-select" className="w-full md:w-64">
               <SelectValue />
             </SelectTrigger>

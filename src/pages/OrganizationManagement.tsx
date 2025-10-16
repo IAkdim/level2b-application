@@ -421,7 +421,7 @@ export function OrganizationManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Member</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {memberToRemove?.user.full_name || "this member"} from
+              Are you sure you want to remove {memberToRemove?.user?.full_name || "this member"} from
               the organization? They will lose access to all organization data.
             </AlertDialogDescription>
           </AlertDialogHeader>
