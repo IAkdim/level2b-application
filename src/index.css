@@ -104,6 +104,33 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "tnum" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+  }
+
+  /* Improved readability for body text */
+  p, li, span {
+    line-height: 1.6;
+  }
+
+  /* Tighter spacing for headings */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /* Tabular numbers for data/stats */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Apply tabular nums to common data elements */
+  [class*="text-2xl"],
+  [class*="text-xl"],
+  table td {
+    font-variant-numeric: tabular-nums;
   }
 }

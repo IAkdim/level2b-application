@@ -14,6 +14,16 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      },
+      letterSpacing: {
+        tighter: '-0.02em',
+        tight: '-0.01em',
+      },
+      lineHeight: {
+        relaxed: '1.75',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

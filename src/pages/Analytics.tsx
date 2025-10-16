@@ -59,10 +59,10 @@ const templatePerformance = [
 
 export function Analytics() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-1">
             Detailleerde insights in je email campaign prestaties
           </p>
@@ -84,17 +84,15 @@ export function Analytics() {
       </div>
 
       {/* Key Metrics - Keep cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {metricsData.map((metric) => (
-          <Card key={metric.label} className="border-border/40 shadow-sm hover:shadow-md transition-shadow">
+          <Card key={metric.label} className="border-border/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{metric.label}</CardTitle>
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <metric.icon className="h-4 w-4 text-primary" />
-              </div>
+              <metric.icon className="h-4 w-4 text-muted-foreground/50" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{metric.value}</div>
+              <div className="text-2xl font-semibold">{metric.value}</div>
               <div className="flex items-center gap-1 mt-1">
                 <span className={`text-xs font-medium ${
                   metric.changeType === "positive"
@@ -113,12 +111,12 @@ export function Analytics() {
       </div>
 
       {/* Email Performance Chart - Remove heavy card, use section */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-semibold">Email Performance Over Time</h2>
+          <h2 className="text-base font-semibold">Email Performance Over Time</h2>
           <p className="text-sm text-muted-foreground">Emails sent, opened, and replied over the last 6 months</p>
         </div>
-        <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-border/40">
+        <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-border/30">
           <div className="text-center">
             <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
             <p className="text-muted-foreground">Chart component would go here</p>
@@ -129,10 +127,10 @@ export function Analytics() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
 
         {/* Conversion Funnel - Keep card for interactive data */}
-        <Card className="border-border/40 shadow-sm">
+        <Card className="border-border/30">
           <CardHeader>
             <CardTitle>Conversion Funnel</CardTitle>
             <CardDescription>
@@ -141,28 +139,28 @@ export function Analytics() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/20">
+              <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
                 <span className="font-medium">Emails Sent</span>
-                <span className="font-bold text-blue-600 dark:text-blue-400">12,847</span>
+                <span className="font-semibold">12,847</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-green-500/10 dark:bg-green-500/20 rounded-lg border border-green-500/20">
+              <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
                 <span className="font-medium">Emails Opened</span>
-                <span className="font-bold text-green-600 dark:text-green-400">4,394 (34.2%)</span>
+                <span className="font-semibold">4,394 (34.2%)</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-yellow-500/10 dark:bg-yellow-500/20 rounded-lg border border-yellow-500/20">
+              <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
                 <span className="font-medium">Replies Received</span>
-                <span className="font-bold text-yellow-600 dark:text-yellow-400">1,644 (12.8%)</span>
+                <span className="font-semibold">1,644 (12.8%)</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg border border-purple-500/20">
+              <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
                 <span className="font-medium">Meetings Booked</span>
-                <span className="font-bold text-purple-600 dark:text-purple-400">287 (2.2%)</span>
+                <span className="font-semibold">287 (2.2%)</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* ROI Analysis - Keep card */}
-        <Card className="border-border/40 shadow-sm">
+        <Card className="border-border/30">
           <CardHeader>
             <CardTitle>ROI Analysis</CardTitle>
             <CardDescription>
@@ -181,7 +179,7 @@ export function Analytics() {
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
                 <span className="font-medium">Total ROI</span>
-                <span className="font-bold text-green-600 dark:text-green-500">404%</span>
+                <span className="font-semibold">404%</span>
               </div>
               <div className="mt-4 pt-3 border-t space-y-2">
                 <div className="flex justify-between text-xs">
@@ -199,12 +197,12 @@ export function Analytics() {
       </div>
 
       {/* Campaign Performance Table - Remove card, use subtle section */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-semibold">Campaign Performance</h2>
+          <h2 className="text-base font-semibold">Campaign Performance</h2>
           <p className="text-sm text-muted-foreground">Detailed breakdown of each email campaign</p>
         </div>
-        <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
+        <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -247,12 +245,12 @@ export function Analytics() {
       </div>
 
       {/* Template Performance - Remove card, use subtle section */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-semibold">Template Performance</h2>
+          <h2 className="text-base font-semibold">Template Performance</h2>
           <p className="text-sm text-muted-foreground">Compare performance across different email templates</p>
         </div>
-        <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
+        <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

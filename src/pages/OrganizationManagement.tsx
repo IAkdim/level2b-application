@@ -215,15 +215,15 @@ export function OrganizationManagement() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Organization Management</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Organization Management</h1>
         <p className="text-muted-foreground mt-1">
           Manage your organization settings and members
         </p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs defaultValue="general" className="space-y-8">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="general" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -236,9 +236,9 @@ export function OrganizationManagement() {
         </TabsList>
 
         <TabsContent value="general" className="space-y-6 mt-6">
-          <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+          <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
             <div>
-              <h2 className="text-lg font-semibold">Organization Details</h2>
+              <h2 className="text-base font-semibold">Organization Details</h2>
               <p className="text-sm text-muted-foreground">
                 Update your organization name and view organization information
               </p>
@@ -297,9 +297,9 @@ export function OrganizationManagement() {
         </TabsContent>
 
         <TabsContent value="members" className="space-y-6 mt-6">
-          <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+          <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
             <div>
-              <h2 className="text-lg font-semibold">Team Members</h2>
+              <h2 className="text-base font-semibold">Team Members</h2>
               <p className="text-sm text-muted-foreground">
                 Manage who has access to this organization
               </p>
@@ -315,9 +315,7 @@ export function OrganizationManagement() {
 
               <div className="p-4 bg-primary/5 dark:bg-primary/10 rounded-lg border border-primary/20">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <UserPlus className="h-4 w-4 text-primary" />
-                  </div>
+                  <UserPlus className="h-4 w-4 text-primary mt-1" />
                   <div className="flex-1">
                     <h4 className="font-medium text-sm">Invite New Members</h4>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -341,7 +339,7 @@ export function OrganizationManagement() {
               {loading ? (
                 <div className="text-center py-12 text-muted-foreground">Loading members...</div>
               ) : (
-                <div className="rounded-lg border border-border/40 bg-background overflow-hidden">
+                <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>

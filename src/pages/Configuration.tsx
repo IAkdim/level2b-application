@@ -421,10 +421,10 @@ export function Configuration() {
   )
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configuration</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
           <p className="text-muted-foreground mt-1">
             Beheer je account instellingen en voorkeuren
           </p>
@@ -435,10 +435,10 @@ export function Configuration() {
         </Button>
       </div>
 
-      <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Settings Navigation - Keep card for navigation */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card className="border-border/40 shadow-sm">
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="border-border/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>
@@ -466,7 +466,7 @@ export function Configuration() {
           </Card>
 
           {/* Security Notice - Keep card for important info */}
-          <Card className="border-border/40 shadow-sm bg-muted/30">
+          <Card className="border-border/30 bg-muted/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Shield className="h-4 w-4" />
@@ -485,9 +485,9 @@ export function Configuration() {
         {/* Settings Content - Remove cards, use sections */}
         <div className="lg:col-span-3">
           <TabsContent value="profile" className="mt-0">
-            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
               <div>
-                <h2 className="text-lg font-semibold">Profile Settings</h2>
+                <h2 className="text-base font-semibold">Profile Settings</h2>
                 <p className="text-sm text-muted-foreground">Personal information and preferences</p>
               </div>
               {renderProfileSettings()}
@@ -495,9 +495,9 @@ export function Configuration() {
           </TabsContent>
 
           <TabsContent value="email" className="mt-0">
-            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
               <div>
-                <h2 className="text-lg font-semibold">Email Settings</h2>
+                <h2 className="text-base font-semibold">Email Settings</h2>
                 <p className="text-sm text-muted-foreground">Email signature and sending preferences</p>
               </div>
               {renderEmailSettings()}
@@ -505,9 +505,9 @@ export function Configuration() {
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-0">
-            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
               <div>
-                <h2 className="text-lg font-semibold">Notifications</h2>
+                <h2 className="text-base font-semibold">Notifications</h2>
                 <p className="text-sm text-muted-foreground">Alert preferences and timing</p>
               </div>
               {renderNotificationSettings()}
@@ -515,9 +515,9 @@ export function Configuration() {
           </TabsContent>
 
           <TabsContent value="campaigns" className="mt-0">
-            <div className="space-y-6 bg-muted/30 rounded-lg p-6 border border-border/40">
+            <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
               <div>
-                <h2 className="text-lg font-semibold">Campaign Settings</h2>
+                <h2 className="text-base font-semibold">Campaign Settings</h2>
                 <p className="text-sm text-muted-foreground">Default campaign behavior and limits</p>
               </div>
               {renderCampaignSettings()}
