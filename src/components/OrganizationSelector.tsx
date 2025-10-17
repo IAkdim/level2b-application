@@ -52,25 +52,23 @@ export function OrganizationSelector({ open, onOpenChange, trigger }: Organizati
         return
       }
 
-      // Create organization
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .insert({ name: newOrgName.trim() })
-        .select()
-        .single()
-
-      if (orgError) throw orgError
-
-      // Add user as owner
-      const { error: userOrgError } = await supabase
-        .from("user_orgs")
-        .insert({
-          user_id: session.user.id,
-          org_id: org.id,
-          role: "owner",
+      // Use the helper function to create org and add user as owner atomically
+      const { data: orgId, error: createError } = await supabase
+        .rpc('create_organization_with_owner', {
+          org_name: newOrgName.trim(),
+          org_slug: null
         })
 
-      if (userOrgError) throw userOrgError
+      if (createError) throw createError
+
+      // Fetch the created organization
+      const { data: org, error: fetchError } = await supabase
+        .from("organizations")
+        .select()
+        .eq("id", orgId)
+        .single()
+
+      if (fetchError) throw fetchError
 
       // Refresh organizations and select the new one
       await refreshOrganizations()

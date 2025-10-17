@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -6,82 +7,90 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Upload, Search, Plus, Mail, Calendar, User } from "lucide-react"
+import { Upload, Search, Plus, Mail, Calendar, User, Loader2, Edit2, Trash2, MoreVertical } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useLeads, useLeadStats, useDeleteLead } from "@/hooks/useLeads"
+import { AddLeadDialog } from "@/components/AddLeadDialog"
+import { EditLeadDialog } from "@/components/EditLeadDialog"
+import type { Lead, LeadStatus } from "@/types/crm"
+import { formatDistanceToNow } from "date-fns"
 
-interface Lead {
-  id: string
-  name: string
-  email: string
-  company: string
-  status: "new" | "contacted" | "replied" | "meeting_scheduled" | "closed"
-  lastContact: string
-  sentiment?: "positive" | "neutral" | "negative"
-}
-
-const mockLeads: Lead[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@company.com",
-    company: "Tech Corp",
-    status: "replied",
-    lastContact: "2 hours ago",
-    sentiment: "positive"
-  },
-  {
-    id: "2", 
-    name: "Sarah Wilson",
-    email: "sarah@startup.io",
-    company: "Startup Inc",
-    status: "contacted",
-    lastContact: "1 day ago"
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike@enterprise.com", 
-    company: "Enterprise Ltd",
-    status: "meeting_scheduled",
-    lastContact: "3 days ago",
-    sentiment: "positive"
-  },
-  {
-    id: "4",
-    name: "Lisa Chen",
-    email: "lisa@agency.com",
-    company: "Creative Agency",
-    status: "new",
-    lastContact: "Never"
-  }
-]
-
-function getStatusVariant(status: Lead['status']) {
-  const variants = {
+function getStatusVariant(status: LeadStatus) {
+  const variants: Record<LeadStatus, string> = {
     new: 'default',
-    contacted: 'info',
-    replied: 'success',
-    meeting_scheduled: 'warning',
-    closed: 'destructive',
-  } as const
-  return variants[status]
+    contacted: 'secondary',
+    replied: 'default',
+    meeting_scheduled: 'default',
+    closed: 'default',
+    lost: 'secondary',
+  }
+  return variants[status] as any
 }
 
 function getSentimentVariant(sentiment: 'positive' | 'neutral' | 'negative') {
-  return sentiment === 'positive' ? 'success' : sentiment === 'negative' ? 'destructive' : 'warning'
+  return sentiment === 'positive' ? 'default' : sentiment === 'negative' ? 'secondary' : 'secondary'
+}
+
+function formatLastContact(date: string | null): string {
+  if (!date) return 'Never'
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true })
+  } catch {
+    return 'Never'
+  }
 }
 
 export function Leads() {
-  const [leads, _setLeads] = useState<Lead[]>(mockLeads)
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all")
+  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [editingLead, setEditingLead] = useState<Lead | null>(null)
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.company.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || lead.status === statusFilter
-    return matchesSearch && matchesStatus
+  // Fetch leads with filters
+  const { data: leadsData, isLoading: leadsLoading } = useLeads(
+    statusFilter !== "all" ? { status: statusFilter } : undefined
+  )
+
+  // Fetch lead stats
+  const { data: stats } = useLeadStats()
+
+  // Delete mutation
+  const deleteLead = useDeleteLead()
+
+  // Client-side filtering for search
+  const filteredLeads = (leadsData?.data || []).filter(lead => {
+    if (!searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    return lead.name.toLowerCase().includes(search) ||
+           lead.email.toLowerCase().includes(search) ||
+           (lead.company?.toLowerCase() || '').includes(search)
   })
+
+  const handleDelete = async (lead: Lead, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (!confirm(`Are you sure you want to delete ${lead.name}? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await deleteLead.mutateAsync(lead.id)
+    } catch (error) {
+      console.error("Failed to delete lead:", error)
+      alert("Failed to delete lead")
+    }
+  }
+
+  const handleEdit = (lead: Lead, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingLead(lead)
+  }
 
   return (
     <div className="space-y-6">
@@ -97,7 +106,7 @@ export function Leads() {
             <Upload className="mr-2 h-4 w-4" />
             Import CSV
           </Button>
-          <Button>
+          <Button onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Lead
           </Button>
@@ -112,7 +121,7 @@ export function Leads() {
             <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{leads.length}</div>
+            <div className="text-2xl font-bold">{stats?.total || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -121,9 +130,7 @@ export function Leads() {
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {leads.filter(l => l.status === "contacted").length}
-            </div>
+            <div className="text-2xl font-bold">{stats?.by_status?.contacted || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -132,9 +139,7 @@ export function Leads() {
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {leads.filter(l => l.status === "replied").length}
-            </div>
+            <div className="text-2xl font-bold">{stats?.by_status?.replied || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -143,9 +148,7 @@ export function Leads() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {leads.filter(l => l.status === "meeting_scheduled").length}
-            </div>
+            <div className="text-2xl font-bold">{stats?.by_status?.meeting_scheduled || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -188,6 +191,7 @@ export function Leads() {
                   <SelectItem value="replied">Replied</SelectItem>
                   <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -196,63 +200,149 @@ export function Leads() {
       </Card>
 
       {/* Leads Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Leads Overview</CardTitle>
-          <CardDescription>
-            {filteredLeads.length} of {leads.length} leads
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Contact</TableHead>
-                  <TableHead>Sentiment</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="font-medium">{lead.name}</TableCell>
-                    <TableCell>{lead.company}</TableCell>
-                    <TableCell className="text-muted-foreground">{lead.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(lead.status)}>
-                        {lead.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{lead.lastContact}</TableCell>
-                    <TableCell>
-                      {lead.sentiment && (
-                        <Badge variant={getSentimentVariant(lead.sentiment)}>
-                          {lead.sentiment}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" aria-label={`Send email to ${lead.name}`}>
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" aria-label={`Schedule meeting with ${lead.name}`}>
-                          <Calendar className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      <Card className="border-border/30">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Leads</CardTitle>
+              <CardDescription className="mt-1">
+                {filteredLeads.length} {filteredLeads.length === 1 ? 'lead' : 'leads'}
+                {searchTerm && ' matching your search'}
+              </CardDescription>
+            </div>
           </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {leadsLoading ? (
+            <div className="flex justify-center items-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredLeads.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <User className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+              <p className="text-muted-foreground font-medium mb-1">
+                {searchTerm || statusFilter !== "all"
+                  ? "No leads found"
+                  : "No leads yet"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {searchTerm || statusFilter !== "all"
+                  ? "Try adjusting your filters"
+                  : "Click 'Add Lead' to create your first lead"}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-border/40">
+                    <TableHead className="font-semibold">Contact</TableHead>
+                    <TableHead className="font-semibold">Company</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Last Contact</TableHead>
+                    <TableHead className="font-semibold">Sentiment</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLeads.map((lead) => (
+                    <TableRow
+                      key={lead.id}
+                      className="cursor-pointer hover:bg-muted/30 transition-colors border-border/30"
+                      onClick={() => navigate(`/outreach/leads/${lead.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium">{lead.name}</span>
+                          <span className="text-sm text-muted-foreground">{lead.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          {lead.company ? (
+                            <>
+                              <span className="font-medium text-sm">{lead.company}</span>
+                              {lead.title && (
+                                <span className="text-xs text-muted-foreground">{lead.title}</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getStatusVariant(lead.status)}
+                          className="font-normal"
+                        >
+                          {lead.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatLastContact(lead.last_contact_at)}
+                      </TableCell>
+                      <TableCell>
+                        {lead.sentiment ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                              lead.sentiment === 'positive' ? 'bg-green-500' :
+                              lead.sentiment === 'negative' ? 'bg-red-500' :
+                              'bg-yellow-500'
+                            }`} />
+                            <span className="text-sm capitalize">{lead.sentiment}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-muted"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => navigate(`/outreach/leads/${lead.id}`)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleEdit(lead, e)}>
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => handleDelete(lead, e)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Add Lead Dialog */}
+      <AddLeadDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
+
+      {/* Edit Lead Dialog */}
+      <EditLeadDialog
+        open={!!editingLead}
+        onOpenChange={(open) => !open && setEditingLead(null)}
+        lead={editingLead}
+      />
     </div>
   )
 }

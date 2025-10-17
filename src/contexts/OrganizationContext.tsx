@@ -16,6 +16,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
 
+      console.log("Fetching orgs for user:", session?.user?.id)
+
       if (!session?.user) {
         setUserOrgs([])
         setLoading(false)
@@ -33,6 +35,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           organization:organizations(id, name, created_at, updated_at)
         `)
         .eq("user_id", session.user.id)
+
+      console.log("Organization fetch result:", { data, error, dataLength: data?.length })
 
       if (error) {
         console.error("Error fetching organizations:", error)
