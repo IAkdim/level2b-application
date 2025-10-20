@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -23,7 +22,7 @@ import {
   Plus,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import type { Activity, ActivityType } from "@/types/crm"
+import type { ActivityType } from "@/types/crm"
 
 interface ActivityTimelineProps {
   leadId: string

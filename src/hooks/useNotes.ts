@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import * as notesApi from '@/lib/api/notes'
-import type { Note, CreateNoteInput, UpdateNoteInput } from '@/types/crm'
+import type { CreateNoteInput, UpdateNoteInput } from '@/types/crm'
 
 /**
  * Hook to fetch notes for a specific lead
@@ -57,7 +57,7 @@ export function useDeleteNote() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ noteId, leadId }: { noteId: string; leadId: string }) =>
+    mutationFn: ({ noteId }: { noteId: string; leadId: string }) =>
       notesApi.deleteNote(noteId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['notes', variables.leadId] })

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import * as tasksApi from '@/lib/api/tasks'
-import type { Task, CreateTaskInput, UpdateTaskInput, TaskFilters } from '@/types/crm'
+import type { CreateTaskInput, UpdateTaskInput, TaskFilters } from '@/types/crm'
 
 /**
  * Hook to fetch tasks with filters

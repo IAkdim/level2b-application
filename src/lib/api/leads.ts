@@ -35,20 +35,30 @@ export async function getLeads(
   }
 
   if (filters?.sentiment) {
-    query = query.eq('sentiment', filters.sentiment)
+    if (Array.isArray(filters.sentiment)) {
+      query = query.in('sentiment', filters.sentiment)
+    } else {
+      query = query.eq('sentiment', filters.sentiment)
+    }
   }
 
-  if (filters?.source) {
-    query = query.eq('source', filters.source)
+  // Source filter - check if lead's source array contains ANY of the filter tags
+  if (filters?.source && filters.source.length > 0) {
+    query = query.overlaps('source', filters.source)
   }
 
   if (filters?.search) {
-    query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`)
+    query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`)
   }
+
+  // Apply sorting
+  const sortBy = filters?.sortBy || 'created_at'
+  const sortOrder = filters?.sortOrder || 'desc'
+  const ascending = sortOrder === 'asc'
 
   // Apply pagination and ordering
   query = query
-    .order('created_at', { ascending: false })
+    .order(sortBy, { ascending })
     .range(offset, offset + limit - 1)
 
   const { data, error, count } = await query
@@ -148,6 +158,42 @@ export async function updateLastContact(leadId: string): Promise<void> {
 }
 
 /**
+ * Update lead status
+ */
+export async function updateLeadStatus(leadId: string, status: Lead['status']): Promise<Lead> {
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ status })
+    .eq('id', leadId)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new Error('Lead not found')
+
+  return data
+}
+
+/**
+ * Get all unique source tags for an organization
+ */
+export async function getUniqueSources(orgId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('leads')
+    .select('source')
+    .eq('org_id', orgId)
+    .not('source', 'is', null)
+
+  if (error) throw error
+
+  // Flatten all source arrays and get unique values
+  const allSources = data?.flatMap(lead => lead.source || []) || []
+  const uniqueSources = Array.from(new Set(allSources)).sort()
+
+  return uniqueSources
+}
+
+/**
  * Get lead statistics for an organization
  */
 export async function getLeadStats(orgId: string) {
@@ -158,8 +204,7 @@ export async function getLeadStats(orgId: string) {
 
   if (error) throw error
 
-  const stats = {
-    total: data?.length || 0,
+  const byStatus = {
     new: 0,
     contacted: 0,
     replied: 0,
@@ -169,10 +214,13 @@ export async function getLeadStats(orgId: string) {
   }
 
   data?.forEach(lead => {
-    if (lead.status in stats) {
-      stats[lead.status as keyof typeof stats]++
+    if (lead.status in byStatus) {
+      byStatus[lead.status as keyof typeof byStatus]++
     }
   })
 
-  return stats
+  return {
+    total: data?.length || 0,
+    by_status: byStatus
+  }
 }

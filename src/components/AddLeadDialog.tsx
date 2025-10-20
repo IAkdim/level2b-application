@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useCreateLead } from "@/hooks/useLeads"
+import { useSourceTags } from "@/hooks/useSourceTags"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2 } from "lucide-react"
+import { Loader2, X, Tag } from "lucide-react"
 import type { LeadStatus, Sentiment } from "@/types/crm"
 
 interface AddLeadDialogProps {
@@ -34,10 +36,17 @@ export function AddLeadDialog({ open, onOpenChange }: AddLeadDialogProps) {
   const [title, setTitle] = useState("")
   const [status, setStatus] = useState<LeadStatus>("new")
   const [sentiment, setSentiment] = useState<Sentiment | "">("")
-  const [source, setSource] = useState("")
   const [notes, setNotes] = useState("")
 
   const createLead = useCreateLead()
+  const {
+    sources,
+    sourceInput,
+    setSourceInput,
+    removeSource,
+    handleSourceKeyDown,
+    resetSources,
+  } = useSourceTags()
 
   const resetForm = () => {
     setName("")
@@ -47,7 +56,7 @@ export function AddLeadDialog({ open, onOpenChange }: AddLeadDialogProps) {
     setTitle("")
     setStatus("new")
     setSentiment("")
-    setSource("")
+    resetSources()
     setNotes("")
   }
 
@@ -68,7 +77,7 @@ export function AddLeadDialog({ open, onOpenChange }: AddLeadDialogProps) {
         title: title.trim() || undefined,
         status,
         sentiment: sentiment || undefined,
-        source: source.trim() || undefined,
+        source: sources.length > 0 ? sources : undefined,
         notes: notes.trim() || undefined,
       })
 
@@ -188,15 +197,40 @@ export function AddLeadDialog({ open, onOpenChange }: AddLeadDialogProps) {
             </div>
           </div>
 
-          {/* Source */}
+          {/* Sources - Tag Input */}
           <div className="space-y-2">
-            <Label htmlFor="source">Source</Label>
-            <Input
-              id="source"
-              placeholder="LinkedIn, referral, cold outreach..."
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-            />
+            <Label htmlFor="source">Sources</Label>
+            <div className="relative">
+              <Tag className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="source"
+                placeholder="Add source (press Enter)"
+                value={sourceInput}
+                onChange={(e) => setSourceInput(e.target.value)}
+                onKeyDown={handleSourceKeyDown}
+                className="pl-9"
+              />
+            </div>
+            {sources.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {sources.map((source) => (
+                  <Badge
+                    key={source}
+                    variant="secondary"
+                    className="text-xs pl-2 pr-1 py-0.5 gap-1"
+                  >
+                    {source}
+                    <button
+                      type="button"
+                      onClick={() => removeSource(source)}
+                      className="hover:bg-muted-foreground/20 rounded-full p-0.5 ml-0.5"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Notes */}

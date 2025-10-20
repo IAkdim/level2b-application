@@ -50,6 +50,22 @@ export function useLeadStats() {
 }
 
 /**
+ * Hook to fetch unique source tags
+ */
+export function useUniqueSources() {
+  const { selectedOrg } = useOrganization()
+
+  return useQuery({
+    queryKey: ['unique-sources', selectedOrg?.id],
+    queryFn: () => {
+      if (!selectedOrg) throw new Error('No organization selected')
+      return leadsApi.getUniqueSources(selectedOrg.id)
+    },
+    enabled: !!selectedOrg,
+  })
+}
+
+/**
  * Hook to create a new lead
  */
 export function useCreateLead() {

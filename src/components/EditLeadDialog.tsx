@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useUpdateLead } from "@/hooks/useLeads"
+import { useSourceTags } from "@/hooks/useSourceTags"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2 } from "lucide-react"
+import { Loader2, X, Tag } from "lucide-react"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 
 interface EditLeadDialogProps {
@@ -35,10 +37,17 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
   const [title, setTitle] = useState("")
   const [status, setStatus] = useState<LeadStatus>("new")
   const [sentiment, setSentiment] = useState<Sentiment | "">("")
-  const [source, setSource] = useState("")
   const [notes, setNotes] = useState("")
 
   const updateLead = useUpdateLead()
+  const {
+    sources,
+    sourceInput,
+    setSourceInput,
+    removeSource,
+    handleSourceKeyDown,
+    resetSources,
+  } = useSourceTags()
 
   // Populate form when lead changes
   useEffect(() => {
@@ -50,10 +59,10 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
       setTitle(lead.title || "")
       setStatus(lead.status)
       setSentiment(lead.sentiment || "")
-      setSource(lead.source || "")
+      resetSources(lead.source || [])
       setNotes(lead.notes || "")
     }
-  }, [lead])
+  }, [lead, resetSources])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,13 +78,13 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
         input: {
           name: name.trim(),
           email: email.trim(),
-          phone: phone.trim() || null,
-          company: company.trim() || null,
-          title: title.trim() || null,
+          phone: phone.trim() || undefined,
+          company: company.trim() || undefined,
+          title: title.trim() || undefined,
           status,
-          sentiment: sentiment || null,
-          source: source.trim() || null,
-          notes: notes.trim() || null,
+          sentiment: sentiment || undefined,
+          source: sources.length > 0 ? sources : undefined,
+          notes: notes.trim() || undefined,
         },
       })
 
@@ -196,15 +205,40 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
             </div>
           </div>
 
-          {/* Source */}
+          {/* Sources - Tag Input */}
           <div className="space-y-2">
-            <Label htmlFor="edit-source">Source</Label>
-            <Input
-              id="edit-source"
-              placeholder="LinkedIn, referral, cold outreach..."
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-            />
+            <Label htmlFor="edit-source">Sources</Label>
+            <div className="relative">
+              <Tag className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="edit-source"
+                placeholder="Add source (press Enter)"
+                value={sourceInput}
+                onChange={(e) => setSourceInput(e.target.value)}
+                onKeyDown={handleSourceKeyDown}
+                className="pl-9"
+              />
+            </div>
+            {sources.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {sources.map((source) => (
+                  <Badge
+                    key={source}
+                    variant="secondary"
+                    className="text-xs pl-2 pr-1 py-0.5 gap-1"
+                  >
+                    {source}
+                    <button
+                      type="button"
+                      onClick={() => removeSource(source)}
+                      className="hover:bg-muted-foreground/20 rounded-full p-0.5 ml-0.5"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Notes */}

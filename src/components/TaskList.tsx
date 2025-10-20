@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -21,7 +20,7 @@ import {
   Trash2,
   Calendar as CalendarIcon,
 } from "lucide-react"
-import { formatDistanceToNow, format } from "date-fns"
+import { format } from "date-fns"
 import type { Task, TaskStatus, TaskPriority } from "@/types/crm"
 
 interface TaskListProps {

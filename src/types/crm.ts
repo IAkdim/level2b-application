@@ -24,7 +24,7 @@ export interface Lead {
   // Status & Tracking
   status: LeadStatus
   sentiment?: Sentiment
-  source?: string
+  source?: string[] // Changed to array for multiple tags
 
   // Additional Data
   notes?: string
@@ -44,7 +44,7 @@ export interface CreateLeadInput {
   title?: string
   status?: LeadStatus
   sentiment?: Sentiment
-  source?: string
+  source?: string[] // Changed to array for multiple tags
   notes?: string
   metadata?: Record<string, any>
 }
@@ -57,7 +57,7 @@ export interface UpdateLeadInput {
   title?: string
   status?: LeadStatus
   sentiment?: Sentiment
-  source?: string
+  source?: string[] // Changed to array for multiple tags
   notes?: string
   metadata?: Record<string, any>
 }
@@ -275,9 +275,11 @@ export interface PaginatedResponse<T> {
 
 export interface LeadFilters {
   status?: LeadStatus | LeadStatus[]
-  sentiment?: Sentiment
+  sentiment?: Sentiment | Sentiment[]
   search?: string
-  source?: string
+  source?: string[] // Changed to array for multi-tag filtering
+  sortBy?: 'name' | 'company' | 'created_at' | 'last_contact_at' | 'status'
+  sortOrder?: 'asc' | 'desc'
 }
 
 export interface TaskFilters {

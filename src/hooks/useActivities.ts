@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import * as activitiesApi from '@/lib/api/activities'
-import type { Activity, CreateActivityInput, ActivityFilters } from '@/types/crm'
+import type { CreateActivityInput, ActivityFilters } from '@/types/crm'
 
 /**
  * Hook to fetch activities for a specific lead
@@ -75,7 +75,7 @@ export function useDeleteActivity() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ activityId, leadId }: { activityId: string; leadId: string }) =>
+    mutationFn: ({ activityId }: { activityId: string; leadId: string }) =>
       activitiesApi.deleteActivity(activityId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['activities', variables.leadId] })
