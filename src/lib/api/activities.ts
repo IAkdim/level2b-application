@@ -143,3 +143,59 @@ export async function getRecentActivities(
 
   return data || []
 }
+
+/**
+ * Get organization activities with advanced filtering
+ * Used for the org-wide activities page
+ */
+export async function getOrgActivities(
+  orgId: string,
+  filters?: {
+    type?: string[]
+    userId?: string
+    dateFrom?: string
+    limit?: number
+  }
+): Promise<Activity[]> {
+  let query = supabase
+    .from('activities')
+    .select(`
+      *,
+      lead:lead_id (
+        id,
+        name,
+        email,
+        company
+      ),
+      creator:created_by (
+        id,
+        full_name,
+        email
+      )
+    `)
+    .eq('org_id', orgId)
+
+  // Apply filters
+  if (filters?.type && filters.type.length > 0) {
+    query = query.in('type', filters.type)
+  }
+
+  if (filters?.userId) {
+    query = query.eq('created_by', filters.userId)
+  }
+
+  if (filters?.dateFrom) {
+    query = query.gte('created_at', filters.dateFrom)
+  }
+
+  // Order and limit
+  query = query
+    .order('created_at', { ascending: false })
+    .limit(filters?.limit || 50)
+
+  const { data, error } = await query
+
+  if (error) throw error
+
+  return data || []
+}

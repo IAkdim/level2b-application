@@ -5,18 +5,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Upload, Search, Plus, Mail, Calendar, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useLeads, useLeadStats, useDeleteLead } from "@/hooks/useLeads"
+import { useLeads, useDeleteLead } from "@/hooks/useLeads"
 import { useDebounce } from "@/hooks/useDebounce"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
+import { ImportCSVDialog } from "@/components/ImportCSVDialog"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
 
@@ -31,6 +32,7 @@ export function Leads() {
   const [sortBy, setSortBy] = useState<SortColumn>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
 
   // Debounce search to avoid excessive API calls
@@ -45,9 +47,6 @@ export function Leads() {
     sortBy,
     sortOrder
   })
-
-  // Fetch lead stats
-  const { data: stats } = useLeadStats()
 
   // Delete mutation
   const deleteLead = useDeleteLead()
@@ -127,7 +126,7 @@ export function Leads() {
               </p>
             </div>
             <div className="flex space-x-3">
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV
               </Button>
@@ -136,46 +135,6 @@ export function Leads() {
                 Add Lead
               </Button>
             </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-                <User className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.total || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contacted</CardTitle>
-                <Mail className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.by_status?.contacted || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Replied</CardTitle>
-                <Mail className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.by_status?.replied || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Meetings</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.by_status?.meeting_scheduled || 0}</div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Leads Table */}
@@ -357,6 +316,9 @@ export function Leads() {
 
           {/* Add Lead Dialog */}
           <AddLeadDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
+
+          {/* Import CSV Dialog */}
+          <ImportCSVDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
 
           {/* Edit Lead Dialog */}
           <EditLeadDialog

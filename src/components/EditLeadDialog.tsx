@@ -62,7 +62,8 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
       resetSources(lead.source || [])
       setNotes(lead.notes || "")
     }
-  }, [lead, resetSources])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
