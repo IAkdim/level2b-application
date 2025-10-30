@@ -224,3 +224,84 @@ export async function getLeadStats(orgId: string) {
     by_status: byStatus
   }
 }
+
+/**
+ * Check which emails already exist in the organization
+ */
+export async function checkExistingEmails(
+  orgId: string,
+  emails: string[]
+): Promise<Map<string, string>> {
+  if (emails.length === 0) {
+    return new Map()
+  }
+
+  const { data, error } = await supabase
+    .from('leads')
+    .select('id, email')
+    .eq('org_id', orgId)
+    .in('email', emails)
+
+  if (error) throw error
+
+  // Return map of email -> lead id
+  const existingEmails = new Map<string, string>()
+  data?.forEach(lead => {
+    existingEmails.set(lead.email.toLowerCase(), lead.id)
+  })
+
+  return existingEmails
+}
+
+/**
+ * Create or update a lead (upsert by email within organization)
+ */
+export async function upsertLead(
+  orgId: string,
+  input: CreateLeadInput,
+  existingLeadId?: string
+): Promise<{ lead: Lead; wasUpdate: boolean; oldLead?: Lead }> {
+  // If we have an existing lead ID, update it
+  if (existingLeadId) {
+    // First, fetch the old lead data for comparison
+    const { data: oldData, error: fetchError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('id', existingLeadId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Then update
+    const { data, error } = await supabase
+      .from('leads')
+      .update({
+        ...input,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingLeadId)
+      .select()
+      .single()
+
+    if (error) throw error
+    if (!data) throw new Error('Failed to update lead')
+
+    return { lead: data, wasUpdate: true, oldLead: oldData }
+  }
+
+  // Otherwise, create new lead
+  const { data, error } = await supabase
+    .from('leads')
+    .insert({
+      org_id: orgId,
+      ...input,
+      status: input.status || 'new',
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new Error('Failed to create lead')
+
+  return { lead: data, wasUpdate: false }
+}

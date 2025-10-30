@@ -82,3 +82,24 @@ export function useDeleteActivity() {
     },
   })
 }
+
+/**
+ * Hook to fetch organization-wide activities with filters
+ */
+export function useOrgActivities(filters?: {
+  type?: string[]
+  userId?: string
+  dateFrom?: string
+  limit?: number
+}) {
+  const { selectedOrg } = useOrganization()
+
+  return useQuery({
+    queryKey: ['org-activities', selectedOrg?.id, filters],
+    queryFn: () => {
+      if (!selectedOrg) throw new Error('No organization selected')
+      return activitiesApi.getOrgActivities(selectedOrg.id, filters)
+    },
+    enabled: !!selectedOrg,
+  })
+}

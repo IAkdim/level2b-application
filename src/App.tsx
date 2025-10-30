@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext"
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
 const Leads = lazy(() => import("@/pages/Leads").then(m => ({ default: m.Leads })))
 const LeadDetail = lazy(() => import("@/pages/LeadDetail").then(m => ({ default: m.LeadDetail })))
+const Activities = lazy(() => import("@/pages/Activities").then(m => ({ default: m.Activities })))
 const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ default: m.EmailThreads })))
 const Templates = lazy(() => import("@/pages/Templates").then(m => ({ default: m.Templates })))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
@@ -75,6 +76,7 @@ function App() {
                               <Route path="email-threads" element={<EmailThreads />} />
                               <Route path="templates" element={<Templates />} />
                             </Route>
+                            <Route path="/activities" element={<Activities />} />
                             <Route path="/meetings" element={<Meetings />} />
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/configuration" element={<Configuration />} />

@@ -1,0 +1,5 @@
+name,email,phone,company,title,status,sentiment,source,notes
+John Doe,john.doe@example.com,+1234567890,Acme Inc,CEO,new,positive,linkedin,Great prospect from conference
+Jane Smith,jane.smith@techcorp.com,,TechCorp,CTO,contacted,neutral,"referral,linkedin",Follow up next week
+Bob Johnson,bob@startup.io,+0987654321,StartupIO,Founder,replied,positive,website,Very interested in demo
+Alice Williams,alice.w@bigco.com,,BigCo,VP Engineering,new,,"conference,email",Met at TechCon 2024

@@ -12,6 +12,7 @@ import {
   BookOpen,
   MessageSquare,
   Building2,
+  Activity,
 } from "lucide-react"
 import { eventBus } from "@/lib/eventBus"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/", icon: Home, shortcut: "⌘D" },
   { name: "Outreach", href: "/outreach/leads", icon: Users, shortcut: "⌘O" },
+  { name: "Activities", href: "/activities", icon: Activity, shortcut: "⌘T" },
   { name: "Meetings", href: "/meetings", icon: Calendar, shortcut: "⌘M", badge: 2 },
   { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "⌘A" },
   { name: "Organization", href: "/organization", icon: Building2, shortcut: "⌘G" },
