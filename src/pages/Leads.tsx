@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,7 @@ import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
 import { ImportCSVDialog } from "@/components/ImportCSVDialog"
+import { BulkEmailDialog } from "@/components/BulkEmailDialog"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
 
@@ -33,7 +35,9 @@ export function Leads() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showBulkEmailDialog, setShowBulkEmailDialog] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
 
   // Debounce search to avoid excessive API calls
   const debouncedSearch = useDebounce(searchTerm, 300)
@@ -101,6 +105,34 @@ export function Leads() {
     setEditingLead(lead)
   }
 
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeads((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId)
+      } else {
+        newSet.add(leadId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllLeads = () => {
+    if (selectedLeads.size === leads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(leads.map((l) => l.id)))
+    }
+  }
+
+  const getSelectedLeadsData = (): Lead[] => {
+    return leads.filter((lead) => selectedLeads.has(lead.id))
+  }
+
+  const clearSelection = () => {
+    setSelectedLeads(new Set())
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left Sidebar - Filters */}
@@ -126,6 +158,16 @@ export function Leads() {
               </p>
             </div>
             <div className="flex space-x-3">
+              {selectedLeads.size > 0 && (
+                <Button
+                  variant="default"
+                  onClick={() => setShowBulkEmailDialog(true)}
+                  className="bg-primary"
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV
@@ -146,6 +188,20 @@ export function Leads() {
                   <CardDescription className="mt-1">
                     {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
                     {searchTerm && ' matching your search'}
+                    {selectedLeads.size > 0 && (
+                      <span className="ml-2">
+                        · {selectedLeads.size} geselecteerd
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearSelection}
+                          className="ml-2 h-6 px-2 text-xs"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Wis selectie
+                        </Button>
+                      </span>
+                    )}
                   </CardDescription>
                 </div>
                 {/* Search */}
@@ -185,6 +241,13 @@ export function Leads() {
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent border-border/40">
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={selectedLeads.size === leads.length && leads.length > 0}
+                            onCheckedChange={toggleAllLeads}
+                            aria-label="Selecteer alle leads"
+                          />
+                        </TableHead>
                         <TableHead className="font-semibold">
                           <button
                             onClick={() => handleSort('name')}
@@ -232,6 +295,13 @@ export function Leads() {
                           className="cursor-pointer hover:bg-muted/30 transition-colors border-border/30"
                           onClick={() => navigate(`/outreach/leads/${lead.id}`)}
                         >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedLeads.has(lead.id)}
+                              onCheckedChange={() => toggleLeadSelection(lead.id)}
+                              aria-label={`Selecteer ${lead.name}`}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
                               <span className="font-medium">{lead.name}</span>
@@ -325,6 +395,13 @@ export function Leads() {
             open={!!editingLead}
             onOpenChange={(open) => !open && setEditingLead(null)}
             lead={editingLead}
+          />
+
+          {/* Bulk Email Dialog */}
+          <BulkEmailDialog
+            open={showBulkEmailDialog}
+            onOpenChange={setShowBulkEmailDialog}
+            selectedLeads={getSelectedLeadsData()}
           />
         </div>
       </div>

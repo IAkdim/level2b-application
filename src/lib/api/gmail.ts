@@ -23,7 +23,7 @@ interface GmailMessage {
   internalDate: string
 }
 
-interface Email {
+export interface Email {
   id: string
   threadId: string
   from: string
@@ -39,14 +39,37 @@ interface Email {
  * Haal de Gmail access token op van de huidige gebruiker
  */
 async function getGmailAccessToken(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession()
-  
-  if (!session?.provider_token) {
-    console.error("Geen provider token gevonden. Gebruiker moet opnieuw inloggen.")
-    return null
+  try {
+    console.log("Getting Gmail access token...");
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.error("Error getting session:", error);
+      return null;
+    }
+    
+    if (!session) {
+      console.error("No session found");
+      return null;
+    }
+    
+    console.log("Session found, checking for provider_token...");
+    
+    if (!session.provider_token) {
+      console.error("No provider_token in session. User needs to re-authenticate with Google.");
+      console.log("Session data:", { 
+        user: session.user?.email,
+        provider: session.user?.app_metadata?.provider 
+      });
+      return null
+    }
+    
+    console.log("Provider token found successfully");
+    return session.provider_token
+  } catch (error) {
+    console.error("Exception in getGmailAccessToken:", error);
+    return null;
   }
-  
-  return session.provider_token
 }
 
 /**
@@ -119,9 +142,44 @@ export async function getEmailsByLabel(
       throw new Error("Niet geautoriseerd. Log opnieuw in.")
     }
     
-    // Stap 1: Haal message IDs op met het label
+    console.log("Fetching emails with label:", labelName);
+    
+    // Bereken datum van 24 uur geleden
+    const afterDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+    
+    // Stap 1: Zoek eerst het label ID op basis van de naam
+    const labelsResponse = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    )
+    
+    if (!labelsResponse.ok) {
+      const error = await labelsResponse.json()
+      throw new Error(`Gmail API error: ${error.error?.message || 'Unknown error'}`)
+    }
+    
+    const labelsData = await labelsResponse.json()
+    const matchingLabel = labelsData.labels.find(
+      (label: { name: string; id: string }) => 
+        label.name.toLowerCase() === labelName.toLowerCase()
+    )
+    
+    if (!matchingLabel) {
+      console.log(`Label "${labelName}" not found in Gmail labels.`);
+      return []
+    }
+    
+    console.log(`Found label "${labelName}" with ID:`, matchingLabel.id);
+    
+    // Stap 2: Haal message IDs op met het label (laatste 24 uur)
+    const query = encodeURIComponent(`after:${afterTimestamp}`)
     const listResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${labelName}&maxResults=${maxResults}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${matchingLabel.id}&q=${query}&maxResults=${maxResults}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -135,12 +193,13 @@ export async function getEmailsByLabel(
     }
     
     const listData = await listResponse.json()
+    console.log("Gmail API found messages:", listData.messages?.length || 0);
     
     if (!listData.messages || listData.messages.length === 0) {
       return []
     }
     
-    // Stap 2: Haal details op voor elke message
+    // Stap 3: Haal details op voor elke message
     const emailPromises = listData.messages.map(async (msg: { id: string }) => {
       const detailResponse = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
@@ -177,8 +236,21 @@ export async function getEmailsByLabel(
     
     const emails = await Promise.all(emailPromises)
     
-    // Filter out null values (failed fetches)
-    return emails.filter((email): email is Email => email !== null)
+    // Filter out null values and remove duplicates by thread ID
+    const validEmails = emails.filter((email): email is Email => email !== null)
+    
+    // Remove duplicates: keep only the latest email per thread
+    const uniqueThreads = new Map<string, Email>();
+    validEmails.forEach(email => {
+      const existing = uniqueThreads.get(email.threadId);
+      if (!existing || email.date > existing.date) {
+        uniqueThreads.set(email.threadId, email);
+      }
+    });
+    
+    const result = Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+    console.log("Returning unique emails:", result.length);
+    return result;
     
   } catch (error) {
     console.error("Error fetching emails:", error)
@@ -205,11 +277,11 @@ export async function getUnreadEmailsByLabel(
       throw new Error("Niet geautoriseerd. Log opnieuw in.")
     }
     
-    // Stap 1: Haal ongelezen message IDs op met het label
-    // Gebruik 'q' parameter voor search query: is:unread
-    const query = encodeURIComponent(`is:unread label:${labelName}`)
-    const listResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxResults}`,
+    console.log("Fetching unread emails with label:", labelName);
+    
+    // Stap 1: Zoek eerst het label ID op basis van de naam
+    const labelsResponse = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -217,14 +289,45 @@ export async function getUnreadEmailsByLabel(
       }
     )
     
+    if (!labelsResponse.ok) {
+      const error = await labelsResponse.json()
+      throw new Error(`Gmail API error: ${error.error?.message || 'Unknown error'}`)
+    }
+    
+    const labelsData = await labelsResponse.json()
+    const matchingLabel = labelsData.labels.find(
+      (label: { name: string; id: string }) => 
+        label.name.toLowerCase() === labelName.toLowerCase()
+    )
+    
+    if (!matchingLabel) {
+      console.log(`Label "${labelName}" not found in Gmail labels.`);
+      return []
+    }
+    
+    console.log(`Found label "${labelName}" with ID:`, matchingLabel.id);
+    
+    // Stap 2: Haal ongelezen message IDs op met het label
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${matchingLabel.id}&maxResults=${maxResults}`;
+    console.log("Gmail API URL:", url);
+    
+    const listResponse = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+    
     if (!listResponse.ok) {
       const error = await listResponse.json()
+      console.error("Gmail API error response:", error);
       throw new Error(`Gmail API error: ${error.error?.message || 'Unknown error'}`)
     }
     
     const listData = await listResponse.json()
+    console.log("Gmail API found messages:", listData.messages?.length || 0);
     
     if (!listData.messages || listData.messages.length === 0) {
+      console.log("No messages found with label:", labelName);
       return []
     }
     
@@ -390,15 +493,26 @@ export async function sendEmail(
   isHtml: boolean = false
 ): Promise<string | null> {
   try {
+    console.log("sendEmail called with:", { to, subject: subject.substring(0, 50), labelName, isHtml });
+    
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
+      console.error("No access token available");
       throw new Error("Niet geautoriseerd. Log opnieuw in.")
     }
+    
+    console.log("Access token retrieved successfully");
     
     // Haal huidige gebruiker email op
     const { data: { user } } = await supabase.auth.getUser()
     const fromEmail = user?.email || ""
+    
+    console.log("Sending from:", fromEmail);
+    
+    if (!fromEmail) {
+      throw new Error("Kan afzender email niet bepalen. Log opnieuw in.")
+    }
     
     // Maak email in RFC 2822 format
     const emailLines = [
@@ -418,6 +532,8 @@ export async function sendEmail(
       .replace(/\//g, '_')
       .replace(/=+$/, '')
     
+    console.log("Email encoded, sending to Gmail API...");
+    
     // Verstuur de email
     const response = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
@@ -433,16 +549,22 @@ export async function sendEmail(
       }
     )
     
+    console.log("Gmail API response status:", response.status);
+    
     if (!response.ok) {
       const error = await response.json()
+      console.error("Gmail API error:", error);
       throw new Error(`Gmail API error: ${error.error?.message || 'Unknown error'}`)
     }
     
     const data = await response.json()
     const messageId = data.id
     
+    console.log("Email sent successfully, message ID:", messageId);
+    
     // Voeg label toe indien opgegeven
     if (labelName && messageId) {
+      console.log("Adding label to message:", labelName);
       // Eerst checken of label bestaat, anders aanmaken
       const labelId = await ensureLabelExists(labelName)
       
@@ -455,7 +577,7 @@ export async function sendEmail(
     return messageId
     
   } catch (error) {
-    console.error("Error sending email:", error)
+    console.error("Error in sendEmail:", error)
     throw error
   }
 }
@@ -478,9 +600,14 @@ export async function sendBatchEmails(
   try {
     const messageIds: string[] = []
     
+    console.log(`Starting batch send of ${emails.length} emails with label: ${labelName || 'none'}`);
+    
     // Verstuur emails sequentieel om rate limiting te voorkomen
-    for (const email of emails) {
+    for (let i = 0; i < emails.length; i++) {
+      const email = emails[i];
       try {
+        console.log(`Sending email ${i + 1}/${emails.length} to ${email.to}`);
+        
         const messageId = await sendEmail(
           email.to,
           email.subject,
@@ -491,21 +618,26 @@ export async function sendBatchEmails(
         
         if (messageId) {
           messageIds.push(messageId)
-          console.log(`Email verzonden naar ${email.to}`)
+          console.log(`✓ Email verzonden naar ${email.to}, message ID: ${messageId}`)
+        } else {
+          console.error(`✗ Email naar ${email.to} returned null message ID`)
         }
         
         // Kleine delay tussen emails om rate limiting te voorkomen
         await new Promise(resolve => setTimeout(resolve, 100))
         
       } catch (error) {
-        console.error(`Failed to send email to ${email.to}:`, error)
+        console.error(`✗ Failed to send email to ${email.to}:`, error)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`  Error details: ${errorMessage}`);
       }
     }
     
+    console.log(`Batch send completed: ${messageIds.length} successful, ${emails.length - messageIds.length} failed`);
     return messageIds
     
   } catch (error) {
-    console.error("Error sending batch emails:", error)
+    console.error("Error in sendBatchEmails:", error)
     throw error
   }
 }
@@ -682,8 +814,16 @@ export async function getRepliesByLabel(
       throw new Error("Niet geautoriseerd. Log opnieuw in.")
     }
     
+    // Haal huidige gebruiker email op
+    const { data: { user } } = await supabase.auth.getUser()
+    const myEmail = user?.email?.toLowerCase() || ""
+    
+    console.log("Getting replies for label:", labelName, "My email:", myEmail);
+    
     // Haal eerst alle emails met het label op
     const labeledEmails = await getEmailsByLabel(labelName, 100)
+    
+    console.log("Found labeled emails:", labeledEmails.length);
     
     if (labeledEmails.length === 0) {
       return []
@@ -692,27 +832,54 @@ export async function getRepliesByLabel(
     // Haal alle threads op voor deze emails
     const threadIds = [...new Set(labeledEmails.map(e => e.threadId))]
     
+    console.log("Checking threads:", threadIds.length);
+    
     const allReplies: Email[] = []
     
     for (const threadId of threadIds) {
       const threadEmails = await getEmailThread(threadId)
       
-      // Filter alleen de reacties (niet de originele email)
-      // Reacties zijn emails die niet het opgegeven label hebben
+      console.log(`Thread ${threadId}: ${threadEmails.length} emails`);
+      
+      // Filter alleen INKOMENDE reacties (niet van jou verstuurd)
       const replies = threadEmails.filter(email => {
         const hasLabel = email.labelIds.includes(labelName)
         const isUnread = email.labelIds.includes('UNREAD')
+        const isSentByMe = email.from.toLowerCase().includes(myEmail)
+        const isInbox = email.labelIds.includes('INBOX')
         
-        // Neem emails die niet het originele label hebben (dus reacties zijn)
-        // En als onlyUnread true is, alleen ongelezen emails
-        return !hasLabel && (!onlyUnread || isUnread)
+        // Een reply is:
+        // 1. NIET het originele email met het label
+        // 2. NIET van jou verstuurd (check from address)
+        // 3. IN je inbox (dus ontvangen)
+        // 4. Optioneel: alleen ongelezen
+        const isReply = !hasLabel && !isSentByMe && isInbox && (!onlyUnread || isUnread)
+        
+        if (isReply) {
+          console.log(`✓ Reply found from ${email.from} in thread ${threadId}`);
+        }
+        
+        return isReply
       })
       
       allReplies.push(...replies)
     }
     
+    console.log("Total replies found:", allReplies.length);
+    
     // Sorteer op datum (nieuwste eerst)
-    return allReplies.sort((a, b) => b.date.getTime() - a.date.getTime())
+    const sortedReplies = allReplies.sort((a, b) => b.date.getTime() - a.date.getTime())
+    
+    // Remove duplicates: keep only the latest email per thread
+    const uniqueThreads = new Map<string, Email>();
+    sortedReplies.forEach(email => {
+      const existing = uniqueThreads.get(email.threadId);
+      if (!existing || email.date > existing.date) {
+        uniqueThreads.set(email.threadId, email);
+      }
+    });
+    
+    return Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
     
   } catch (error) {
     console.error("Error fetching replies by label:", error)
