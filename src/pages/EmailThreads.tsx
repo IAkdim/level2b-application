@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Mail, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, type Email } from "@/lib/api/gmail";
 import { formatRelativeTime } from "@/lib/utils/formatters";
 
@@ -22,23 +22,13 @@ export function EmailThreads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"sent" | "responses">("responses");
   const [showFilters, setShowFilters] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Fetch available labels on mount
   useEffect(() => {
     loadLabels();
   }, []);
-
-  // Auto-refresh every 5 minutes
-  useEffect(() => {
-    if (!autoRefreshEnabled || !selectedLabel) return;
-
-    const interval = setInterval(() => {
-      handleRefresh(true); // Silent refresh
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval);
-  }, [autoRefreshEnabled, selectedLabel]);
 
   // Load emails when label is selected
   useEffect(() => {
@@ -92,17 +82,13 @@ export function EmailThreads() {
     }
   };
 
-  const handleRefresh = async (silent: boolean = false) => {
-    if (!silent) {
-      setIsRefreshing(true);
-    }
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
     
     try {
       await loadEmails();
     } finally {
-      if (!silent) {
-        setIsRefreshing(false);
-      }
+      setIsRefreshing(false);
     }
   };
 
@@ -127,6 +113,16 @@ export function EmailThreads() {
     notInterested: replies.filter(r => r.sentiment?.sentiment === 'not_interested').length,
   };
 
+  const handleEmailClick = (email: Email) => {
+    setSelectedEmail(email);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setTimeout(() => setSelectedEmail(null), 200); // Clear after animation
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -143,23 +139,11 @@ export function EmailThreads() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {/* Auto-refresh toggle */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="auto-refresh"
-              checked={autoRefreshEnabled}
-              onCheckedChange={(checked) => setAutoRefreshEnabled(checked as boolean)}
-            />
-            <Label htmlFor="auto-refresh" className="text-sm cursor-pointer">
-              Auto-refresh (5 min)
-            </Label>
-          </div>
-          
           {/* Refresh button */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleRefresh(false)}
+            onClick={handleRefresh}
             disabled={isRefreshing || isLoading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -336,7 +320,11 @@ export function EmailThreads() {
               ) : (
                 <div className="space-y-4">
                   {filteredSent.map((email) => (
-                    <div key={email.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                    <div 
+                      key={email.id} 
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleEmailClick(email)}
+                    >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
@@ -397,7 +385,11 @@ export function EmailThreads() {
               ) : (
                 <div className="space-y-4">
                   {filteredReplies.map((email) => (
-                    <div key={email.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                    <div 
+                      key={email.id} 
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleEmailClick(email)}
+                    >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
@@ -453,6 +445,134 @@ export function EmailThreads() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Email Detail Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedEmail && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl">{selectedEmail.subject}</DialogTitle>
+                <DialogDescription className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-foreground">Van:</span>
+                        <span className="text-foreground">{selectedEmail.from}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-foreground">Aan:</span>
+                        <span className="text-foreground">{selectedEmail.to}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-foreground">Datum:</span>
+                        <span className="text-foreground">{selectedEmail.date.toLocaleString('nl-NL', { 
+                          dateStyle: 'long', 
+                          timeStyle: 'short' 
+                        })}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end space-y-2">
+                      {selectedEmail.sentiment && (
+                        <Badge 
+                          variant={
+                            selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
+                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                            'destructive'
+                          }
+                          className="text-sm"
+                        >
+                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
+                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
+                           '🔴 Niet Geïnteresseerd'}
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        Thread ID: {selectedEmail.threadId}
+                      </span>
+                    </div>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-6 space-y-6">
+                {/* Email Body */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Bericht</h3>
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="prose prose-sm max-w-none whitespace-pre-wrap">
+                      {selectedEmail.body || selectedEmail.snippet}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Sentiment Analysis */}
+                {selectedEmail.sentiment && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">AI Sentiment Analyse</h3>
+                    
+                    {selectedEmail.sentiment.error ? (
+                      <div className="border border-red-200 rounded-lg p-4 bg-red-50 dark:bg-red-950/20">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">Analyse Mislukt</h4>
+                            <p className="text-sm text-red-700 dark:text-red-300">{selectedEmail.sentiment.error}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="border rounded-lg p-4 bg-muted/30">
+                            <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
+                            <div className="text-2xl font-bold">
+                              {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
+                               selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
+                               '🔴 Niet Geïnteresseerd'}
+                            </div>
+                          </div>
+                          <div className="border rounded-lg p-4 bg-muted/30">
+                            <div className="text-xs text-muted-foreground mb-1">Zekerheid</div>
+                            <div className="text-2xl font-bold">
+                              {Math.round(selectedEmail.sentiment.confidence * 100)}%
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="border rounded-lg p-4 bg-muted/30">
+                          <div className="text-xs text-muted-foreground mb-2 font-semibold">AI Redenering</div>
+                          <p className="text-sm leading-relaxed">
+                            {selectedEmail.sentiment.reasoning}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Labels */}
+                {selectedEmail.labelIds && selectedEmail.labelIds.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Labels</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedEmail.labelIds.map((labelId) => (
+                        <Badge key={labelId} variant="outline" className="text-xs">
+                          {labelId}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <Button onClick={handleCloseDialog}>Sluiten</Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
