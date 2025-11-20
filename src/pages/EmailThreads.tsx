@@ -120,6 +120,13 @@ export function EmailThreads() {
   const filteredReplies = filterEmails(replies);
   const filteredSent = filterEmails(sentEmails);
 
+  // Calculate sentiment statistics
+  const sentimentStats = {
+    positive: replies.filter(r => r.sentiment?.sentiment === 'positive').length,
+    doubtful: replies.filter(r => r.sentiment?.sentiment === 'doubtful').length,
+    notInterested: replies.filter(r => r.sentiment?.sentiment === 'not_interested').length,
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -241,15 +248,17 @@ export function EmailThreads() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Totaal Threads</CardTitle>
+            <CardTitle className="text-sm font-medium">Sentiment</CardTitle>
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {new Set([...sentEmails.map(e => e.threadId), ...replies.map(e => e.threadId)]).size}
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg font-bold">🟢 {sentimentStats.positive}</span>
+              <span className="text-lg font-bold">🟡 {sentimentStats.doubtful}</span>
+              <span className="text-lg font-bold">🔴 {sentimentStats.notInterested}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Unieke conversaties
+            <p className="text-xs text-muted-foreground">
+              AI sentiment analyse
             </p>
           </CardContent>
         </Card>
@@ -396,14 +405,43 @@ export function EmailThreads() {
                             <Badge variant="success" className="text-xs">
                               Nieuwe Reactie
                             </Badge>
+                            {email.sentiment && (
+                              <Badge 
+                                variant={
+                                  email.sentiment.sentiment === 'positive' ? 'default' :
+                                  email.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                                  'destructive'
+                                }
+                                className="text-xs"
+                              >
+                                {email.sentiment.sentiment === 'positive' ? '🟢 Positief' :
+                                 email.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
+                                 '🔴 Niet Geïnteresseerd'}
+                              </Badge>
+                            )}
                           </div>
                           <p className="font-medium text-sm mb-1">{email.subject}</p>
                           <p className="text-sm text-muted-foreground mb-2 line-clamp-3">
                             {email.snippet}
                           </p>
+                          {email.sentiment && (
+                            <>
+                              <p className="text-xs text-muted-foreground italic mb-2">
+                                AI Analyse: {email.sentiment.reasoning}
+                              </p>
+                              {email.sentiment.error && (
+                                <p className="text-xs text-red-500 mb-2">
+                                  ⚠️ Error: {email.sentiment.error}
+                                </p>
+                              )}
+                            </>
+                          )}
                           <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                             <span>{formatRelativeTime(email.date.toISOString())}</span>
                             <span>Thread ID: {email.threadId.substring(0, 8)}...</span>
+                            {email.sentiment && !email.sentiment.error && (
+                              <span>Zekerheid: {Math.round(email.sentiment.confidence * 100)}%</span>
+                            )}
                           </div>
                         </div>
                       </div>

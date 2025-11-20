@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient"
+import { analyzeSentiment, type EmailSentiment, type SentimentAnalysis } from "./claude-secure"
 
 interface GmailMessage {
   id: string
@@ -33,6 +34,7 @@ export interface Email {
   body: string
   date: Date
   labelIds: string[]
+  sentiment?: SentimentAnalysis
 }
 
 /**
@@ -801,11 +803,13 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
  * Haal alle reacties op emails met een specifiek label
  * @param labelName - Label naam om reacties voor op te halen
  * @param onlyUnread - Alleen ongelezen reacties ophalen (standaard true)
+ * @param analyzeSentiments - Voer sentiment analyse uit op reacties (standaard true)
  * @returns Array van emails die reacties zijn op gelabelde emails
  */
 export async function getRepliesByLabel(
   labelName: string,
-  onlyUnread: boolean = true
+  onlyUnread: boolean = true,
+  analyzeSentiments: boolean = true
 ): Promise<Email[]> {
   try {
     const accessToken = await getGmailAccessToken()
@@ -879,11 +883,60 @@ export async function getRepliesByLabel(
       }
     });
     
-    return Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+    const uniqueReplies = Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    // Voer sentiment analyse uit als gewenst
+    if (analyzeSentiments && uniqueReplies.length > 0) {
+      console.log(`Analyzing sentiment for ${uniqueReplies.length} replies...`);
+      
+      for (const reply of uniqueReplies) {
+        try {
+          const sentiment = await analyzeSentiment(reply.body, reply.subject);
+          reply.sentiment = sentiment;
+          
+          // Voeg sentiment label toe aan email in Gmail
+          await addSentimentLabel(reply.id, sentiment.sentiment);
+          
+          console.log(`✓ Sentiment analyzed for email ${reply.id}: ${sentiment.sentiment} (${sentiment.confidence})`);
+        } catch (error) {
+          console.error(`Failed to analyze sentiment for email ${reply.id}:`, error);
+        }
+      }
+    }
+    
+    return uniqueReplies;
     
   } catch (error) {
     console.error("Error fetching replies by label:", error)
     throw error
+  }
+}
+
+/**
+ * Voeg een sentiment label toe aan een email
+ * @param messageId - ID van het bericht
+ * @param sentiment - Het sentiment om als label toe te voegen
+ */
+async function addSentimentLabel(messageId: string, sentiment: EmailSentiment): Promise<void> {
+  try {
+    // Map sentiment naar label namen
+    const labelMap: Record<EmailSentiment, string> = {
+      'not_interested': '🔴 Niet Geïnteresseerd',
+      'doubtful': '🟡 Twijfelend',
+      'positive': '🟢 Positief'
+    };
+    
+    const labelName = labelMap[sentiment];
+    
+    // Zorg ervoor dat label bestaat
+    const labelId = await ensureLabelExists(labelName);
+    
+    if (labelId) {
+      await addLabelToMessage(messageId, labelId);
+      console.log(`Sentiment label '${labelName}' toegevoegd aan email ${messageId}`);
+    }
+  } catch (error) {
+    console.error("Error adding sentiment label:", error);
   }
 }
 
