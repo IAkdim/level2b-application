@@ -2,7 +2,6 @@
 
 export type LeadStatus = 'new' | 'contacted' | 'replied' | 'meeting_scheduled' | 'closed' | 'lost'
 export type Sentiment = 'positive' | 'neutral' | 'negative'
-export type ActivityType = 'email' | 'call' | 'meeting' | 'note' | 'status_change' | 'task'
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost'
@@ -60,42 +59,6 @@ export interface UpdateLeadInput {
   source?: string[] // Changed to array for multiple tags
   notes?: string
   metadata?: Record<string, any>
-}
-
-// ============================================================================
-// ACTIVITY
-// ============================================================================
-export interface Activity {
-  id: string
-  org_id: string
-  lead_id: string
-
-  // Activity Details
-  type: ActivityType
-  subject?: string
-  content?: string
-  metadata?: Record<string, any>
-
-  // Timestamps
-  created_at: string
-  created_by?: string
-  scheduled_at?: string
-
-  // Joined data (not in DB)
-  creator?: {
-    id: string
-    full_name?: string
-    email?: string
-  }
-}
-
-export interface CreateActivityInput {
-  lead_id: string
-  type: ActivityType
-  subject?: string
-  content?: string
-  metadata?: Record<string, any>
-  scheduled_at?: string
 }
 
 // ============================================================================
@@ -289,11 +252,4 @@ export interface TaskFilters {
   lead_id?: string
   due_before?: string
   due_after?: string
-}
-
-export interface ActivityFilters {
-  type?: ActivityType | ActivityType[]
-  lead_id?: string
-  created_after?: string
-  created_before?: string
 }
