@@ -7,9 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Mail, RefreshCw, Loader2, AlertCircle } from "lucide-react";
-import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, type Email } from "@/lib/api/gmail";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles } from "lucide-react";
+import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, type Email } from "@/lib/api/gmail";
+import { generateSalesReply, type EmailReplyContext } from "@/lib/api/claude-secure";
 import { formatRelativeTime } from "@/lib/utils/formatters";
+import { toast } from "sonner";
 
 export function EmailThreads() {
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
@@ -24,6 +27,11 @@ export function EmailThreads() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isReplyDialogOpen, setIsReplyDialogOpen] = useState(false);
+  const [replySubject, setReplySubject] = useState("");
+  const [replyBody, setReplyBody] = useState("");
+  const [isGeneratingReply, setIsGeneratingReply] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   // Fetch available labels on mount
   useEffect(() => {
@@ -120,7 +128,88 @@ export function EmailThreads() {
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setTimeout(() => setSelectedEmail(null), 200); // Clear after animation
+    // Don't clear selectedEmail immediately, other dialogs might need it
+  };
+
+  const handleReplyClick = (email: Email) => {
+    console.log('Reply button clicked for email:', email.id);
+    setSelectedEmail(email);
+    setReplySubject(`Re: ${email.subject}`);
+    setReplyBody("");
+    setIsReplyDialogOpen(true);
+    console.log('Reply dialog should be open now');
+  };
+
+  const handleGenerateAIReply = async () => {
+    if (!selectedEmail) return;
+
+    setIsGeneratingReply(true);
+    try {
+      // Extract recipient name from email address
+      const fromMatch = selectedEmail.from.match(/<(.+)>/);
+      const recipientEmail = fromMatch ? fromMatch[1] : selectedEmail.from;
+      const recipientName = selectedEmail.from.split('<')[0].trim() || recipientEmail.split('@')[0];
+
+      const context: EmailReplyContext = {
+        recipientName,
+        recipientEmail,
+        originalSubject: selectedEmail.subject,
+        originalBody: selectedEmail.body || selectedEmail.snippet,
+        sentiment: selectedEmail.sentiment?.sentiment || 'doubtful',
+        companyName: 'jullie bedrijf',
+        productService: 'jullie dienstverlening',
+      };
+
+      const generatedReply = await generateSalesReply(context);
+
+      if (generatedReply.error) {
+        toast.error(`Fout bij genereren reply: ${generatedReply.error}`);
+        return;
+      }
+
+      setReplySubject(generatedReply.subject);
+      setReplyBody(generatedReply.body);
+      toast.success(`AI reply gegenereerd (${generatedReply.tone})`);
+    } catch (error) {
+      console.error('Error generating AI reply:', error);
+      toast.error('Fout bij genereren AI reply');
+    } finally {
+      setIsGeneratingReply(false);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedEmail || !replyBody.trim()) {
+      toast.error('Vul een bericht in om te versturen');
+      return;
+    }
+
+    setIsSendingReply(true);
+    try {
+      // Extract recipient email
+      const fromMatch = selectedEmail.from.match(/<(.+)>/);
+      const recipientEmail = fromMatch ? fromMatch[1] : selectedEmail.from;
+
+      await sendEmail(
+        recipientEmail,
+        replySubject,
+        replyBody,
+        selectedLabel // Add label to sent reply
+      );
+
+      toast.success(`Reply verzonden naar ${recipientEmail}`);
+      setIsReplyDialogOpen(false);
+      setReplyBody("");
+      setReplySubject("");
+      
+      // Refresh emails to show sent reply
+      await loadEmails();
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      toast.error('Fout bij versturen reply');
+    } finally {
+      setIsSendingReply(false);
+    }
   };
 
   return (
@@ -566,8 +655,145 @@ export function EmailThreads() {
                 )}
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    handleCloseDialog();
+                    handleReplyClick(selectedEmail);
+                  }}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Beantwoorden
+                </Button>
                 <Button onClick={handleCloseDialog}>Sluiten</Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reply Dialog */}
+      <Dialog open={isReplyDialogOpen} onOpenChange={setIsReplyDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedEmail && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Reply op email</DialogTitle>
+                <DialogDescription>
+                  <div className="space-y-1 mt-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-foreground">Aan:</span>
+                      <span className="text-foreground">{selectedEmail.from}</span>
+                    </div>
+                    {selectedEmail.sentiment && (
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-foreground">Sentiment:</span>
+                        <Badge 
+                          variant={
+                            selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
+                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                            'destructive'
+                          }
+                          className="text-xs"
+                        >
+                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
+                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
+                           '🔴 Niet Geïnteresseerd'}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-4">
+                {/* AI Generate Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateAIReply}
+                    disabled={isGeneratingReply}
+                  >
+                    {isGeneratingReply ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        AI genereert reply...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Genereer AI Reply
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Original Email Preview */}
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">ORIGINELE EMAIL</div>
+                  <div className="text-sm font-medium mb-1">{selectedEmail.subject}</div>
+                  <div className="text-sm text-muted-foreground line-clamp-3">
+                    {selectedEmail.body || selectedEmail.snippet}
+                  </div>
+                </div>
+
+                {/* Reply Form */}
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="reply-subject">Onderwerp</Label>
+                    <Input
+                      id="reply-subject"
+                      value={replySubject}
+                      onChange={(e) => setReplySubject(e.target.value)}
+                      placeholder="Re: ..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="reply-body">Bericht</Label>
+                    <Textarea
+                      id="reply-body"
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      placeholder="Schrijf je reply hier..."
+                      rows={12}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-between pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsReplyDialogOpen(false);
+                      setReplyBody("");
+                      setReplySubject("");
+                      setSelectedEmail(null);
+                    }}
+                    disabled={isSendingReply}
+                  >
+                    Annuleren
+                  </Button>
+                  <Button
+                    onClick={handleSendReply}
+                    disabled={isSendingReply || !replyBody.trim()}
+                  >
+                    {isSendingReply ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Versturen...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Verstuur Reply
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </>
           )}

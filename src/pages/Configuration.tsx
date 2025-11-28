@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings, Bell, Mail, Shield, Save, User } from "lucide-react"
+import { Settings, Bell, Mail, Shield, Save, User, Building2 } from "lucide-react"
 import { useTheme } from "@/contexts/ThemeContext"
+import { CompanySettingsForm } from "@/components/CompanySettingsForm"
 
 interface ConfigSection {
   id: string
@@ -17,6 +18,12 @@ interface ConfigSection {
 }
 
 const configSections: ConfigSection[] = [
+  {
+    id: "company",
+    title: "Bedrijfsinformatie",
+    description: "Info voor template generatie",
+    icon: Building2
+  },
   {
     id: "profile",
     title: "Profile Settings",
@@ -44,7 +51,7 @@ const configSections: ConfigSection[] = [
 ]
 
 export function Configuration() {
-  const [selectedSection, setSelectedSection] = useState("profile")
+  const [selectedSection, setSelectedSection] = useState("company")
   const { theme, setTheme } = useTheme()
   const [settings, setSettings] = useState({
     profile: {
@@ -484,6 +491,12 @@ export function Configuration() {
 
         {/* Settings Content - Remove cards, use sections */}
         <div className="lg:col-span-3">
+          <TabsContent value="company" className="mt-0">
+            <div className="space-y-6">
+              <CompanySettingsForm />
+            </div>
+          </TabsContent>
+
           <TabsContent value="profile" className="mt-0">
             <div className="space-y-6 bg-muted/30 rounded-lg p-8 border border-border/30">
               <div>
