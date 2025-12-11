@@ -129,11 +129,6 @@ export default function Templates() {
         calendlyLink: settings.calendly_link,
       })
 
-      if (result.error) {
-        toast.error(`Fout bij genereren: ${result.error}`)
-        return
-      }
-
       setGeneratedTemplate(result)
       setTemplateName(result.templateName)
       setTemplateSubject(result.subject)
@@ -142,7 +137,11 @@ export default function Templates() {
       toast.success('Template gegenereerd!')
     } catch (error) {
       console.error('Error generating template:', error)
-      toast.error('Fout bij genereren van template')
+      const errorMessage = error instanceof Error ? error.message : 'Onbekende fout bij genereren'
+      toast.error(errorMessage, {
+        duration: 6000,
+        description: 'Check de console voor meer details'
+      })
     } finally {
       setIsGenerating(false)
     }

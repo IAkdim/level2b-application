@@ -47,11 +47,27 @@ Deno.serve(async (req) => {
     if (!companyInfo.targetAudience) missingFields.push('targetAudience')
     
     if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
+      return new Response(
+        JSON.stringify({
+          error: `Verplichte velden ontbreken: ${missingFields.join(', ')}. Vul deze in via Configuratie > Bedrijfsinformatie.`,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     if (!CLAUDE_API_KEY) {
-      throw new Error('CLAUDE_API_KEY not configured')
+      return new Response(
+        JSON.stringify({
+          error: 'AI functionaliteit is niet geconfigureerd. Neem contact op met je administrator om de CLAUDE_API_KEY in te stellen in Supabase Edge Function secrets.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     // Build USPs string
@@ -134,7 +150,28 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Claude API error:', errorText)
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`)
+      
+      let errorMessage = 'AI service niet bereikbaar. '
+      
+      if (response.status === 401) {
+        errorMessage += 'API key is ongeldig of verlopen. Vernieuw de CLAUDE_API_KEY in Supabase secrets.'
+      } else if (response.status === 429) {
+        errorMessage += 'Te veel verzoeken. Probeer het later opnieuw.'
+      } else if (response.status === 400) {
+        errorMessage += 'Ongeldig verzoek naar AI service. Check je bedrijfsinformatie.'
+      } else {
+        errorMessage += `Status ${response.status}. Check Supabase logs voor details.`
+      }
+      
+      return new Response(
+        JSON.stringify({
+          error: errorMessage,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     const data = await response.json()
@@ -207,7 +244,16 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
       console.error('Attempted to parse:', claudeResponse.substring(0, 500))
-      throw new Error('Failed to parse Claude response as JSON')
+      
+      return new Response(
+        JSON.stringify({
+          error: 'AI response kon niet worden verwerkt. De AI heeft een ongeldig formaat teruggestuurd. Probeer het opnieuw.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     return new Response(JSON.stringify(result), {
@@ -216,16 +262,11 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
   } catch (error) {
     console.error('Error in generate-cold-email-template function:', error)
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = error instanceof Error ? error.message : 'Onbekende fout'
     
     return new Response(
       JSON.stringify({
-        templateName: '',
-        subject: '',
-        body: '',
-        tone: '',
-        targetSegment: '',
-        error: errorMessage,
+        error: `Template generatie mislukt: ${errorMessage}. Check Supabase logs voor meer details.`,
       }),
       {
         status: 500,
