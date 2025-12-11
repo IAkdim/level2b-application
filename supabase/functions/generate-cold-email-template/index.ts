@@ -148,23 +148,52 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
     try {
       const jsonMatch = claudeResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0])
+        let jsonString = jsonMatch[0]
         
-        result = {
-          templateName: parsed.templateName || 'Cold Email Template',
-          subject: parsed.subject || 'Nieuwe mogelijkheid voor uw bedrijf',
-          body: parsed.body || claudeResponse,
-          tone: parsed.tone || 'Professional',
-          targetSegment: parsed.targetSegment || companyInfo.targetAudience,
+        // Fix common JSON issues from Claude:
+        // 1. Replace actual newlines in string values with \n
+        // 2. Replace actual tabs with \t
+        // We need to be careful to only fix these inside string values, not in the JSON structure
+        
+        // First, let's try to parse and catch the specific error
+        try {
+          const parsed = JSON.parse(jsonString)
+          result = {
+            templateName: parsed.templateName || 'Cold Email Template',
+            subject: parsed.subject || 'Nieuwe mogelijkheid voor uw bedrijf',
+            body: parsed.body || claudeResponse,
+            tone: parsed.tone || 'Professional',
+            targetSegment: parsed.targetSegment || companyInfo.targetAudience,
+          }
+        } catch (initialError) {
+          console.log('Initial parse failed, cleaning JSON string...')
+          
+          // Clean the JSON string by fixing newlines and control characters in string values
+          // This regex finds string values and replaces control characters within them
+          jsonString = jsonString.replace(/"([^"]+)":\s*"([^"]*(?:\\.[^"]*)*)"/g, (_match: string, key: string, value: string) => {
+            // Fix control characters in the value
+            const cleanValue = value
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t')
+            return `"${key}": "${cleanValue}"`
+          })
+          
+          console.log('Cleaned JSON string, attempting parse...')
+          const parsed = JSON.parse(jsonString)
+          
+          result = {
+            templateName: parsed.templateName || 'Cold Email Template',
+            subject: parsed.subject || 'Nieuwe mogelijkheid voor uw bedrijf',
+            body: parsed.body || claudeResponse,
+            tone: parsed.tone || 'Professional',
+            targetSegment: parsed.targetSegment || companyInfo.targetAudience,
+          }
         }
 
-        // Clean up any escape sequences in body
-        if (result.body.includes('\\n') || result.body.includes('\\"')) {
-          result.body = result.body
-            .replace(/\\n/g, '\n')
-            .replace(/\\"/g, '"')
-            .replace(/\\t/g, '\t')
-          console.log('Cleaned escape sequences from body')
+        // Restore newlines in body for display
+        if (result.body.includes('\\n')) {
+          result.body = result.body.replace(/\\n/g, '\n')
         }
 
         console.log('Template generated:', {
@@ -177,6 +206,7 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
       }
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
+      console.error('Attempted to parse:', claudeResponse.substring(0, 500))
       throw new Error('Failed to parse Claude response as JSON')
     }
 
