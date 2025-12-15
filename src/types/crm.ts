@@ -158,6 +158,47 @@ export interface UpdateNoteInput {
 }
 
 // ============================================================================
+// EMAIL TEMPLATE
+// ============================================================================
+export interface EmailTemplate {
+  id: string
+  org_id: string
+  
+  // Template content
+  name: string
+  subject: string
+  body: string
+  
+  // Generation metadata
+  company_info?: Record<string, any>
+  additional_context?: string
+  
+  // Usage tracking
+  times_used: number
+  last_used_at?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateEmailTemplateInput {
+  name: string
+  subject: string
+  body: string
+  company_info?: Record<string, any>
+  additional_context?: string
+}
+
+export interface UpdateEmailTemplateInput {
+  name?: string
+  subject?: string
+  body?: string
+  company_info?: Record<string, any>
+  additional_context?: string
+}
+
+// ============================================================================
 // DEAL
 // ============================================================================
 export interface Deal {
