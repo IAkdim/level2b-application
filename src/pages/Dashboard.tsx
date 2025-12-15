@@ -244,10 +244,10 @@ export function Dashboard() {
 
           <Card className="border-border/30">
             <CardContent className="pt-6 space-y-2">
-              <Button size="sm" className="w-full" onClick={() => navigate('/templates')}>
+              <Button size="sm" className="w-full" onClick={() => navigate('/outreach/templates')}>
                 Nieuwe Template
               </Button>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/leads')}>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/outreach/leads')}>
                 Leads Beheren
               </Button>
               <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/analytics')}>

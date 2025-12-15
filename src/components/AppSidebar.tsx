@@ -12,6 +12,8 @@ import {
   BookOpen,
   MessageSquare,
   Building2,
+  Send,
+  Star,
 } from "lucide-react"
 import { eventBus } from "@/lib/eventBus"
 import { Button } from "@/components/ui/button"
@@ -19,6 +21,14 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
+import { submitFeedback } from '@/lib/api/feedback'
+import { useOrganization } from '@/contexts/OrganizationContext'
+import type { FeedbackType } from '@/types/crm'
 
 interface NavItem {
   name: string
@@ -39,7 +49,13 @@ const navigation: NavItem[] = [
 
 export function AppSidebar() {
   const location = useLocation()
+  const { selectedOrg } = useOrganization()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>('other')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -61,6 +77,39 @@ export function AppSidebar() {
     if (item.href === "/" && location.pathname === "/") return true
     if (item.href !== "/" && location.pathname.startsWith(item.href)) return true
     return false
+  }
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      toast.error('Voer een bericht in')
+      return
+    }
+
+    if (!selectedOrg?.id) {
+      toast.error('Geen organisatie geselecteerd')
+      return
+    }
+
+    setIsSubmittingFeedback(true)
+    try {
+      await submitFeedback(selectedOrg.id, {
+        type: feedbackType,
+        message: feedbackMessage.trim(),
+        rating: feedbackRating > 0 ? feedbackRating : undefined,
+        page_url: window.location.href,
+      })
+      
+      toast.success('Bedankt voor je feedback!')
+      setShowFeedbackDialog(false)
+      setFeedbackMessage('')
+      setFeedbackType('other')
+      setFeedbackRating(0)
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      toast.error('Kon feedback niet versturen')
+    } finally {
+      setIsSubmittingFeedback(false)
+    }
   }
 
   // Render navigation item
@@ -185,6 +234,7 @@ const content = (
               <Button
                 variant="outline"
                 className={cn("w-full", isCollapsed && "px-0")}
+                onClick={() => setShowFeedbackDialog(true)}
               >
                 <MessageSquare className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                 {!isCollapsed && "Feedback"}
@@ -196,6 +246,86 @@ const content = (
           </Tooltip>
         </div>
       </div>
+
+      {/* Feedback Dialog */}
+      <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deel je Feedback</DialogTitle>
+            <DialogDescription>
+              Help ons Level2b te verbeteren door je feedback te delen
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Type selector */}
+            <div className="space-y-2">
+              <Label htmlFor="feedback-type">Type</Label>
+              <Select value={feedbackType} onValueChange={(val) => setFeedbackType(val as FeedbackType)}>
+                <SelectTrigger id="feedback-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bug">🐛 Bug Report</SelectItem>
+                  <SelectItem value="feature">✨ Feature Request</SelectItem>
+                  <SelectItem value="improvement">💡 Verbetering</SelectItem>
+                  <SelectItem value="other">💬 Anders</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Rating */}
+            <div className="space-y-2">
+              <Label>Hoe tevreden ben je met Level2b?</Label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setFeedbackRating(star)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={`h-8 w-8 ${
+                        star <= feedbackRating
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-gray-300'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="space-y-2">
+              <Label htmlFor="feedback-message">Bericht</Label>
+              <Textarea
+                id="feedback-message"
+                value={feedbackMessage}
+                onChange={(e) => setFeedbackMessage(e.target.value)}
+                placeholder="Deel je gedachten, suggesties of problemen..."
+                rows={6}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                onClick={() => setShowFeedbackDialog(false)}
+                variant="outline"
+                disabled={isSubmittingFeedback}
+              >
+                Annuleren
+              </Button>
+              <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback}>
+                <Send className="mr-2 h-4 w-4" />
+                {isSubmittingFeedback ? 'Versturen...' : 'Verstuur Feedback'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

@@ -199,6 +199,44 @@ export interface UpdateEmailTemplateInput {
 }
 
 // ============================================================================
+// FEEDBACK
+// ============================================================================
+export type FeedbackType = 'bug' | 'feature' | 'improvement' | 'other'
+export type FeedbackStatus = 'new' | 'in_review' | 'planned' | 'completed' | 'rejected'
+
+export interface Feedback {
+  id: string
+  org_id: string
+  user_id?: string
+  
+  // Feedback content
+  type: FeedbackType
+  message: string
+  rating?: number
+  
+  // Optional metadata
+  page_url?: string
+  user_agent?: string
+  metadata?: Record<string, any>
+  
+  // Status tracking
+  status: FeedbackStatus
+  admin_notes?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateFeedbackInput {
+  type: FeedbackType
+  message: string
+  rating?: number
+  page_url?: string
+  metadata?: Record<string, any>
+}
+
+// ============================================================================
 // DEAL
 // ============================================================================
 export interface Deal {
