@@ -154,7 +154,7 @@ export function Leads() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
               <p className="text-muted-foreground">
-                Beheer je prospects en volg de status van je outreach
+                Manage your prospects and track the status of your outreach
               </p>
             </div>
             <div className="flex space-x-3">
@@ -190,7 +190,7 @@ export function Leads() {
                     {searchTerm && ' matching your search'}
                     {selectedLeads.size > 0 && (
                       <span className="ml-2">
-                        · {selectedLeads.size} geselecteerd
+                        · {selectedLeads.size} selected
                         <Button
                           variant="ghost"
                           size="sm"
@@ -198,7 +198,7 @@ export function Leads() {
                           className="ml-2 h-6 px-2 text-xs"
                         >
                           <X className="h-3 w-3 mr-1" />
-                          Wis selectie
+                          Clear selection
                         </Button>
                       </span>
                     )}
@@ -245,7 +245,7 @@ export function Leads() {
                           <Checkbox
                             checked={selectedLeads.size === leads.length && leads.length > 0}
                             onCheckedChange={toggleAllLeads}
-                            aria-label="Selecteer alle leads"
+                            aria-label="Select all leads"
                           />
                         </TableHead>
                         <TableHead className="font-semibold">
@@ -299,7 +299,7 @@ export function Leads() {
                             <Checkbox
                               checked={selectedLeads.has(lead.id)}
                               onCheckedChange={() => toggleLeadSelection(lead.id)}
-                              aria-label={`Selecteer ${lead.name}`}
+                              aria-label={`Select ${lead.name}`}
                             />
                           </TableCell>
                           <TableCell>

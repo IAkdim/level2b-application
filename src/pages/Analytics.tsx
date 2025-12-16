@@ -78,7 +78,7 @@ export function Analytics() {
 
       setMetrics([
         {
-          label: "Totaal Emails Verzonden",
+          label: "Total Emails Sent",
           value: (emailCount || 0).toLocaleString(),
           icon: Mail
         },
@@ -93,7 +93,7 @@ export function Analytics() {
           icon: TrendingDown
         },
         {
-          label: "Meetings Gepland",
+          label: "Meetings Scheduled",
           value: (meetingsCount || 0).toLocaleString(),
           icon: Calendar
         }
@@ -152,14 +152,14 @@ export function Analytics() {
 
   function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
-      'new': 'Nieuw',
-      'contacted': 'Gecontacteerd',
-      'qualified': 'Gekwalificeerd',
-      'meeting_scheduled': 'Meeting Gepland',
-      'proposal': 'Voorstel',
-      'negotiation': 'Onderhandeling',
-      'won': 'Gewonnen',
-      'lost': 'Verloren'
+      'new': 'New',
+      'contacted': 'Contacted',
+      'qualified': 'Qualified',
+      'meeting_scheduled': 'Meeting Scheduled',
+      'proposal': 'Proposal',
+      'negotiation': 'Negotiation',
+      'won': 'Won',
+      'lost': 'Lost'
     }
     return labels[status] || status
   }
@@ -192,7 +192,7 @@ export function Analytics() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-1">
-            Detailleerde insights in je email campaign prestaties
+            Detailed insights into your email campaign performance
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -248,16 +248,16 @@ export function Analytics() {
         {/* Lead Status Distribution */}
         <Card className="border-border/30">
           <CardHeader>
-            <CardTitle>Lead Status Distributie</CardTitle>
+            <CardTitle>Lead Status Distribution</CardTitle>
             <CardDescription>
-              Verdeling van leads over verschillende statussen
+              Distribution of leads across different statuses
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {leadsByStatus.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  Nog geen leads
+                  No leads yet
                 </div>
               ) : (
                 leadsByStatus.map((item) => (
@@ -277,27 +277,27 @@ export function Analytics() {
         {/* Activity Summary */}
         <Card className="border-border/30">
           <CardHeader>
-            <CardTitle>Activiteiten Overzicht</CardTitle>
+            <CardTitle>Activities Overview</CardTitle>
             <CardDescription>
-              Totaal aantal activiteiten in je systeem
+              Total number of activities in your system
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
-                <span className="font-medium">Totaal Leads</span>
+                <span className="font-medium">Total Leads</span>
                 <span className="font-semibold">{totalLeads.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
-                <span className="font-medium">Activiteiten</span>
+                <span className="font-medium">Activities</span>
                 <span className="font-semibold">{totalActivities.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
-                <span className="font-medium">Notities</span>
+                <span className="font-medium">Notes</span>
                 <span className="font-semibold">{totalNotes.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border/30">
-                <span className="font-medium">Taken</span>
+                <span className="font-medium">Tasks</span>
                 <span className="font-semibold">{totalTasks.toLocaleString()}</span>
               </div>
             </div>
@@ -314,9 +314,9 @@ export function Analytics() {
         <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-border/30">
           <div className="text-center">
             <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Chart component komt hier</p>
+            <p className="text-muted-foreground">Chart component goes here</p>
             <p className="text-sm text-muted-foreground">
-              Integratie met charts library (Chart.js, Recharts, etc.)
+              Integration with charts library (Chart.js, Recharts, etc.)
             </p>
           </div>
         </div>

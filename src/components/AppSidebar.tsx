@@ -81,12 +81,12 @@ export function AppSidebar() {
 
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
-      toast.error('Voer een bericht in')
+      toast.error('Please enter a message')
       return
     }
 
     if (!selectedOrg?.id) {
-      toast.error('Geen organisatie geselecteerd')
+      toast.error('No organisation selected')
       return
     }
 
@@ -99,14 +99,14 @@ export function AppSidebar() {
         page_url: window.location.href,
       })
       
-      toast.success('Bedankt voor je feedback!')
+      toast.success('Thank you for your feedback!')
       setShowFeedbackDialog(false)
       setFeedbackMessage('')
       setFeedbackType('other')
       setFeedbackRating(0)
     } catch (error) {
       console.error('Error submitting feedback:', error)
-      toast.error('Kon feedback niet versturen')
+      toast.error('Could not send feedback')
     } finally {
       setIsSubmittingFeedback(false)
     }
@@ -221,11 +221,11 @@ const content = (
                 className={cn("w-full", isCollapsed && "px-0")}
               >
                 <BookOpen className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "Bekijk guide"}
+                {!isCollapsed && "View Guide"}
               </Button>
             </TooltipTrigger>
             {isCollapsed && (
-              <TooltipContent side="right">Bekijk guide</TooltipContent>
+              <TooltipContent side="right">View Guide</TooltipContent>
             )}
           </Tooltip>
 
@@ -251,9 +251,9 @@ const content = (
       <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Deel je Feedback</DialogTitle>
+            <DialogTitle>Share Your Feedback</DialogTitle>
             <DialogDescription>
-              Help ons Level2b te verbeteren door je feedback te delen
+              Help us improve Level2B by sharing your feedback
             </DialogDescription>
           </DialogHeader>
 
@@ -268,15 +268,15 @@ const content = (
                 <SelectContent>
                   <SelectItem value="bug">🐛 Bug Report</SelectItem>
                   <SelectItem value="feature">✨ Feature Request</SelectItem>
-                  <SelectItem value="improvement">💡 Verbetering</SelectItem>
-                  <SelectItem value="other">💬 Anders</SelectItem>
+                  <SelectItem value="improvement">💡 Improvement</SelectItem>
+                  <SelectItem value="other">💬 Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Rating */}
             <div className="space-y-2">
-              <Label>Hoe tevreden ben je met Level2b?</Label>
+              <Label>How satisfied are you with Level2B?</Label>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -299,12 +299,12 @@ const content = (
 
             {/* Message */}
             <div className="space-y-2">
-              <Label htmlFor="feedback-message">Bericht</Label>
+              <Label htmlFor="feedback-message">Message</Label>
               <Textarea
                 id="feedback-message"
                 value={feedbackMessage}
                 onChange={(e) => setFeedbackMessage(e.target.value)}
-                placeholder="Deel je gedachten, suggesties of problemen..."
+                placeholder="Share your thoughts, suggestions, or issues..."
                 rows={6}
               />
             </div>
@@ -316,11 +316,11 @@ const content = (
                 variant="outline"
                 disabled={isSubmittingFeedback}
               >
-                Annuleren
+                Cancel
               </Button>
               <Button onClick={handleSubmitFeedback} disabled={isSubmittingFeedback}>
                 <Send className="mr-2 h-4 w-4" />
-                {isSubmittingFeedback ? 'Versturen...' : 'Verstuur Feedback'}
+                {isSubmittingFeedback ? 'Sending...' : 'Send Feedback'}
               </Button>
             </div>
           </div>

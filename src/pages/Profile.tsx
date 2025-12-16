@@ -39,7 +39,7 @@ export function Profile() {
       }
     } catch (error) {
       console.error('Error loading profile:', error)
-      toast.error('Kon profiel niet laden')
+      toast.error('Could not load profile')
     } finally {
       setIsLoading(false)
     }
@@ -57,11 +57,11 @@ export function Profile() {
 
       if (error) throw error
 
-      toast.success('Profiel bijgewerkt!')
+      toast.success('Profile updated!')
       loadProfile() // Reload to get updated data
     } catch (error) {
       console.error('Error updating profile:', error)
-      toast.error('Kon profiel niet bijwerken')
+      toast.error('Could not update profile')
     } finally {
       setIsSaving(false)
     }
@@ -78,9 +78,9 @@ export function Profile() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Profiel</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground mt-1">
-          Beheer je persoonlijke informatie en voorkeuren
+          Manage your personal information and preferences
         </p>
       </div>
 
@@ -88,20 +88,20 @@ export function Profile() {
         {/* Profile Information Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Persoonlijke Informatie</CardTitle>
+            <CardTitle>Personal Information</CardTitle>
             <CardDescription>
-              Update je naam
+              Update your name
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="full_name">Naam</Label>
+              <Label htmlFor="full_name">Name</Label>
               <Input
                 id="full_name"
                 value={profile.full_name}
                 onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                placeholder="Je volledige naam"
+                placeholder="Your full name"
               />
             </div>
 
@@ -109,7 +109,7 @@ export function Profile() {
             <div className="flex justify-end">
               <Button onClick={handleSave} disabled={isSaving}>
                 <Save className="mr-2 h-4 w-4" />
-                {isSaving ? 'Opslaan...' : 'Wijzigingen Opslaan'}
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </CardContent>
@@ -118,9 +118,9 @@ export function Profile() {
         {/* Account Information Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Account Informatie</CardTitle>
+            <CardTitle>Account Information</CardTitle>
             <CardDescription>
-              Je account gegevens
+              Your account details
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -138,7 +138,7 @@ export function Profile() {
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Account aangemaakt</p>
+                  <p className="text-sm font-medium">Account created</p>
                   <p className="text-sm text-muted-foreground">
                     {user?.created_at
                       ? new Date(user.created_at).toLocaleDateString('nl-NL', {
@@ -157,7 +157,7 @@ export function Profile() {
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium">Huidige Organisatie</p>
+                      <p className="text-sm font-medium">Current Organisation</p>
                       <p className="text-sm text-muted-foreground">{selectedOrg.name}</p>
                     </div>
                   </div>

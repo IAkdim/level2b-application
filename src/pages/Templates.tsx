@@ -1,5 +1,5 @@
 // src/pages/Templates.tsx
-// Cold email template generator (geen database opslag)
+// Cold email template generator (no database storage)
 
 import { useState, useEffect } from 'react'
 import { 
@@ -99,7 +99,7 @@ export default function Templates() {
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
-      toast.error('Kon templates niet laden')
+      toast.error('Could not load templates')
     } finally {
       setIsLoadingTemplates(false)
     }
@@ -117,15 +117,15 @@ export default function Templates() {
   const handleQuickSettingsSave = async () => {
     // Validate required fields
     if (!quickSettings.company_name?.trim()) {
-      toast.error('Bedrijfsnaam is verplicht')
+      toast.error('Company name is required')
       return
     }
     if (!quickSettings.product_service?.trim()) {
-      toast.error('Product/Service is verplicht')
+      toast.error('Product/Service is required')
       return
     }
     if (!quickSettings.target_audience?.trim()) {
-      toast.error('Doelgroep is verplicht')
+      toast.error('Target audience is required')
       return
     }
 
@@ -165,13 +165,13 @@ export default function Templates() {
       setShowGenerateDialog(true)
       // Reset additional context after successful generation
       setAdditionalContext('')
-      toast.success('Template gegenereerd!')
+      toast.success('Template generated!')
     } catch (error) {
       console.error('Error generating template:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Onbekende fout bij genereren'
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error during generation'
       toast.error(errorMessage, {
         duration: 6000,
-        description: 'Check de console voor meer details'
+        description: 'Check the console for more details'
       })
     } finally {
       setIsGenerating(false)
@@ -180,7 +180,7 @@ export default function Templates() {
 
   const handleCopyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
-    toast.success(`${label} gekopieerd!`)
+    toast.success(`${label} copied!`)
   }
 
   const handlePreview = () => {
@@ -212,7 +212,7 @@ export default function Templates() {
     }
 
     if (!selectedOrg?.id) {
-      toast.error('Geen organisatie geselecteerd')
+      toast.error('No organisation selected')
       return
     }
 
@@ -227,25 +227,25 @@ export default function Templates() {
         additional_context: additionalContext || undefined,
       })
       console.log('Template saved successfully:', result)
-      toast.success('Template opgeslagen!')
+      toast.success('Template saved!')
       await loadTemplates() // Reload templates
     } catch (error) {
       console.error('Error saving template:', error)
-      const errorMsg = error instanceof Error ? error.message : 'Onbekende fout'
-      toast.error(`Kon template niet opslaan: ${errorMsg}`)
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Could not save template: ${errorMsg}`)
     }
   }
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Weet je zeker dat je deze template wilt verwijderen?')) return
+    if (!confirm('Are you sure you want to delete this template?')) return
 
     try {
       await deleteEmailTemplate(id)
-      toast.success('Template verwijderd')
+      toast.success('Template deleted')
       loadTemplates()
     } catch (error) {
       console.error('Error deleting template:', error)
-      toast.error('Kon template niet verwijderen')
+      toast.error('Could not delete template')
     }
   }
 
@@ -274,7 +274,7 @@ export default function Templates() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cold Email Templates</h1>
           <p className="text-muted-foreground mt-1">
-            Genereer overtuigende cold emails met AI
+            Generate persuasive cold emails with AI
           </p>
         </div>
         <Button 
@@ -283,7 +283,7 @@ export default function Templates() {
           size="lg"
         >
           <Sparkles className="mr-2 h-4 w-4" />
-          {isGenerating ? 'Genereren...' : 'Nieuwe Template Genereren'}
+          {isGenerating ? 'Generating...' : 'Generate New Template'}
         </Button>
       </div>
 
@@ -295,10 +295,10 @@ export default function Templates() {
               <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-semibold text-blue-900">
-                  Bedrijfsinformatie Ontbreekt
+                  Company Information Missing
                 </h3>
                 <p className="text-sm text-blue-800 mt-1">
-                  Klik op "Nieuwe Template Genereren" om je bedrijfsinformatie in te vullen en direct een template te genereren.
+                  Click on "Generate New Template" to fill in your company information and generate a template directly.
                 </p>
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function Templates() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Laatst Gegenereerde Template
+              Last Generated Template
             </CardTitle>
             <CardDescription>
               {generatedTemplate.templateName}
@@ -320,7 +320,7 @@ export default function Templates() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="text-sm font-semibold">Onderwerp</Label>
+              <Label className="text-sm font-semibold">Subject</Label>
               <p className="text-sm mt-1 p-3 bg-gray-50 rounded border">{generatedTemplate.subject}</p>
             </div>
             <div>
@@ -340,7 +340,7 @@ export default function Templates() {
                 }}
                 variant="outline"
               >
-                Bekijk
+                View
               </Button>
               <Button
                 onClick={() => handleCopyToClipboard(
@@ -349,7 +349,7 @@ export default function Templates() {
                 )}
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Kopieer
+                Copy
               </Button>
             </div>
           </CardContent>
@@ -362,10 +362,10 @@ export default function Templates() {
           <CardContent className="py-12 text-center">
             <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">
-              Nog geen templates gegenereerd
+              No templates generated yet
             </h3>
             <p className="text-muted-foreground mb-4">
-              Klik op "Nieuwe Template Genereren" om te beginnen
+              Click on "Generate New Template" to get started
             </p>
           </CardContent>
         </Card>
@@ -374,7 +374,7 @@ export default function Templates() {
       {/* Saved Templates */}
       {savedTemplates.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Opgeslagen Templates</h2>
+          <h2 className="text-2xl font-bold">Saved Templates</h2>
           <div className="grid gap-4 md:grid-cols-2">
             {savedTemplates.map((template) => (
               <Card key={template.id}>
@@ -403,7 +403,7 @@ export default function Templates() {
                       {new Date(template.created_at).toLocaleDateString('nl-NL')}
                     </span>
                     {template.times_used > 0 && (
-                      <span>Gebruikt: {template.times_used}x</span>
+                      <span>Used: {template.times_used}x</span>
                     )}
                   </div>
                   <Button
@@ -412,7 +412,7 @@ export default function Templates() {
                     variant="outline"
                   >
                     <Copy className="mr-2 h-4 w-4" />
-                    Kopieer Template
+                    Copy Template
                   </Button>
                 </CardContent>
               </Card>
@@ -425,15 +425,15 @@ export default function Templates() {
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>AI Gegenereerde Template</DialogTitle>
+            <DialogTitle>AI Generated Template</DialogTitle>
             <DialogDescription>
-              Review en pas de template aan indien nodig
+              Review and adjust the template if needed
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Template Naam</Label>
+              <Label htmlFor="name">Template Name</Label>
               <Input
                 id="name"
                 value={templateName}
@@ -442,7 +442,7 @@ export default function Templates() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="subject">Onderwerp</Label>
+              <Label htmlFor="subject">Subject</Label>
               <Input
                 id="subject"
                 value={templateSubject}
@@ -466,17 +466,17 @@ export default function Templates() {
                 onClick={() => setShowGenerateDialog(false)}
                 variant="outline"
               >
-                Sluiten
+                Close
               </Button>
               <Button 
                 onClick={handleSaveTemplate}
                 variant="default"
               >
                 <Save className="mr-2 h-4 w-4" />
-                Opslaan
+                Save
               </Button>
               <Button onClick={handlePreview} variant="outline">
-                Bekijk Preview
+                View Preview
               </Button>
               <Button
                 onClick={() => {
@@ -489,7 +489,7 @@ export default function Templates() {
                 variant="outline"
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Kopieer
+                Copy
               </Button>
             </div>
           </div>
@@ -500,22 +500,22 @@ export default function Templates() {
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Bedrijfsinformatie Invullen</DialogTitle>
+            <DialogTitle>Fill in Company Information</DialogTitle>
             <DialogDescription>
-              Vul de onderstaande velden in om een template te genereren
+              Fill in the fields below to generate a template
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="quick_company_name">
-                Bedrijfsnaam <span className="text-red-500">*</span>
+                Company name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_company_name"
                 value={quickSettings.company_name}
                 onChange={(e) => setQuickSettings({ ...quickSettings, company_name: e.target.value })}
-                placeholder="Bijv. Level2B Solutions"
+                placeholder="e.g. Level2B Solutions"
               />
             </div>
 
@@ -527,25 +527,25 @@ export default function Templates() {
                 id="quick_product_service"
                 value={quickSettings.product_service}
                 onChange={(e) => setQuickSettings({ ...quickSettings, product_service: e.target.value })}
-                placeholder="Kort overzicht van wat je aanbiedt"
+                placeholder="Brief overview of what you offer"
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="quick_target_audience">
-                Doelgroep <span className="text-red-500">*</span>
+                Target audience <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_target_audience"
                 value={quickSettings.target_audience}
                 onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
-                placeholder="Bijv. B2B SaaS bedrijven met 10-50 medewerkers"
+                placeholder="e.g. B2B SaaS companies with 10-50 employees"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Unique Selling Points (USPs) - Optioneel</Label>
+              <Label>Unique Selling Points (USPs) - Optional</Label>
               <div className="flex gap-2">
                 <Input
                   value={newUsp}
@@ -556,7 +556,7 @@ export default function Templates() {
                       handleAddUsp()
                     }
                   }}
-                  placeholder="Voeg een USP toe"
+                  placeholder="Add a USP"
                 />
                 <Button type="button" onClick={handleAddUsp} variant="outline" size="icon">
                   <Plus className="h-4 w-4" />
@@ -585,18 +585,18 @@ export default function Templates() {
 
             <div className="space-y-2">
               <Label htmlFor="additional_context">
-                Extra Context (Optioneel)
+                Extra Context (Optional)
               </Label>
               <Textarea
                 id="additional_context"
                 value={additionalContext}
                 onChange={(e) => setAdditionalContext(e.target.value)}
-                placeholder="Bijvoorbeeld: specifieke use case, recente resultaten, doelgroep pijnpunten, of andere relevante info die de AI kan gebruiken om een betere template te maken"
+                placeholder="For example: specific use case, recent results, target audience pain points, or other relevant information that the AI can use to create a better template"
                 rows={3}
                 className="text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Tip: Vertel meer over je doelgroep, specifieke problemen die je oplost, of recente successen
+                Tip: Tell us more about your target audience, specific problems you solve, or recent successes
               </p>
             </div>
 
@@ -605,11 +605,11 @@ export default function Templates() {
                 onClick={() => setShowSettingsDialog(false)}
                 variant="outline"
               >
-                Annuleren
+                Cancel
               </Button>
               <Button onClick={handleQuickSettingsSave} disabled={isGenerating}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                {isGenerating ? 'Genereren...' : 'Genereer Template'}
+                {isGenerating ? 'Generating...' : 'Generate Template'}
               </Button>
             </div>
           </div>
@@ -621,12 +621,12 @@ export default function Templates() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Preview</DialogTitle>
-            <DialogDescription>Zo ziet de email eruit</DialogDescription>
+            <DialogDescription>This is what the email looks like</DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 border rounded-lg p-6 bg-gray-50">
             <div>
-              <div className="text-xs text-muted-foreground mb-1">ONDERWERP</div>
+              <div className="text-xs text-muted-foreground mb-1">SUBJECT</div>
               <div className="font-semibold">{templateSubject}</div>
             </div>
             
@@ -642,7 +642,7 @@ export default function Templates() {
               onClick={() => setShowPreviewDialog(false)}
               variant="outline"
             >
-              Sluiten
+              Close
             </Button>
             <Button
               onClick={() => {
@@ -654,7 +654,7 @@ export default function Templates() {
               }}
             >
               <Copy className="mr-2 h-4 w-4" />
-              Kopieer
+              Copy
             </Button>
           </div>
         </DialogContent>

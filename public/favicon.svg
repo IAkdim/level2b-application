@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Orange upward arrow favicon -->
+  <rect width="32" height="32" rx="6" fill="#ea580c"/>
+  <path d="M16 8L8 18h5v6h6v-6h5L16 8z" fill="white" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+</svg>

@@ -31,7 +31,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads }: BulkEmail
     }
 
     if (selectedLeads.length === 0) {
-      alert("Geen leads geselecteerd")
+      alert("No leads selected")
       return
     }
 

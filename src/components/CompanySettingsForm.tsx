@@ -1,5 +1,5 @@
 // src/components/CompanySettingsForm.tsx
-// Form voor bedrijfsinformatie met Calendly OAuth integratie
+// Form for company information with Calendly OAuth integration
 
 import { useState, useEffect } from 'react'
 import { useOrganization } from '@/contexts/OrganizationContext'
@@ -57,7 +57,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       setEventTypes(types)
     } catch (error) {
       console.error('Error loading event types:', error)
-      toast.error('Fout bij laden van Calendly event types')
+      toast.error('Error loading Calendly event types')
     }
   }
 
@@ -91,7 +91,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       console.log('[CompanySettingsForm] Settings load complete')
     } catch (error) {
       console.error('[CompanySettingsForm] Error loading settings:', error)
-      toast.error('Fout bij laden van instellingen')
+      toast.error('Error loading settings')
       // Set empty settings on error
       setSettings({
         company_name: '',
@@ -122,13 +122,13 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     const calendlyError = params.get('calendly_error')
 
     if (calendlyConnected === 'true') {
-      toast.success('Calendly succesvol verbonden!')
+      toast.success('Calendly successfully connected!')
       // Clean up URL and trigger reload through selectedOrganization change
       window.history.replaceState({}, '', window.location.pathname)
     }
 
     if (calendlyError) {
-      toast.error(`Calendly verbinding mislukt: ${calendlyError}`)
+      toast.error(`Calendly connection failed: ${calendlyError}`)
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
@@ -144,14 +144,14 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     try {
       if (!selectedOrg) {
         console.log('[CompanySettingsForm] No selectedOrg, returning')
-        toast.error('Geen organisatie geselecteerd')
+        toast.error('No organisation selected')
         return
       }
 
       console.log('[CompanySettingsForm] Checking company_name...')
       if (!settings.company_name?.trim()) {
         console.log('[CompanySettingsForm] No company name, returning. Value:', settings.company_name)
-        toast.error('Bedrijfsnaam is verplicht')
+        toast.error('Company name is required')
         return
       }
 
@@ -180,10 +180,10 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       })
       
       console.log('[CompanySettingsForm] Settings saved successfully')
-      toast.success('Instellingen opgeslagen!')
+      toast.success('Settings saved!')
     } catch (error) {
       console.error('[CompanySettingsForm] CAUGHT ERROR:', error)
-      toast.error('Fout bij opslaan van instellingen')
+      toast.error('Error saving settings')
     } finally {
       console.log('[CompanySettingsForm] Finally block, setting isSaving to false')
       setIsSaving(false)
@@ -195,7 +195,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     console.log('[CompanySettingsForm] selectedOrg:', selectedOrg)
     
     if (!selectedOrg) {
-      toast.error('Geen organisatie geselecteerd')
+      toast.error('No organisation selected')
       return
     }
 
@@ -208,7 +208,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       window.location.href = authUrl
     } catch (error) {
       console.error('[CompanySettingsForm] Error connecting Calendly:', error)
-      toast.error('Fout bij verbinden met Calendly')
+      toast.error('Error connecting to Calendly')
       setIsConnectingCalendly(false)
     }
   }
@@ -221,10 +221,10 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       setIsCalendlyConnected(false)
       setEventTypes([])
       setSelectedEventTypeUri('')
-      toast.success('Calendly verbinding verwijderd')
+      toast.success('Calendly connection removed')
     } catch (error) {
       console.error('Error disconnecting Calendly:', error)
-      toast.error('Fout bij verwijderen Calendly verbinding')
+      toast.error('Error removing Calendly connection')
     }
   }
 
@@ -266,16 +266,16 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
               <>
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
                 <div>
-                  <p className="font-medium">Calendly verbonden</p>
-                  <p className="text-sm text-muted-foreground">Je account is succesvol gekoppeld</p>
+                  <p className="font-medium">Calendly connected</p>
+                  <p className="text-sm text-muted-foreground">Your account is successfully linked</p>
                 </div>
               </>
             ) : (
               <>
                 <AlertCircle className="h-5 w-5 text-orange-500" />
                 <div>
-                  <p className="font-medium">Calendly niet verbonden</p>
-                  <p className="text-sm text-muted-foreground">Verbind je Calendly account om meetings te synchroniseren</p>
+                  <p className="font-medium">Calendly not connected</p>
+                  <p className="text-sm text-muted-foreground">Connect your Calendly account to synchronise meetings</p>
                 </div>
               </>
             )}
@@ -286,7 +286,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
               variant="outline"
               size="sm"
             >
-              Verbreek verbinding
+              Disconnect
             </Button>
           ) : (
             <Button
@@ -298,12 +298,12 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
               {isConnectingCalendly ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Verbinden...
+                  Connecting...
                 </>
               ) : (
                 <>
                   <Calendar className="h-4 w-4" />
-                  Verbind Calendly
+                  Connect Calendly
                 </>
               )}
             </Button>
@@ -314,13 +314,13 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
         {isCalendlyConnected && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="event_type">Selecteer meeting type</Label>
+              <Label htmlFor="event_type">Select meeting type</Label>
               <Select
                 value={selectedEventTypeUri}
                 onValueChange={setSelectedEventTypeUri}
               >
                 <SelectTrigger id="event_type">
-                  <SelectValue placeholder="Kies een meeting type..." />
+                  <SelectValue placeholder="Choose a meeting type..." />
                 </SelectTrigger>
                 <SelectContent>
                   {eventTypes.map((eventType) => (
@@ -331,7 +331,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Dit meeting type wordt gebruikt in je outreach emails
+                This meeting type will be used in your outreach emails
               </p>
             </div>
 
@@ -341,12 +341,12 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                 {isSaving ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Opslaan...
+                    Saving...
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4" />
-                    Opslaan
+                    Save
                   </>
                 )}
               </Button>
@@ -365,26 +365,26 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Bedrijfsinformatie
+            Company Information
           </CardTitle>
           <CardDescription>
-            Deze informatie wordt gebruikt om AI cold email templates te genereren
+            This information is used to generate AI cold email templates
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Verplichte velden */}
+          {/* Required fields */}
           <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-            <h3 className="font-semibold text-sm text-blue-900">Verplichte velden voor template generatie</h3>
+            <h3 className="font-semibold text-sm text-blue-900">Required fields for template generation</h3>
             
             <div className="space-y-2">
               <Label htmlFor="company_name">
-                Bedrijfsnaam <span className="text-red-500">*</span>
+                Company name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="company_name"
                 value={settings.company_name}
                 onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
-                placeholder="Bijv. Level2B Solutions"
+                placeholder="E.g. Level2B Solutions"
               />
             </div>
 
@@ -396,46 +396,46 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                 id="product_service"
                 value={settings.product_service}
                 onChange={(e) => setSettings({ ...settings, product_service: e.target.value })}
-                placeholder="Kort overzicht van wat je aanbiedt"
+                placeholder="Brief overview of what you offer"
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="target_audience">
-                Doelgroep <span className="text-red-500">*</span>
+                Target audience <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="target_audience"
                 value={settings.target_audience}
                 onChange={(e) => setSettings({ ...settings, target_audience: e.target.value })}
-                placeholder="Bijv. B2B SaaS bedrijven met 10-50 medewerkers"
+                placeholder="E.g. B2B SaaS companies with 10-50 employees"
               />
             </div>
           </div>
 
-          {/* Optionele velden */}
+          {/* Optional fields */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Aanvullende informatie (optioneel maar aanbevolen)</h3>
+            <h3 className="font-semibold text-sm">Additional information (optional but recommended)</h3>
 
             <div className="space-y-2">
-              <Label htmlFor="company_description">Bedrijfsomschrijving</Label>
+              <Label htmlFor="company_description">Company description</Label>
               <Textarea
                 id="company_description"
                 value={settings.company_description}
                 onChange={(e) => setSettings({ ...settings, company_description: e.target.value })}
-                placeholder="Beschrijving van je bedrijf en missie"
+                placeholder="Description of your company and mission"
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="industry">Industrie</Label>
+              <Label htmlFor="industry">Industry</Label>
               <Input
                 id="industry"
                 value={settings.industry}
                 onChange={(e) => setSettings({ ...settings, industry: e.target.value })}
-                placeholder="Bijv. SaaS, Consulting, Marketing"
+                placeholder="E.g. SaaS, Consulting, Marketing"
               />
             </div>
 
@@ -452,7 +452,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                       handleAddUsp()
                     }
                   }}
-                  placeholder="Voeg een USP toe"
+                  placeholder="Add a USP"
                 />
                 <Button type="button" onClick={handleAddUsp} variant="outline" size="icon">
                   <Plus className="h-4 w-4" />
@@ -486,12 +486,12 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
               {isSaving ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Opslaan...
+                  Saving...
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Instellingen Opslaan
+                  Save Settings
                 </>
               )}
             </Button>

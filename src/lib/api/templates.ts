@@ -61,7 +61,7 @@ export async function generateColdEmailTemplate(companyInfo: {
 
     if (!data) {
       console.error('No data returned from Edge Function')
-      throw new Error('AI service gaf geen response. Is de Edge Function correct gedeployed?')
+      throw new Error('AI service gave no response. Is the Edge Function deployed correctly?')
     }
 
     // Check if the response contains an error
