@@ -17,104 +17,178 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Settings, User, LogOut, Plus } from "lucide-react"
+import { Settings, User, LogOut, Plus, X } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState, useEffect } from "react"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { OrganizationSelector } from "@/components/OrganizationSelector"
-
-
-
-interface Notification {
-  id: string
-  title: string
-  message: string
-  time: string
-  read: boolean
-  type: "info" | "success" | "warning" | "error"
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "New reply received",
-    message: "John Doe replied to your email about partnership",
-    time: "2 minutes ago",
-    read: false,
-    type: "info",
-  },
-  {
-    id: "2",
-    title: "Meeting scheduled",
-    message: "Sarah Wilson scheduled a meeting for tomorrow at 2 PM",
-    time: "1 hour ago",
-    read: false,
-    type: "success",
-  },
-  {
-    id: "3",
-    title: "Campaign completed",
-    message: "Your 'Q1 Outreach' campaign has finished sending to 50 leads",
-    time: "3 hours ago",
-    read: true,
-    type: "success",
-  },
-  {
-    id: "4",
-    title: "Email bounced",
-    message: "Email to mike@company.com bounced. Please verify the address.",
-    time: "5 hours ago",
-    read: false,
-    type: "error",
-  },
-  {
-    id: "5",
-    title: "Daily limit approaching",
-    message: "You've sent 45 of 50 daily emails",
-    time: "Yesterday",
-    read: true,
-    type: "warning",
-  },
-]
+import { 
+  getNotifications, 
+  getUnreadCount, 
+  markAsRead, 
+  markAllAsRead, 
+  deleteNotification,
+  subscribeToNotifications,
+  type Notification 
+} from "@/lib/api/notifications"
+import { toast } from "sonner"
+import { useNavigate } from "react-router-dom"
 
 export function TopBar() {
-  const unreadCount = mockNotifications.filter((n) => !n.read).length
+  const navigate = useNavigate()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
   const { selectedOrg, userOrgs, setOrganization } = useOrganization()
 
-  const getNotificationIcon = (type: Notification["type"]) => {
+  function getNotificationIcon(type: Notification["type"]) {
     const baseClasses = "h-2 w-2 rounded-full"
     switch (type) {
-      case "success":
+      case 'meeting_scheduled':
+      case 'success':
         return <div className={`${baseClasses} bg-green-500`} />
-      case "warning":
+      case 'daily_limit_warning':
+      case 'warning':
         return <div className={`${baseClasses} bg-yellow-500`} />
-      case "error":
+      case 'email_bounced':
+      case 'meeting_canceled':
+      case 'error':
         return <div className={`${baseClasses} bg-red-500`} />
       default:
         return <div className={`${baseClasses} bg-blue-500`} />
     }
   }
 
+  async function loadNotifications() {
+    try {
+      console.log('Loading notifications...')
+      setIsLoadingNotifications(true)
+      const notifs = await getNotifications(20)
+      const count = await getUnreadCount()
+      console.log('Notifications loaded:', notifs.length, 'notifications, unread:', count)
+      setNotifications(notifs)
+      setUnreadCount(count)
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+      setNotifications([])
+      setUnreadCount(0)
+    } finally {
+      setIsLoadingNotifications(false)
+    }
+  }
+
+  async function handleNotificationClick(notification: Notification) {
+    try {
+      if (!notification.read) {
+        await markAsRead(notification.id)
+        setUnreadCount(prev => Math.max(0, prev - 1))
+        setNotifications(prev => 
+          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+        )
+      }
+
+      if (notification.action_url) {
+        navigate(notification.action_url)
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error)
+      toast.error('Fout bij verwerken van notificatie')
+    }
+  }
+
+  async function handleMarkAllAsRead() {
+    try {
+      await markAllAsRead()
+      setUnreadCount(0)
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+      toast.success('Alle notificaties gemarkeerd als gelezen')
+    } catch (error) {
+      console.error('Error marking all as read:', error)
+      toast.error('Fout bij markeren als gelezen')
+    }
+  }
+
+  async function handleDeleteNotification(notificationId: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await deleteNotification(notificationId)
+      setNotifications(prev => prev.filter(n => n.id !== notificationId))
+      const deletedNotif = notifications.find(n => n.id === notificationId)
+      if (deletedNotif && !deletedNotif.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+      toast.error('Fout bij verwijderen van notificatie')
+    }
+  }
+
+  function formatTimeAgo(dateString: string) {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Zojuist'
+    if (diffMins < 60) return `${diffMins} minuten geleden`
+    if (diffHours < 24) return `${diffHours} uur geleden`
+    if (diffDays === 1) return 'Gisteren'
+    if (diffDays < 7) return `${diffDays} dagen geleden`
+    return date.toLocaleDateString('nl-NL')
+  }
+
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+    async function fetchUser() {
+      try {
+        const authResponse = await supabase.auth.getSession()
+        const session = authResponse.data.session
 
-      if (session?.user) {
-        // Fetch from your public.users table
-        const { data, error } = await supabase
-          .from("users")
-          .select("full_name, avatar_url, email")
-          .eq("id", session.user.id)
-          .single()
+        if (session && session.user) {
+          const userResponse = await supabase
+            .from("users")
+            .select("full_name, avatar_url, email")
+            .eq("id", session.user.id)
+            .single()
 
-        if (!error) setUser(data)
+          if (!userResponse.error && userResponse.data) {
+            setUser(userResponse.data)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error)
       }
     }
 
     fetchUser()
+    loadNotifications()
+
+    let subscription: any = null
+    
+    try {
+      subscription = subscribeToNotifications((newNotification) => {
+        console.log('New notification received:', newNotification)
+        setNotifications(prev => [newNotification, ...prev])
+        setUnreadCount(prev => prev + 1)
+        
+        toast.info(newNotification.title, {
+          description: newNotification.message,
+        })
+      })
+    } catch (error) {
+      console.error('Error subscribing to notifications:', error)
+    }
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
+
   return (
     <TooltipProvider>
       <div className="h-14 border-b bg-background">
@@ -192,26 +266,38 @@ export function TopBar() {
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
                 <div className="flex items-center justify-between p-4 pb-2">
-                  <h3 className="font-semibold">Notifications</h3>
+                  <h3 className="font-semibold">Notificaties</h3>
                   {unreadCount > 0 && (
-                    <Button variant="ghost" size="sm" className="h-8 text-xs">
-                      Mark all read
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-xs"
+                      onClick={handleMarkAllAsRead}
+                    >
+                      Alles gelezen
                     </Button>
                   )}
                 </div>
                 <Separator />
                 <ScrollArea className="h-[400px]">
                   <div className="p-2">
-                    {mockNotifications.length === 0 ? (
+                    {isLoadingNotifications ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <Bell className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">No notifications</p>
+                        <p className="text-sm text-muted-foreground">Geen notificaties</p>
                       </div>
                     ) : (
-                      mockNotifications.map((notification) => (
+                      notifications.map((notification) => (
                         <button
                           key={notification.id}
-                          className="w-full text-left p-3 rounded-lg hover:bg-accent transition-colors"
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`w-full text-left p-3 rounded-lg hover:bg-accent transition-colors relative group ${
+                            !notification.read ? 'bg-accent/50' : ''
+                          }`}
                         >
                           <div className="flex gap-3">
                             <div className="mt-1">{getNotificationIcon(notification.type)}</div>
@@ -220,15 +306,18 @@ export function TopBar() {
                                 <p className="text-sm font-medium leading-none">
                                   {notification.title}
                                 </p>
-                                {!notification.read && (
-                                  <div className="h-2 w-2 rounded-full bg-primary" />
-                                )}
+                                <button
+                                  onClick={(e) => handleDeleteNotification(notification.id, e)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                </button>
                               </div>
                               <p className="text-sm text-muted-foreground line-clamp-2">
                                 {notification.message}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {notification.time}
+                                {formatTimeAgo(notification.created_at)}
                               </p>
                             </div>
                           </div>
@@ -237,12 +326,6 @@ export function TopBar() {
                     )}
                   </div>
                 </ScrollArea>
-                <Separator />
-                <div className="p-2">
-                  <Button variant="ghost" className="w-full justify-center text-xs" size="sm">
-                    View all notifications
-                  </Button>
-                </div>
               </PopoverContent>
             </Popover>
 

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient"
+import { analyzeSentiment, type SentimentAnalysis } from "./claude-secure"
 
 interface GmailMessage {
   id: string
@@ -33,6 +34,7 @@ export interface Email {
   body: string
   date: Date
   labelIds: string[]
+  sentiment?: SentimentAnalysis
 }
 
 /**
@@ -801,11 +803,13 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
  * Haal alle reacties op emails met een specifiek label
  * @param labelName - Label naam om reacties voor op te halen
  * @param onlyUnread - Alleen ongelezen reacties ophalen (standaard true)
+ * @param analyzeSentiments - Voer sentiment analyse uit op reacties (standaard true)
  * @returns Array van emails die reacties zijn op gelabelde emails
  */
 export async function getRepliesByLabel(
   labelName: string,
-  onlyUnread: boolean = true
+  onlyUnread: boolean = true,
+  analyzeSentiments: boolean = true
 ): Promise<Email[]> {
   try {
     const accessToken = await getGmailAccessToken()
@@ -879,7 +883,25 @@ export async function getRepliesByLabel(
       }
     });
     
-    return Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+    const uniqueReplies = Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    // Voer sentiment analyse uit als gewenst
+    if (analyzeSentiments && uniqueReplies.length > 0) {
+      console.log(`Analyzing sentiment for ${uniqueReplies.length} replies...`);
+      
+      for (const reply of uniqueReplies) {
+        try {
+          const sentiment = await analyzeSentiment(reply.body, reply.subject);
+          reply.sentiment = sentiment;
+          
+          console.log(`✓ Sentiment analyzed for email ${reply.id}: ${sentiment.sentiment} (${sentiment.confidence})`);
+        } catch (error) {
+          console.error(`Failed to analyze sentiment for email ${reply.id}:`, error);
+        }
+      }
+    }
+    
+    return uniqueReplies;
     
   } catch (error) {
     console.error("Error fetching replies by label:", error)

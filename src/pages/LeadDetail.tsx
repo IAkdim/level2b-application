@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useLead } from "@/hooks/useLeads"
-import { ActivityTimeline } from "@/components/ActivityTimeline"
 import { TaskList } from "@/components/TaskList"
 import { NotesList } from "@/components/NotesList"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -190,18 +189,13 @@ export function LeadDetail() {
           )}
         </div>
 
-        {/* Right Column - Activity, Tasks, Notes */}
+        {/* Right Column - Tasks, Notes */}
         <div className="lg:col-span-2">
-          <Tabs defaultValue="activity" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="activity">Activity</TabsTrigger>
+          <Tabs defaultValue="tasks" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="activity" className="mt-6">
-              {leadId && <ActivityTimeline leadId={leadId} />}
-            </TabsContent>
 
             <TabsContent value="tasks" className="mt-6">
               {leadId && <TaskList leadId={leadId} />}
