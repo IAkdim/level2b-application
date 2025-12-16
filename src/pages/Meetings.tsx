@@ -15,24 +15,16 @@ import { nl } from "date-fns/locale"
 
 function getStatusVariant(status: Meeting['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   const variants = {
-    scheduled: 'default',
-    confirmed: 'default',
-    completed: 'secondary',
-    canceled: 'destructive',
-    no_show: 'destructive',
-    rescheduled: 'outline'
+    active: 'default',
+    canceled: 'destructive'
   } as const
   return variants[status] || 'default'
 }
 
 function getStatusLabel(status: Meeting['status']): string {
   const labels = {
-    scheduled: 'Gepland',
-    confirmed: 'Bevestigd',
-    completed: 'Voltooid',
-    canceled: 'Geannuleerd',
-    no_show: 'Niet verschenen',
-    rescheduled: 'Verzet'
+    active: 'Actief',
+    canceled: 'Geannuleerd'
   }
   return labels[status] || status
 }
@@ -122,9 +114,9 @@ export function Meetings() {
 
   const filteredMeetings = meetings.filter(meeting => {
     const matchesSearch = 
-      meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (meeting.attendee_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (meeting.attendee_email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      meeting.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (meeting.invitee_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (meeting.invitee_email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (meeting.lead?.company?.toLowerCase().includes(searchTerm.toLowerCase()))
     
     const matchesStatus = statusFilter === "all" || meeting.status === statusFilter
@@ -301,7 +293,7 @@ export function Meetings() {
                 </p>
               ) : (
                 filteredMeetings.map((meeting) => {
-                  const meetingDate = new Date(meeting.scheduled_at)
+                  const meetingDate = new Date(meeting.start_time)
                   const endDate = meeting.end_time ? new Date(meeting.end_time) : null
                   const duration = endDate 
                     ? Math.round((endDate.getTime() - meetingDate.getTime()) / 60000)
@@ -318,23 +310,20 @@ export function Meetings() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-medium">{meeting.title}</h3>
+                            <h3 className="font-medium">{meeting.name}</h3>
                             <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                            <Badge variant={getStatusVariant(meeting.status)}>
-                              {getStatusLabel(meeting.status)}
+                            <Badge variant={getStatusVariant(meeting.status as any)}>
+                              {getStatusLabel(meeting.status as any)}
                             </Badge>
                           </div>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-2">
                             <span>
-                              {meeting.attendee_name || meeting.attendee_email}
+                              {meeting.invitee_name || meeting.invitee_email}
                               {meeting.lead?.company && ` - ${meeting.lead.company}`}
                             </span>
                             <span>{format(meetingDate, 'PPP', { locale: nl })} om {format(meetingDate, 'HH:mm')}</span>
                             <span>{duration} min</span>
                           </div>
-                          {meeting.description && (
-                            <p className="text-sm text-muted-foreground">{meeting.description}</p>
-                          )}
                           {meeting.location && meeting.location.startsWith('http') && (
                             <a 
                               href={meeting.location} 

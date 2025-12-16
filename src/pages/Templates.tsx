@@ -4,8 +4,14 @@
 import { useState, useEffect } from 'react'
 import { 
   generateColdEmailTemplate,
-  type GeneratedTemplate
+  type GeneratedTemplate,
+  getEmailTemplates,
+  saveEmailTemplate,
+  deleteEmailTemplate,
+  incrementTemplateUsage,
 } from '@/lib/api/templates'
+import type { EmailTemplate } from '@/types/crm'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import {
   getCompanySettings,
   saveCompanySettings,
@@ -27,7 +33,10 @@ import {
   AlertCircle,
   Settings,
   Plus,
-  X
+  X,
+  Trash2,
+  Save,
+  Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -35,8 +44,11 @@ import { useNavigate } from 'react-router-dom'
 
 export default function Templates() {
   const navigate = useNavigate()
+  const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
+  const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
@@ -46,6 +58,9 @@ export default function Templates() {
   const [templateName, setTemplateName] = useState('')
   const [templateSubject, setTemplateSubject] = useState('')
   const [templateBody, setTemplateBody] = useState('')
+
+  // Extra context for template generation
+  const [additionalContext, setAdditionalContext] = useState('')
 
   // Quick settings form state
   const [quickSettings, setQuickSettings] = useState<CompanySettings>({
@@ -70,22 +85,33 @@ export default function Templates() {
     return () => window.removeEventListener('focus', checkValidation)
   }, [])
 
-  const handleGenerateTemplate = async () => {
-    // Check settings real-time
-    const settings = getCompanySettings()
-    const validationCheck = validateSettingsForTemplateGeneration(settings)
-    
-    if (!settings || !validationCheck.isValid) {
-      // Show quick settings dialog instead of redirecting
-      const existing = getCompanySettings()
-      if (existing) {
-        setQuickSettings(existing)
-      }
-      setShowSettingsDialog(true)
-      return
-    }
+  // Load saved templates on mount
+  useEffect(() => {
+    loadTemplates()
+  }, [])
 
-    await generateTemplate(settings)
+  const loadTemplates = async () => {
+    if (!selectedOrg?.id) return
+    
+    try {
+      setIsLoadingTemplates(true)
+      const templates = await getEmailTemplates(selectedOrg.id)
+      setSavedTemplates(templates)
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      toast.error('Kon templates niet laden')
+    } finally {
+      setIsLoadingTemplates(false)
+    }
+  }
+
+  const handleGenerateTemplate = async () => {
+    // Always show quick settings dialog so user can add extra context
+    const existing = getCompanySettings()
+    if (existing) {
+      setQuickSettings(existing)
+    }
+    setShowSettingsDialog(true)
   }
 
   const handleQuickSettingsSave = async () => {
@@ -105,14 +131,15 @@ export default function Templates() {
 
     // Save settings
     saveCompanySettings(quickSettings)
-    toast.success('Instellingen opgeslagen!')
     
     // Update validation
     const result = validateSettingsForTemplateGeneration(quickSettings)
     setValidation(result)
     
-    // Close dialog and generate
+    // Close dialog FIRST before generating
     setShowSettingsDialog(false)
+    
+    // Then generate
     await generateTemplate(quickSettings)
   }
 
@@ -127,22 +154,25 @@ export default function Templates() {
         targetAudience: settings.target_audience!,
         industry: settings.industry,
         calendlyLink: settings.calendly_link,
+        additionalContext: additionalContext.trim() || undefined,
       })
-
-      if (result.error) {
-        toast.error(`Fout bij genereren: ${result.error}`)
-        return
-      }
 
       setGeneratedTemplate(result)
       setTemplateName(result.templateName)
       setTemplateSubject(result.subject)
       setTemplateBody(result.body)
+      
       setShowGenerateDialog(true)
+      // Reset additional context after successful generation
+      setAdditionalContext('')
       toast.success('Template gegenereerd!')
     } catch (error) {
       console.error('Error generating template:', error)
-      toast.error('Fout bij genereren van template')
+      const errorMessage = error instanceof Error ? error.message : 'Onbekende fout bij genereren'
+      toast.error(errorMessage, {
+        duration: 6000,
+        description: 'Check de console voor meer details'
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -172,6 +202,69 @@ export default function Templates() {
       ...quickSettings,
       unique_selling_points: quickSettings.unique_selling_points?.filter((_, i) => i !== index),
     })
+  }
+
+  const handleSaveTemplate = async () => {
+    console.log('handleSaveTemplate called')
+    if (!generatedTemplate) {
+      console.log('No generated template to save')
+      return
+    }
+
+    if (!selectedOrg?.id) {
+      toast.error('Geen organisatie geselecteerd')
+      return
+    }
+
+    try {
+      console.log('Saving template to database...')
+      const settings = getCompanySettings()
+      const result = await saveEmailTemplate(selectedOrg.id, {
+        name: templateName,
+        subject: templateSubject,
+        body: templateBody,
+        company_info: settings,
+        additional_context: additionalContext || undefined,
+      })
+      console.log('Template saved successfully:', result)
+      toast.success('Template opgeslagen!')
+      await loadTemplates() // Reload templates
+    } catch (error) {
+      console.error('Error saving template:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Onbekende fout'
+      toast.error(`Kon template niet opslaan: ${errorMsg}`)
+    }
+  }
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (!confirm('Weet je zeker dat je deze template wilt verwijderen?')) return
+
+    try {
+      await deleteEmailTemplate(id)
+      toast.success('Template verwijderd')
+      loadTemplates()
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      toast.error('Kon template niet verwijderen')
+    }
+  }
+
+  const handleUseTemplate = async (template: EmailTemplate) => {
+    try {
+      await incrementTemplateUsage(template.id)
+      handleCopyToClipboard(
+        `${template.subject}\n\n${template.body}`,
+        'Template'
+      )
+      loadTemplates() // Reload to update usage count
+    } catch (error) {
+      console.error('Error using template:', error)
+      // Still copy even if usage tracking fails
+      handleCopyToClipboard(
+        `${template.subject}\n\n${template.body}`,
+        'Template'
+      )
+    }
   }
 
   return (
@@ -278,6 +371,56 @@ export default function Templates() {
         </Card>
       )}
 
+      {/* Saved Templates */}
+      {savedTemplates.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold">Opgeslagen Templates</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {savedTemplates.map((template) => (
+              <Card key={template.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="truncate">{template.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </CardTitle>
+                  <CardDescription className="truncate">
+                    {template.subject}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {template.body}
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(template.created_at).toLocaleDateString('nl-NL')}
+                    </span>
+                    {template.times_used > 0 && (
+                      <span>Gebruikt: {template.times_used}x</span>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => handleUseTemplate(template)}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Kopieer Template
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Generate Dialog */}
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
@@ -325,7 +468,14 @@ export default function Templates() {
               >
                 Sluiten
               </Button>
-              <Button onClick={handlePreview}>
+              <Button 
+                onClick={handleSaveTemplate}
+                variant="default"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Opslaan
+              </Button>
+              <Button onClick={handlePreview} variant="outline">
                 Bekijk Preview
               </Button>
               <Button
@@ -336,9 +486,10 @@ export default function Templates() {
                   )
                   setShowGenerateDialog(false)
                 }}
+                variant="outline"
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Kopieer en Sluiten
+                Kopieer
               </Button>
             </div>
           </div>
@@ -432,6 +583,23 @@ export default function Templates() {
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="additional_context">
+                Extra Context (Optioneel)
+              </Label>
+              <Textarea
+                id="additional_context"
+                value={additionalContext}
+                onChange={(e) => setAdditionalContext(e.target.value)}
+                placeholder="Bijvoorbeeld: specifieke use case, recente resultaten, doelgroep pijnpunten, of andere relevante info die de AI kan gebruiken om een betere template te maken"
+                rows={3}
+                className="text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Tip: Vertel meer over je doelgroep, specifieke problemen die je oplost, of recente successen
+              </p>
+            </div>
+
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button
                 onClick={() => setShowSettingsDialog(false)}
@@ -441,7 +609,7 @@ export default function Templates() {
               </Button>
               <Button onClick={handleQuickSettingsSave} disabled={isGenerating}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                {isGenerating ? 'Genereren...' : 'Opslaan & Genereren'}
+                {isGenerating ? 'Genereren...' : 'Genereer Template'}
               </Button>
             </div>
           </div>

@@ -11,6 +11,7 @@ interface CompanyInfo {
   targetAudience: string
   industry?: string
   calendlyLink?: string
+  additionalContext?: string
 }
 
 interface GeneratedTemplate {
@@ -47,11 +48,27 @@ Deno.serve(async (req) => {
     if (!companyInfo.targetAudience) missingFields.push('targetAudience')
     
     if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
+      return new Response(
+        JSON.stringify({
+          error: `Verplichte velden ontbreken: ${missingFields.join(', ')}. Vul deze in via Configuratie > Bedrijfsinformatie.`,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     if (!CLAUDE_API_KEY) {
-      throw new Error('CLAUDE_API_KEY not configured')
+      return new Response(
+        JSON.stringify({
+          error: 'AI functionaliteit is niet geconfigureerd. Neem contact op met je administrator om de CLAUDE_API_KEY in te stellen in Supabase Edge Function secrets.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     // Build USPs string
@@ -67,15 +84,48 @@ Je schrijft cold emails die:
 - Leiden tot een reactie of meeting
 - Kort en bondig zijn (max 120 woorden)
 
-BELANGRIJKE PRINCIPES:
-1. Start met een haak die nieuwsgierigheid wekt
-2. Maak het over HUN probleem, niet jouw product
-3. Gebruik social proof als relevant
-4. Eindige met een zachte CTA (geen harde verkoop)
-5. Gebruik NOOIT placeholders zoals [Naam], [Bedrijf]
-6. Schrijf in het Nederlands
-7. Gebruik een professionele maar toegankelijke toon
-8. GEEN "Met vriendelijke groet" of handtekening aan het einde`
+ABSOLUTE REGELS - NOOIT OVERTREDEN:
+1. VERBODEN: Placeholders zoals [naam], [bedrijf], [link], [voornaam], etc.
+2. Begin de email direct met een opening die algemeen genoeg is voor meerdere ontvangers
+3. Gebruik "je", "jouw", "jullie" ZONDER specifieke namen
+4. Als Calendly link beschikbaar: gebruik de VOLLEDIGE URL in klikbare vorm
+5. Start met een haak die nieuwsgierigheid wekt
+6. Maak het over HUN probleem, niet jouw product
+7. Eindige met concrete CTA inclusief link
+8. Nederlands, professioneel maar toegankelijk
+9. GEEN groet of handtekening
+
+VERMIJD TYPISCHE AI-KENMERKEN:
+- GEEN clichés: "game-changer", "revolutionair", "cutting-edge", "innovatief", "disruptief"
+- GEEN overdreven enthousiasme: "super interessant!", "geweldig!", "fantastisch!"
+- GEEN typische AI-zinnen: "Laten we sparren", "Zou het interessant zijn om...", "Ik ben benieuwd naar..."
+- GEEN perfect gestructureerde paragrafen - schrijf natuurlijk en conversationeel
+- GEEN buzzwords en corporate jargon - schrijf zoals een mens praat
+- GEEN emoji's of uitroeptekens na elk zinnetje
+- Gebruik eenvoudige, directe taal - niet te formeel, niet te casual
+- Schrijf alsof je een collega een berichtje stuurt
+
+SCHRIJF MENSELIJK:
+✓ "Je krijgt waarschijnlijk veel van dit soort mails..."
+✓ "Ik houd het kort..."
+✓ "Dit werkt voor bureaus zoals jouw bedrijf omdat..."
+✓ Varieer zinslengte - sommige kort. Andere langer met extra context.
+
+FOUT - TYPISCHE AI TAAL:
+✗ "Laten we binnenkort even sparren!"
+✗ "Dit is een game-changer voor jouw business"
+✗ "Zou het interessant zijn om hier eens over door te praten?"
+✗ "Ik ben benieuwd naar je uitdaging op dit gebied"
+
+VOORBEELDEN VAN GOEDE OPENINGS (ZONDER PLACEHOLDERS):
+✓ "Ik zag dat veel webdesign bureaus moeite hebben met..."
+✓ "Wat als je volgende maand 20% meer leads zou hebben zonder..."
+✓ "De meeste marketing teams maken deze fout bij..."
+
+FOUT - NOOIT DOEN:
+✗ "Hé [naam],"
+✗ "Beste [voornaam],"
+✗ "Klik hier: [link naar Calendly]"`
 
     const userPrompt = `Genereer een overtuigende cold email template met deze bedrijfsinformatie:
 
@@ -88,14 +138,41 @@ ${companyInfo.industry ? `INDUSTRIE: ${companyInfo.industry}` : ''}
 UNIQUE SELLING POINTS:
 ${uspsText}
 
-${companyInfo.calendlyLink ? `CALENDLY LINK: ${companyInfo.calendlyLink}` : ''}
+${companyInfo.additionalContext ? `
+EXTRA CONTEXT (BELANGRIJK):
+${companyInfo.additionalContext}
 
-Maak een email die:
-- Een pakkende onderwerpregel heeft die nieuwsgierigheid wekt
-- Een opening heeft die direct relevant is voor de target audience
-- Een probleem of uitdaging adresseert die zij hebben
-- Kort uitlegt hoe jullie kunnen helpen
-- Eindigt met een zachte vraag of CTA (bij voorkeur link naar meeting als Calendly beschikbaar is)
+Gebruik deze extra context om de email nog relevanter en specifieker te maken.
+` : ''}
+
+${companyInfo.calendlyLink ? `
+=== CALENDLY LINK - VERPLICHT ===
+${companyInfo.calendlyLink}
+
+Je MOET deze exacte URL gebruiken in de CTA aan het einde van de email.
+VOORBEELD: "Plan hier een gesprek in: ${companyInfo.calendlyLink}"
+Of: "Klik hier om een tijdslot te kiezen: ${companyInfo.calendlyLink}"
+
+NOOIT: "[Link naar Calendly]" of "[Calendly]" of andere placeholders!
+` : 'GEEN Calendly link beschikbaar - gebruik een zachte vraag CTA zoals "Laat me weten of dit interessant klinkt"'}
+
+VEREISTEN VOOR DE EMAIL:
+1. Begin ZONDER placeholder - gebruik directe aanspraakvorm
+   ✓ "Wat als je volgende maand..."
+   ✓ "Ik zag dat veel [doelgroep]..."
+   ✗ "Hé [naam]," - DIT MAG NIET
+
+2. Pakkende onderwerpregel (nieuwsgierigheid, geen spam)
+
+3. Opening: direct relevant probleem of kans voor de doelgroep
+
+4. Kort uitleggen hoe jullie helpen (2-3 zinnen max)
+
+5. CTA aan het einde${companyInfo.calendlyLink ? ` met de VOLLEDIGE Calendly link:\n   "${companyInfo.calendlyLink}"` : ''}
+
+6. GEEN groet, GEEN naam, GEEN handtekening
+
+De body moet direct beginnen met de opening en eindigen met de CTA.
 
 BELANGRIJK: Geef ALLEEN een JSON object terug met exact deze structuur:
 {
@@ -120,7 +197,7 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
         max_tokens: 1500,
-        temperature: 0.8, // Hoger voor meer creativiteit
+        temperature: 0.7, // Balans tussen creativiteit en consistentie
         system: systemPrompt,
         messages: [
           {
@@ -134,7 +211,28 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Claude API error:', errorText)
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`)
+      
+      let errorMessage = 'AI service niet bereikbaar. '
+      
+      if (response.status === 401) {
+        errorMessage += 'API key is ongeldig of verlopen. Vernieuw de CLAUDE_API_KEY in Supabase secrets.'
+      } else if (response.status === 429) {
+        errorMessage += 'Te veel verzoeken. Probeer het later opnieuw.'
+      } else if (response.status === 400) {
+        errorMessage += 'Ongeldig verzoek naar AI service. Check je bedrijfsinformatie.'
+      } else {
+        errorMessage += `Status ${response.status}. Check Supabase logs voor details.`
+      }
+      
+      return new Response(
+        JSON.stringify({
+          error: errorMessage,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     const data = await response.json()
@@ -207,7 +305,16 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
       console.error('Attempted to parse:', claudeResponse.substring(0, 500))
-      throw new Error('Failed to parse Claude response as JSON')
+      
+      return new Response(
+        JSON.stringify({
+          error: 'AI response kon niet worden verwerkt. De AI heeft een ongeldig formaat teruggestuurd. Probeer het opnieuw.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     return new Response(JSON.stringify(result), {
@@ -216,16 +323,11 @@ De body moet direct beginnen met de opening en eindigen na de CTA - ZONDER groet
   } catch (error) {
     console.error('Error in generate-cold-email-template function:', error)
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = error instanceof Error ? error.message : 'Onbekende fout'
     
     return new Response(
       JSON.stringify({
-        templateName: '',
-        subject: '',
-        body: '',
-        tone: '',
-        targetSegment: '',
-        error: errorMessage,
+        error: `Template generatie mislukt: ${errorMessage}. Check Supabase logs voor meer details.`,
       }),
       {
         status: 500,
