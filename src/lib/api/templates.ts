@@ -47,26 +47,51 @@ export async function generateColdEmailTemplate(companyInfo: {
 
     console.log('Edge Function response:', { data, error })
 
+    // First check if data itself contains an error (Edge Function returned error in response body)
+    if (data && data.error) {
+      console.error('Edge Function returned error in data:', data.error)
+      throw new Error(data.error)
+    }
+
     if (error) {
       console.error('Edge Function Error Details:', {
         message: error.message,
         status: error.context?.status,
         statusText: error.context?.statusText,
-        body: error.context?.body,
         fullError: error
       })
       
-      throw new Error(`${error.message || 'Edge Function fout'}`)
+      // Try to get error details from the Response body
+      let errorMessage = error.message || 'Edge Function error'
+      
+      if (error.context instanceof Response) {
+        try {
+          const responseText = await error.context.text()
+          console.log('Error response body:', responseText)
+          
+          try {
+            const responseJson = JSON.parse(responseText)
+            if (responseJson.error) {
+              errorMessage = responseJson.error
+            }
+          } catch (jsonError) {
+            // If not JSON, use the text directly
+            if (responseText) {
+              errorMessage = responseText
+            }
+          }
+        } catch (readError) {
+          console.error('Could not read error response:', readError)
+        }
+      }
+      
+      // Throw the extracted error message
+      throw new Error(errorMessage)
     }
 
     if (!data) {
       console.error('No data returned from Edge Function')
       throw new Error('AI service gave no response. Is the Edge Function deployed correctly?')
-    }
-
-    // Check if the response contains an error
-    if (data.error) {
-      throw new Error(data.error)
     }
 
     // Validate required fields in response

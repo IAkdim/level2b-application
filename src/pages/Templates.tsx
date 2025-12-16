@@ -53,6 +53,7 @@ export default function Templates() {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [validation, setValidation] = useState({ isValid: false, missingFields: [] as string[] })
+  const [generationError, setGenerationError] = useState<string | null>(null)
   
   // Form state for editing generated template
   const [templateName, setTemplateName] = useState('')
@@ -111,6 +112,7 @@ export default function Templates() {
     if (existing) {
       setQuickSettings(existing)
     }
+    setGenerationError(null) // Clear any previous errors
     setShowSettingsDialog(true)
   }
 
@@ -136,15 +138,18 @@ export default function Templates() {
     const result = validateSettingsForTemplateGeneration(quickSettings)
     setValidation(result)
     
-    // Close dialog FIRST before generating
-    setShowSettingsDialog(false)
+    // Generate template - only close dialog if successful
+    const success = await generateTemplate(quickSettings)
     
-    // Then generate
-    await generateTemplate(quickSettings)
+    // Only close dialog if generation was successful
+    if (success) {
+      setShowSettingsDialog(false)
+    }
   }
 
-  const generateTemplate = async (settings: CompanySettings) => {
+  const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
     setIsGenerating(true)
+    setGenerationError(null) // Clear previous errors
     try {
       const result = await generateColdEmailTemplate({
         companyName: settings.company_name!,
@@ -166,13 +171,20 @@ export default function Templates() {
       // Reset additional context after successful generation
       setAdditionalContext('')
       toast.success('Template generated!')
+      return true // Success
     } catch (error) {
       console.error('Error generating template:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error during generation'
-      toast.error(errorMessage, {
-        duration: 6000,
-        description: 'Check the console for more details'
+      
+      // Store error in state to show in dialog
+      setGenerationError(errorMessage)
+      
+      // Also show toast
+      toast.error('Template generation failed', {
+        duration: 10000,
+        description: errorMessage,
       })
+      return false // Failed
     } finally {
       setIsGenerating(false)
     }
@@ -505,6 +517,23 @@ export default function Templates() {
               Fill in the fields below to generate a template
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Error message display */}
+          {generationError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-red-900 text-sm mb-1">
+                    Template Generation Failed
+                  </h4>
+                  <p className="text-sm text-red-800 whitespace-pre-wrap">
+                    {generationError}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="space-y-4">
             <div className="space-y-2">
