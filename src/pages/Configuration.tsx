@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings, Bell, Mail, Shield, Save, User, Building2, Link2 } from "lucide-react"
+import { Settings, Bell, Mail, Shield, User, Building2, Link2 } from "lucide-react"
 import { useTheme } from "@/contexts/ThemeContext"
 import { CompanySettingsForm } from "@/components/CompanySettingsForm"
 
@@ -89,11 +89,6 @@ export function Configuration() {
       excludeWeekends: true
     }
   })
-
-  const handleSaveSettings = () => {
-    // Here you would save to your backend
-    alert("Settings saved successfully!")
-  }
 
   const renderProfileSettings = () => (
     <div className="space-y-6">
@@ -435,17 +430,11 @@ export function Configuration() {
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your account settings and preferences
-          </p>
-        </div>
-        <Button onClick={handleSaveSettings} size="sm">
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your account settings and preferences
+        </p>
       </div>
 
       <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-8">
