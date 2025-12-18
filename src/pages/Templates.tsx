@@ -339,8 +339,14 @@ export default function Templates() {
         additional_context: additionalContext || undefined,
       })
       console.log('Template saved successfully:', result)
-      toast.success('Template saved!')
+      console.log('About to show toast and close dialog...')
+      toast.success('Template opgeslagen!')
+      console.log('Toast shown, reloading templates...')
       await loadTemplates() // Reload templates
+      console.log('Templates reloaded, closing dialog...')
+      setShowGenerateDialog(false) // Close the GENERATE dialog (not preview)
+      setGeneratedTemplate(null) // Reset generated template
+      console.log('Dialog closed and template reset')
     } catch (error) {
       console.error('Error saving template:', error)
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
