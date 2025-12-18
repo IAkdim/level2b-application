@@ -10,6 +10,9 @@ This directory is for **future migrations** only.
 ## Recent Migrations
 
 - `20251218104912_fix_organization_join_rls_policies.sql` - Fixed RLS policies to enable users to join organizations
+- `20251218105825_fix_organization_members_visibility.sql` - Fixed members list to show all team members, not just yourself
+- `20251218110158_fix_users_visibility_for_org_members.sql` - Fixed users table policy to allow viewing teammate profiles
+- `20251218111500_enable_rls_on_critical_tables.sql` - **CRITICAL FIX**: Enabled RLS on users and user_orgs tables
 
 ## Adding New Migrations
 
