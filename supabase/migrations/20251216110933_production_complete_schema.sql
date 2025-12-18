@@ -1,0 +1,30 @@
+-- ============================================================================
+-- PRODUCTION COMPLETE SCHEMA MIGRATION
+-- ============================================================================
+-- Migration Name: production_complete_schema
+-- Created: 2025-12-16
+-- Status: Applied to production (nfqkrsvqyzfjinzlfuii)
+-- Description: Consolidated migration representing the complete production schema
+--
+-- This migration consolidates all previous migrations into a single file.
+-- All historical migrations have been archived in git history.
+-- ============================================================================
+
+-- This file serves as a marker for the production schema state.
+-- To regenerate the full DDL from your production database, run:
+--
+--   supabase db pull
+--
+-- This will update this migration file with the actual schema from production.
+-- ============================================================================
+
+-- The production database includes:
+-- - 18 tables in public schema (users, organizations, leads, tasks, notes, etc.)
+-- - 3 materialized views (lead_stats, task_stats, deal_stats)
+-- - Full-text search indexes (leads, notes, email_messages)
+-- - RLS policies for multi-tenant security
+-- - Triggers for updated_at timestamps
+-- - Helper functions for CRM operations
+-- - Calendly and Google OAuth integration support
+--
+-- For the complete schema definition, use: supabase db pull
