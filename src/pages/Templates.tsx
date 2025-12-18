@@ -1,7 +1,7 @@
 // src/pages/Templates.tsx
 // Cold email template generator (no database storage)
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   generateColdEmailTemplate,
   type GeneratedTemplate,
@@ -10,6 +10,14 @@ import {
   deleteEmailTemplate,
   incrementTemplateUsage,
 } from '@/lib/api/templates'
+import { 
+  getDailyUsage,
+  checkUsageLimit,
+  incrementUsage,
+  formatUsageLimitError,
+  getTimeUntilReset,
+  type DailyUsage
+} from '@/lib/api/usageLimits'
 import type { EmailTemplate } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import {
@@ -37,6 +45,7 @@ import {
   Trash2,
   Save,
   Clock,
+  Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -55,6 +64,10 @@ export default function Templates() {
   const [validation, setValidation] = useState({ isValid: false, missingFields: [] as string[] })
   const [generationError, setGenerationError] = useState<string | null>(null)
   
+  // Usage limits state
+  const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null)
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true)
+  
   // Form state for editing generated template
   const [templateName, setTemplateName] = useState('')
   const [templateSubject, setTemplateSubject] = useState('')
@@ -72,6 +85,30 @@ export default function Templates() {
   })
   const [newUsp, setNewUsp] = useState('')
 
+  const loadDailyUsage = useCallback(async () => {
+    if (!selectedOrg?.id) return
+    
+    try {
+      setIsLoadingUsage(true)
+      const usage = await getDailyUsage(selectedOrg.id)
+      setDailyUsage(usage)
+    } catch (error) {
+      console.error('Error loading daily usage:', error)
+      // Don't show error toast - usage limits may not be set up yet
+      // Just set loading to false and continue without usage limits
+      setDailyUsage(null)
+    } finally {
+      setIsLoadingUsage(false)
+    }
+  }, [selectedOrg?.id])
+
+  // Load daily usage on mount and when org changes
+  useEffect(() => {
+    if (selectedOrg?.id) {
+      loadDailyUsage()
+    }
+  }, [selectedOrg?.id, loadDailyUsage])
+
   // Check validation on mount and update
   useEffect(() => {
     const checkValidation = () => {
@@ -82,16 +119,12 @@ export default function Templates() {
     checkValidation()
     
     // Re-check when window gets focus (after coming back from config)
-    window.addEventListener('focus', checkValidation)
-    return () => window.removeEventListener('focus', checkValidation)
+    const handleFocus = () => checkValidation()
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
-  // Load saved templates on mount
-  useEffect(() => {
-    loadTemplates()
-  }, [])
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     if (!selectedOrg?.id) return
     
     try {
@@ -104,7 +137,12 @@ export default function Templates() {
     } finally {
       setIsLoadingTemplates(false)
     }
-  }
+  }, [selectedOrg?.id])
+
+  // Load saved templates on mount
+  useEffect(() => {
+    loadTemplates()
+  }, [loadTemplates])
 
   const handleGenerateTemplate = async () => {
     // Always show quick settings dialog so user can add extra context
@@ -150,7 +188,28 @@ export default function Templates() {
   const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null) // Clear previous errors
+    
+    if (!selectedOrg?.id) {
+      setGenerationError('No organisation selected')
+      setIsGenerating(false)
+      return false
+    }
+
     try {
+      // Check usage limit before generating (only if usage limits are set up)
+      if (dailyUsage) {
+        const limitCheck = await checkUsageLimit(selectedOrg.id, 'template')
+        
+        if (!limitCheck.allowed) {
+          const errorMsg = formatUsageLimitError(limitCheck.error!)
+          const resetTime = getTimeUntilReset()
+          setGenerationError(`${errorMsg}\nResets in ${resetTime}`)
+          setIsGenerating(false)
+          toast.error(`Daily template limit reached. Resets in ${resetTime}`)
+          return false
+        }
+      }
+
       const result = await generateColdEmailTemplate({
         companyName: settings.company_name!,
         companyDescription: settings.company_description,
@@ -161,6 +220,20 @@ export default function Templates() {
         calendlyLink: settings.calendly_link,
         additionalContext: additionalContext.trim() || undefined,
       })
+
+      // Increment usage counter after successful generation (only if usage limits are set up)
+      if (dailyUsage) {
+        try {
+          const incrementResult = await incrementUsage(selectedOrg.id, 'template')
+          if (incrementResult.success) {
+            // Reload usage to update UI
+            await loadDailyUsage()
+          }
+        } catch (error) {
+          console.error('Error incrementing usage:', error)
+          // Don't fail the generation if usage tracking fails
+        }
+      }
 
       setGeneratedTemplate(result)
       setTemplateName(result.templateName)
@@ -291,13 +364,70 @@ export default function Templates() {
         </div>
         <Button 
           onClick={handleGenerateTemplate}
-          disabled={isGenerating}
+          disabled={isGenerating || (dailyUsage && dailyUsage.templatesRemaining === 0)}
           size="lg"
         >
           <Sparkles className="mr-2 h-4 w-4" />
           {isGenerating ? 'Generating...' : 'Generate New Template'}
         </Button>
       </div>
+
+      {/* Daily Usage Card */}
+      {!isLoadingUsage && dailyUsage && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Zap className="h-5 w-5 text-orange-600" />
+                <div>
+                  <h3 className="font-semibold text-orange-900">
+                    Daily Template Generation
+                  </h3>
+                  <p className="text-sm text-orange-800 mt-0.5">
+                    {dailyUsage.templatesRemaining} of {dailyUsage.templateLimit} templates remaining today
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-orange-600">
+                  {dailyUsage.templatesRemaining}/{dailyUsage.templateLimit}
+                </div>
+                <p className="text-xs text-orange-700 mt-1">
+                  Resets in {getTimeUntilReset()}
+                </p>
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="w-full bg-orange-200 rounded-full h-2">
+                <div 
+                  className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${Math.min(100, Math.max(0, (dailyUsage.templatesGenerated / dailyUsage.templateLimit) * 100))}%` 
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Warning when close to limit */}
+            {dailyUsage.templatesRemaining <= 2 && dailyUsage.templatesRemaining > 0 && (
+              <p className="text-xs text-orange-700 mt-2 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Only {dailyUsage.templatesRemaining} generation{dailyUsage.templatesRemaining === 1 ? '' : 's'} left today
+              </p>
+            )}
+
+            {/* Limit reached */}
+            {dailyUsage.templatesRemaining === 0 && (
+              <p className="text-sm text-orange-900 mt-3 font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Daily limit reached. Template generation will reset in {getTimeUntilReset()}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Warning if settings incomplete - now with direct action */}
       {!validation.isValid && (

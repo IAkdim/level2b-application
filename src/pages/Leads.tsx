@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X } from "lucide-react"
+import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X, Zap, AlertCircle } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,18 +15,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useLeads, useDeleteLead } from "@/hooks/useLeads"
 import { useDebounce } from "@/hooks/useDebounce"
+import { useOrganization } from "@/contexts/OrganizationContext"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
 import { ImportCSVDialog } from "@/components/ImportCSVDialog"
 import { BulkEmailDialog } from "@/components/BulkEmailDialog"
+import { getDailyUsage, getTimeUntilReset, type DailyUsage } from "@/lib/api/usageLimits"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
+import { toast } from "sonner"
 
 type SortColumn = 'name' | 'company' | 'created_at' | 'last_contact_at' | 'status'
 
 export function Leads() {
   const navigate = useNavigate()
+  const { selectedOrg } = useOrganization()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<LeadStatus[]>([])
   const [sentimentFilter, setSentimentFilter] = useState<Sentiment[]>([])
@@ -38,6 +42,32 @@ export function Leads() {
   const [showBulkEmailDialog, setShowBulkEmailDialog] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  
+  // Usage limits state
+  const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null)
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true)
+
+  // Load daily usage
+  const loadDailyUsage = useCallback(async () => {
+    if (!selectedOrg?.id) return
+    
+    try {
+      setIsLoadingUsage(true)
+      const usage = await getDailyUsage(selectedOrg.id)
+      setDailyUsage(usage)
+    } catch (error) {
+      console.error('Error loading daily usage:', error)
+      setDailyUsage(null)
+    } finally {
+      setIsLoadingUsage(false)
+    }
+  }, [selectedOrg?.id])
+
+  useEffect(() => {
+    if (selectedOrg?.id) {
+      loadDailyUsage()
+    }
+  }, [selectedOrg?.id, loadDailyUsage])
 
   // Debounce search to avoid excessive API calls
   const debouncedSearch = useDebounce(searchTerm, 300)
@@ -163,6 +193,7 @@ export function Leads() {
                   variant="default"
                   onClick={() => setShowBulkEmailDialog(true)}
                   className="bg-primary"
+                  disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
                 >
                   <Mail className="mr-2 h-4 w-4" />
                   Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
@@ -178,6 +209,63 @@ export function Leads() {
               </Button>
             </div>
           </div>
+
+          {/* Daily Email Usage Card */}
+          {!isLoadingUsage && dailyUsage && (
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Zap className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-blue-900">
+                        Daily Email Sending
+                      </h3>
+                      <p className="text-sm text-blue-800 mt-0.5">
+                        {dailyUsage.emailsRemaining} of {dailyUsage.emailLimit} emails remaining today
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {dailyUsage.emailsRemaining}/{dailyUsage.emailLimit}
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Resets in {getTimeUntilReset()}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="mt-4">
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, (dailyUsage.emailsSent / dailyUsage.emailLimit) * 100))}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Warning when close to limit */}
+                {dailyUsage.emailsRemaining <= 10 && dailyUsage.emailsRemaining > 0 && (
+                  <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Only {dailyUsage.emailsRemaining} email{dailyUsage.emailsRemaining === 1 ? '' : 's'} left today
+                  </p>
+                )}
+
+                {/* Limit reached */}
+                {dailyUsage.emailsRemaining === 0 && (
+                  <p className="text-sm text-blue-900 mt-3 font-medium flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Daily email limit reached. Sending will reset in {getTimeUntilReset()}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Leads Table */}
           <Card className="border-border/30">
@@ -402,6 +490,7 @@ export function Leads() {
             open={showBulkEmailDialog}
             onOpenChange={setShowBulkEmailDialog}
             selectedLeads={getSelectedLeadsData()}
+            onEmailsSent={loadDailyUsage}
           />
         </div>
       </div>
