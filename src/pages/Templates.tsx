@@ -18,7 +18,7 @@ import {
   getTimeUntilReset,
   type DailyUsage
 } from '@/lib/api/usageLimits'
-import type { EmailTemplate } from '@/types/crm'
+import type { EmailTemplate, Language } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import { eventBus } from '@/lib/eventBus'
 import {
@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Sparkles, 
   Copy, 
@@ -78,6 +79,7 @@ export default function Templates() {
 
   // Extra context for template generation
   const [additionalContext, setAdditionalContext] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>('en')
 
   // Quick settings form state
   const [quickSettings, setQuickSettings] = useState<Partial<OrganizationSettings>>({
@@ -246,6 +248,7 @@ export default function Templates() {
         industry: settings.industry,
         calendlyLink: settings.calendly_link,
         additionalContext: additionalContext.trim() || undefined,
+        language: selectedLanguage,
       })
 
       // Increment usage counter after successful generation (only if usage limits are set up)
@@ -335,6 +338,7 @@ export default function Templates() {
         name: templateName,
         subject: templateSubject,
         body: templateBody,
+        language: selectedLanguage,
         company_info: settings,
         additional_context: additionalContext || undefined,
       })
@@ -734,6 +738,26 @@ export default function Templates() {
                 onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
                 placeholder="e.g. B2B SaaS companies with 10-50 employees"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="language">
+                Template Language <span className="text-red-500">*</span>
+              </Label>
+              <Select value={selectedLanguage} onValueChange={(value) => setSelectedLanguage(value as Language)}>
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">🇬🇧 English</SelectItem>
+                  <SelectItem value="nl">🇳🇱 Nederlands</SelectItem>
+                  <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                  <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                  <SelectItem value="es">🇪🇸 Español</SelectItem>
+                  <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                  <SelectItem value="pt">🇵🇹 Português</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

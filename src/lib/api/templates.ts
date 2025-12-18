@@ -2,7 +2,7 @@
 // Email template generation and storage API
 
 import { supabase } from '@/lib/supabaseClient'
-import type { EmailTemplate, CreateEmailTemplateInput, UpdateEmailTemplateInput } from '@/types/crm'
+import type { EmailTemplate, CreateEmailTemplateInput, UpdateEmailTemplateInput, Language } from '@/types/crm'
 
 export interface GeneratedTemplate {
   templateName: string
@@ -25,6 +25,7 @@ export async function generateColdEmailTemplate(companyInfo: {
   industry?: string
   calendlyLink?: string
   additionalContext?: string
+  language?: Language
 }): Promise<GeneratedTemplate> {
   try {
     console.log('Generating cold email template via Edge Function:', companyInfo)
