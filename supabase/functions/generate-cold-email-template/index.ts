@@ -262,6 +262,7 @@ Deno.serve(async (req) => {
       additionalContext: companyInfo.additionalContext
         ? sanitizeInput(companyInfo.additionalContext, INPUT_LIMITS.ADDITIONAL_CONTEXT)
         : undefined,
+      language: companyInfo.language,
     }
 
     if (!CLAUDE_API_KEY) {
