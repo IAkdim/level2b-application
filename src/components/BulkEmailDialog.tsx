@@ -1,12 +1,14 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles } from "lucide-react"
+import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles, Clock } from "lucide-react"
 import { sendBatchEmails } from "@/lib/api/gmail"
+import { getEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
+import type { EmailTemplate } from "@/types/crm"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth"
@@ -34,6 +36,41 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
   const [isComplete, setIsComplete] = useState(false)
+  const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+
+  // Load saved templates when dialog opens
+  useEffect(() => {
+    const loadTemplates = async () => {
+      if (!open || !selectedOrg?.id) return
+      
+      setIsLoadingTemplates(true)
+      try {
+        const templates = await getEmailTemplates(selectedOrg.id)
+        setSavedTemplates(templates)
+      } catch (error) {
+        console.error('Error loading templates:', error)
+      } finally {
+        setIsLoadingTemplates(false)
+      }
+    }
+    
+    loadTemplates()
+  }, [open, selectedOrg?.id])
+
+  const handleUseTemplate = async (template: EmailTemplate) => {
+    setSubject(template.subject)
+    setBody(template.body)
+    
+    // Increment usage counter
+    try {
+      await incrementTemplateUsage(template.id)
+    } catch (error) {
+      console.error('Error incrementing template usage:', error)
+    }
+    
+    toast.success('Template toegepast')
+  }
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
@@ -222,21 +259,64 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Navigate to Templates Page */}
-          <div className="flex justify-end">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                onOpenChange(false)
-                navigate('/templates')
-              }}
-              disabled={isSending}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Ga naar Templates
-            </Button>
-          </div>
+          {/* Saved Templates Section */}
+          {savedTemplates.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Saved Templates</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false)
+                    navigate('/outreach/templates')
+                  }}
+                  disabled={isSending}
+                >
+                  <Sparkles className="mr-2 h-3 w-3" />
+                  Maak nieuwe template
+                </Button>
+              </div>
+              <div className="grid gap-2 max-h-60 overflow-y-auto">
+                {savedTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                    onClick={() => handleUseTemplate(template)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{template.name}</div>
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">{template.subject}</div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                        <Clock className="h-3 w-3" />
+                        {template.times_used || 0}x
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No templates - show link to create */}
+          {savedTemplates.length === 0 && !isLoadingTemplates && (
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false)
+                  navigate('/outreach/templates')
+                }}
+                disabled={isSending}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Maak nieuwe template
+              </Button>
+            </div>
+          )}
 
           {/* Sending Progress */}
           {isSending && (
