@@ -20,38 +20,38 @@ interface ConfigSection {
 const configSections: ConfigSection[] = [
   {
     id: "company",
-    title: "Company Information",
-    description: "Info for template generation",
+    title: "Company",
+    description: "Company info",
     icon: Building2
   },
   {
     id: "connections",
     title: "Connections",
-    description: "Integraties met externe services",
+    description: "External integrations",
     icon: Link2
   },
   {
     id: "profile",
-    title: "Profile Settings",
-    description: "Personal information and preferences",
+    title: "Profile",
+    description: "Personal info",
     icon: User
   },
   {
     id: "email",
-    title: "Email Settings", 
-    description: "Email signature and sending preferences",
+    title: "Email", 
+    description: "Signature settings",
     icon: Mail
   },
   {
     id: "notifications",
     title: "Notifications",
-    description: "Alert preferences and timing",
+    description: "Alert settings",
     icon: Bell
   },
   {
     id: "campaigns",
-    title: "Campaign Settings",
-    description: "Default campaign behavior and limits",
+    title: "Campaigns",
+    description: "Campaign limits",
     icon: Settings
   }
 ]
@@ -463,11 +463,11 @@ export function Configuration() {
                     value={section.id}
                     className="w-full justify-start px-4 py-3 data-[state=active]:bg-muted rounded-none first:rounded-t-md last:rounded-b-md"
                   >
-                    <div className="flex items-center space-x-3">
-                      <section.icon className="h-4 w-4" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">{section.title}</div>
-                        <div className="text-xs text-muted-foreground">
+                    <div className="flex items-start space-x-3 w-full">
+                      <section.icon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div className="text-left flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{section.title}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2">
                           {section.description}
                         </div>
                       </div>

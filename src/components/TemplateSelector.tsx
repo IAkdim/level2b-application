@@ -16,11 +16,10 @@ import {
   type GeneratedTemplate 
 } from '@/lib/api/templates'
 import { 
-  getCompanySettings,
-  saveCompanySettings,
-  validateSettingsForTemplateGeneration,
-  type CompanySettings
-} from '@/lib/api/settings'
+  getOrganizationSettings,
+  updateOrganizationSettings,
+  type OrganizationSettings
+} from '@/lib/api/calendly'
 import {
   checkUsageLimit,
   incrementUsage,
@@ -54,7 +53,7 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
   
   // Settings state
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [quickSettings, setQuickSettings] = useState<CompanySettings>({
+  const [quickSettings, setQuickSettings] = useState<Partial<OrganizationSettings>>({
     company_name: '',
     product_service: '',
     target_audience: '',
@@ -62,12 +61,26 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
   })
   const [newUsp, setNewUsp] = useState('')
 
-  // Load saved templates
+  // Load saved templates and settings
   useEffect(() => {
     if (open && selectedOrg?.id) {
       loadTemplates()
+      loadSettings()
     }
   }, [open, selectedOrg?.id])
+
+  // Listen for settings updates from Configuration page
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      if (selectedOrg?.id) {
+        console.log('[TemplateSelector] Settings updated, reloading...')
+        loadSettings()
+      }
+    }
+
+    eventBus.on('companySettingsUpdated', handleSettingsUpdate)
+    return () => eventBus.off('companySettingsUpdated', handleSettingsUpdate)
+  }, [selectedOrg?.id])
 
   const loadTemplates = async () => {
     if (!selectedOrg?.id) return
@@ -84,28 +97,58 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
     }
   }
 
-  const handleGenerateClick = async () => {
-    // Load existing settings
-    const existing = getCompanySettings()
+  const loadSettings = async () => {
+    if (!selectedOrg?.id) return
     
-    if (existing) {
-      setQuickSettings(existing)
-      const result = validateSettingsForTemplateGeneration(existing)
-      
-      // If settings are complete, generate immediately
-      if (result.isValid) {
-        await generateTemplate(existing)
+    try {
+      console.log('[TemplateSelector] Loading settings for org:', selectedOrg.id)
+      const settings = await getOrganizationSettings(selectedOrg.id)
+      console.log('[TemplateSelector] Settings loaded:', settings)
+      if (settings) {
+        setQuickSettings({
+          company_name: settings.company_name || '',
+          company_description: settings.company_description || '',
+          product_service: settings.product_service || '',
+          target_audience: settings.target_audience || '',
+          unique_selling_points: settings.unique_selling_points || [],
+          industry: settings.industry || '',
+          calendly_link: settings.calendly_event_type_uri || '',
+        })
+        console.log('[TemplateSelector] QuickSettings updated')
       } else {
-        // Show settings dialog
-        setShowSettingsDialog(true)
+        console.log('[TemplateSelector] No settings found, using empty values')
       }
+    } catch (error) {
+      console.error('[TemplateSelector] Error loading settings:', error)
+    }
+  }
+
+  const handleGenerateClick = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
+
+    console.log('[TemplateSelector] Generate clicked, current quickSettings:', quickSettings)
+    
+    // Check if required fields are filled in current quickSettings
+    const isValid = quickSettings.company_name && quickSettings.product_service && quickSettings.target_audience
+    
+    if (isValid) {
+      console.log('[TemplateSelector] Settings valid, generating template')
+      await generateTemplate()
     } else {
-      // No settings, show dialog
+      console.log('[TemplateSelector] Settings incomplete, showing dialog')
       setShowSettingsDialog(true)
     }
   }
 
   const handleQuickSettingsSave = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
+
     // Validate required fields
     if (!quickSettings.company_name?.trim()) {
       toast.error('Company name is required')
@@ -120,18 +163,34 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
       return
     }
 
-    // Save settings
-    saveCompanySettings(quickSettings)
+    // Save settings to database
+    try {
+      await updateOrganizationSettings(selectedOrg.id, {
+        company_name: quickSettings.company_name,
+        company_description: quickSettings.company_description,
+        product_service: quickSettings.product_service,
+        target_audience: quickSettings.target_audience,
+        unique_selling_points: quickSettings.unique_selling_points,
+        industry: quickSettings.industry,
+      })
+      toast.success('Settings saved')
+      // Notify other components that settings were updated
+      eventBus.emit('companySettingsUpdated')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+      return
+    }
     
     // Generate template
-    const success = await generateTemplate(quickSettings)
+    const success = await generateTemplate()
     
     if (success) {
       setShowSettingsDialog(false)
     }
   }
 
-  const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
+  const generateTemplate = async (): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null)
     
@@ -155,13 +214,13 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
       }
 
       const result = await generateColdEmailTemplate({
-        companyName: settings.company_name!,
-        companyDescription: settings.company_description,
-        productService: settings.product_service!,
-        uniqueSellingPoints: settings.unique_selling_points,
-        targetAudience: settings.target_audience!,
-        industry: settings.industry,
-        calendlyLink: settings.calendly_link,
+        companyName: quickSettings.company_name!,
+        companyDescription: quickSettings.company_description,
+        productService: quickSettings.product_service!,
+        uniqueSellingPoints: quickSettings.unique_selling_points,
+        targetAudience: quickSettings.target_audience!,
+        industry: quickSettings.industry,
+        calendlyLink: quickSettings.calendly_link,
         additionalContext: additionalContext.trim() || undefined,
       })
 
@@ -238,7 +297,7 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" key={selectedOrg?.id}>
           <DialogHeader>
             <DialogTitle>Select or Generate Email Template</DialogTitle>
             <DialogDescription>
@@ -414,7 +473,7 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
 
       {/* Quick Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" key={selectedOrg?.id}>
           <DialogHeader>
             <DialogTitle>Complete Company Information</DialogTitle>
             <DialogDescription>

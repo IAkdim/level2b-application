@@ -22,11 +22,13 @@ import type { EmailTemplate } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import { eventBus } from '@/lib/eventBus'
 import {
-  getCompanySettings,
-  saveCompanySettings,
+  getOrganizationSettings,
+  updateOrganizationSettings,
+  type OrganizationSettings
+} from '@/lib/api/calendly'
+import {
   validateSettingsForTemplateGeneration,
   getFieldLabel,
-  type CompanySettings
 } from '@/lib/api/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -78,7 +80,7 @@ export default function Templates() {
   const [additionalContext, setAdditionalContext] = useState('')
 
   // Quick settings form state
-  const [quickSettings, setQuickSettings] = useState<CompanySettings>({
+  const [quickSettings, setQuickSettings] = useState<Partial<OrganizationSettings>>({
     company_name: '',
     product_service: '',
     target_audience: '',
@@ -112,8 +114,9 @@ export default function Templates() {
 
   // Check validation on mount and update
   useEffect(() => {
-    const checkValidation = () => {
-      const settings = getCompanySettings()
+    const checkValidation = async () => {
+      if (!selectedOrg?.id) return
+      const settings = await getOrganizationSettings(selectedOrg.id)
       const result = validateSettingsForTemplateGeneration(settings)
       setValidation(result)
     }
@@ -123,7 +126,7 @@ export default function Templates() {
     const handleFocus = () => checkValidation()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+  }, [selectedOrg?.id])
 
   const loadTemplates = useCallback(async () => {
     if (!selectedOrg?.id) return
@@ -152,8 +155,12 @@ export default function Templates() {
   }, [loadTemplates])
 
   const handleGenerateTemplate = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
     // Always show quick settings dialog so user can add extra context
-    const existing = getCompanySettings()
+    const existing = await getOrganizationSettings(selectedOrg.id)
     if (existing) {
       setQuickSettings(existing)
     }
@@ -162,6 +169,11 @@ export default function Templates() {
   }
 
   const handleQuickSettingsSave = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
+    
     // Validate required fields
     if (!quickSettings.company_name?.trim()) {
       toast.error('Company name is required')
@@ -176,8 +188,16 @@ export default function Templates() {
       return
     }
 
-    // Save settings
-    saveCompanySettings(quickSettings)
+    // Save settings to database
+    try {
+      await updateOrganizationSettings(selectedOrg.id, quickSettings)
+      // Emit event to notify other components
+      eventBus.emit('companySettingsUpdated')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+      return
+    }
     
     // Update validation
     const result = validateSettingsForTemplateGeneration(quickSettings)
@@ -310,7 +330,7 @@ export default function Templates() {
 
     try {
       console.log('Saving template to database...')
-      const settings = getCompanySettings()
+      const settings = await getOrganizationSettings(selectedOrg.id)
       const result = await saveEmailTemplate(selectedOrg.id, {
         name: templateName,
         subject: templateSubject,

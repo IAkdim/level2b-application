@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Save, Plus, X, Building2, Calendar, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { eventBus } from '@/lib/eventBus'
 
 interface CompanySettingsFormProps {
   showOnlyCalendly?: boolean
@@ -115,6 +116,19 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     }
   }, [selectedOrg?.id])
 
+  // Listen for settings updates from other components (e.g., TemplateSelector)
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      if (selectedOrg?.id) {
+        console.log('[CompanySettingsForm] Settings updated event received, reloading...')
+        loadSettings(selectedOrg.id)
+      }
+    }
+
+    eventBus.on('companySettingsUpdated', handleSettingsUpdate)
+    return () => eventBus.off('companySettingsUpdated', handleSettingsUpdate)
+  }, [selectedOrg?.id])
+
   // Check for Calendly OAuth callback - only once on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -181,6 +195,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       
       console.log('[CompanySettingsForm] Settings saved successfully')
       toast.success('Settings saved!')
+      
+      // Notify other components (like TemplateSelector) that settings were updated
+      eventBus.emit('companySettingsUpdated')
     } catch (error) {
       console.error('[CompanySettingsForm] CAUGHT ERROR:', error)
       toast.error('Error saving settings')

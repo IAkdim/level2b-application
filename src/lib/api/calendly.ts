@@ -34,13 +34,9 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
     .from('organization_settings')
     .select('*')
     .eq('org_id', orgId)
-    .single()
+    .maybeSingle()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // No settings found, return null
-      return null
-    }
     console.error('Error fetching organization settings:', error)
     throw error
   }
@@ -55,31 +51,45 @@ export async function updateOrganizationSettings(
   orgId: string,
   updates: Partial<OrganizationSettings>
 ): Promise<void> {
-  // Check if settings exist
-  const existing = await getOrganizationSettings(orgId)
+  console.log('[updateOrganizationSettings] Saving settings for org:', orgId)
+  console.log('[updateOrganizationSettings] Updates:', updates)
+  
+  // First, try to update existing row
+  const { data: updateData, error: updateError } = await supabase
+    .from('organization_settings')
+    .update(updates)
+    .eq('org_id', orgId)
+    .select()
 
-  if (existing) {
-    // Update existing
-    const { error } = await supabase
-      .from('organization_settings')
-      .update(updates)
-      .eq('org_id', orgId)
+  console.log('[updateOrganizationSettings] Update result:', { updateData, updateError })
 
-    if (error) {
-      console.error('Error updating organization settings:', error)
-      throw error
-    }
-  } else {
-    // Insert new
-    const { error } = await supabase
-      .from('organization_settings')
-      .insert({ org_id: orgId, ...updates })
-
-    if (error) {
-      console.error('Error inserting organization settings:', error)
-      throw error
-    }
+  // If update succeeded and returned data, we're done
+  if (updateData && updateData.length > 0) {
+    console.log('[updateOrganizationSettings] Update successful')
+    return
   }
+
+  // If update failed with real error (not just no rows), throw it
+  if (updateError) {
+    console.error('[updateOrganizationSettings] Update error:', updateError)
+    throw updateError
+  }
+
+  // If update succeeded but no rows affected, insert new row
+  console.log('[updateOrganizationSettings] No existing row, inserting new one')
+  const { data: insertData, error: insertError } = await supabase
+    .from('organization_settings')
+    .insert({ org_id: orgId, ...updates })
+    .select()
+
+  console.log('[updateOrganizationSettings] Insert result:', { insertData, insertError })
+
+  if (insertError) {
+    console.error('[updateOrganizationSettings] Insert error:', insertError)
+    throw insertError
+  }
+  
+  console.log('[updateOrganizationSettings] Settings saved successfully')
 }
 
 /**
