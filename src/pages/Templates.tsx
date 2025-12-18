@@ -28,7 +28,6 @@ import {
 } from '@/lib/api/calendly'
 import {
   validateSettingsForTemplateGeneration,
-  getFieldLabel,
 } from '@/lib/api/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -43,7 +42,6 @@ import {
   Copy, 
   Mail,
   AlertCircle,
-  Settings,
   Plus,
   X,
   Trash2,
@@ -56,12 +54,10 @@ import { useNavigate } from 'react-router-dom'
 
 
 export default function Templates() {
-  const navigate = useNavigate()
   const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
@@ -134,14 +130,11 @@ export default function Templates() {
     if (!selectedOrg?.id) return
     
     try {
-      setIsLoadingTemplates(true)
       const templates = await getEmailTemplates(selectedOrg.id)
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
       toast.error('Could not load templates')
-    } finally {
-      setIsLoadingTemplates(false)
     }
   }, [selectedOrg?.id])
 
@@ -214,7 +207,7 @@ export default function Templates() {
     }
   }
 
-  const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
+  const generateTemplate = async (settings: Partial<OrganizationSettings>): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null) // Clear previous errors
     
@@ -339,7 +332,7 @@ export default function Templates() {
         subject: templateSubject,
         body: templateBody,
         language: selectedLanguage,
-        company_info: settings,
+        company_info: settings || undefined,
         additional_context: additionalContext || undefined,
       })
       console.log('Template saved successfully:', result)
@@ -401,7 +394,7 @@ export default function Templates() {
         </div>
         <Button 
           onClick={handleGenerateTemplate}
-          disabled={isGenerating || (dailyUsage && dailyUsage.templatesRemaining === 0)}
+          disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
           size="lg"
         >
           <Sparkles className="mr-2 h-4 w-4" />
