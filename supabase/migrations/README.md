@@ -7,6 +7,10 @@ This directory is for **future migrations** only.
 ✅ All historical migrations have been applied to production and archived
 🔄 Redesign migrations are pending in `migrations_pending/`
 
+## Recent Migrations
+
+- `20251218104912_fix_organization_join_rls_policies.sql` - Fixed RLS policies to enable users to join organizations
+
 ## Adding New Migrations
 
 When you need to make new database changes:
