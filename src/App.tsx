@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { GuideDialog } from "@/components/GuideDialog"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
+import { Toaster } from "@/components/ui/sonner"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -94,6 +95,7 @@ function App() {
             />
               </Routes>
             </Suspense>
+            <Toaster />
           </OrganizationProvider>
         </Router>
       </ThemeProvider>
