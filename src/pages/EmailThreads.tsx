@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles } from "lucide-react";
-import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, type Email } from "@/lib/api/gmail";
-import { generateSalesReply, type EmailReplyContext } from "@/lib/api/claude-secure";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles, Trash2, X } from "lucide-react";
+import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, deleteGmailLabel, type Email } from "@/lib/api/gmail";
+import { generateSalesReply, type EmailReplyContext, analyzeSentiment } from "@/lib/api/claude-secure";
+import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth";
 import { formatRelativeTime } from "@/lib/utils/formatters";
 import { toast } from "sonner";
 
@@ -32,6 +34,8 @@ export function EmailThreads() {
   const [replyBody, setReplyBody] = useState("");
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
+  const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
 
   // Fetch available labels on mount
   useEffect(() => {
@@ -48,15 +52,28 @@ export function EmailThreads() {
   const loadLabels = async () => {
     try {
       const labels = await getGmailLabels();
-      // Filter only custom labels (not system labels like INBOX, SENT, etc.)
-      const customLabels = labels.filter(
-        (l) => !['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT'].includes(l.id)
-      );
+      
+      // Filter systeemlabels - alleen user-created labels tonen
+      const systemLabelPrefixes = ['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT', 'CHAT', 'CATEGORY_'];
+      const systemLabelNames = ['Junk', 'Notes'];
+      
+      const customLabels = labels.filter((l) => {
+        // Filter op ID (systeem labels hebben uppercase IDs die starten met bekend prefixes)
+        const hasSystemPrefix = systemLabelPrefixes.some(prefix => l.id.startsWith(prefix));
+        // Filter op naam
+        const isSystemName = systemLabelNames.includes(l.name);
+        // Filter labels die eindigen op _STAR (zoals YELLOW_STAR, RED_STAR, etc.)
+        const isStar = l.id.endsWith('_STAR');
+        
+        return !hasSystemPrefix && !isSystemName && !isStar && l.type !== 'system';
+      });
+      
       setAvailableLabels(customLabels);
       
-      // Auto-select first label if available
+      // Auto-select laatst aangemaakte label (laatste in de lijst)
       if (customLabels.length > 0 && !selectedLabel) {
-        setSelectedLabel(customLabels[0].name);
+        const latestLabel = customLabels[customLabels.length - 1];
+        setSelectedLabel(latestLabel.name);
       }
     } catch (error) {
       console.error("Error loading labels:", error);
@@ -75,16 +92,38 @@ export function EmailThreads() {
       console.log("Sent emails loaded:", sent.length);
       setSentEmails(sent);
 
-      // Haal reacties op emails met dit label
-      const repliesData = await getRepliesByLabel(selectedLabel, false); // Fetch all replies, not just unread
+      // Haal reacties op emails met dit label (zonder sentiment analyse)
+      const repliesData = await getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
       console.log("Replies loaded:", repliesData.length);
       setReplies(repliesData);
       
       setLastRefresh(new Date());
     } catch (error) {
       console.error("Error loading emails:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`An error occurred while loading emails:\n${errorMessage}\n\nCheck that:\n- You are logged in with Google\n- You have granted Gmail permissions\n- The label "${selectedLabel}" exists in Gmail`);
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        toast.error("Error loading emails", {
+          description: errorMessage,
+          duration: 5000
+        })
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +136,121 @@ export function EmailThreads() {
       await loadEmails();
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleAnalyzeSentiment = async () => {
+    if (selectedEmailIds.size === 0) {
+      toast.error("Selecteer eerst emails", {
+        description: "Selecteer minimaal één email om sentiment te analyseren"
+      });
+      return;
+    }
+
+    setIsAnalyzingSentiment(true);
+    const selectedEmails = replies.filter(r => selectedEmailIds.has(r.id));
+    let successCount = 0;
+    let errorCount = 0;
+
+    toast.info(`Sentiment analyse gestart voor ${selectedEmails.length} email${selectedEmails.length !== 1 ? 's' : ''}...`);
+
+    for (const email of selectedEmails) {
+      try {
+        const sentiment = await analyzeSentiment(email.body, email.subject);
+        
+        // Update de email in de state
+        setReplies(prevReplies => 
+          prevReplies.map(r => 
+            r.id === email.id ? { ...r, sentiment } : r
+          )
+        );
+        
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to analyze sentiment for email ${email.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    setIsAnalyzingSentiment(false);
+    setSelectedEmailIds(new Set()); // Clear selection
+
+    if (successCount > 0) {
+      toast.success(`Sentiment analyse voltooid`, {
+        description: `${successCount} email${successCount !== 1 ? 's' : ''} geanalyseerd${errorCount > 0 ? `, ${errorCount} mislukt` : ''}`
+      });
+    } else {
+      toast.error("Sentiment analyse mislukt", {
+        description: "Geen emails konden worden geanalyseerd"
+      });
+    }
+  };
+
+  const handleToggleEmailSelection = (emailId: string) => {
+    setSelectedEmailIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(emailId)) {
+        newSet.delete(emailId);
+      } else {
+        newSet.add(emailId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllEmails = () => {
+    if (selectedEmailIds.size === filteredReplies.length) {
+      setSelectedEmailIds(new Set());
+    } else {
+      setSelectedEmailIds(new Set(filteredReplies.map(r => r.id)));
+    }
+  };
+
+  const handleDeleteLabel = async (labelId: string, labelName: string) => {
+    if (!confirm(`Are you sure you want to delete the label "${labelName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteGmailLabel(labelId);
+      toast.success("Label deleted", {
+        description: `The label "${labelName}" has been deleted successfully`
+      });
+      
+      // Als de verwijderde label de geselecteerde was, clear de selectie
+      if (selectedLabel === labelName) {
+        setSelectedLabel("");
+        setReplies([]);
+        setSentEmails([]);
+      }
+      
+      // Reload labels
+      await loadLabels();
+    } catch (error) {
+      console.error("Error deleting label:", error);
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+                toast.success("Re-authentication successful")
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        toast.error("Failed to delete label", {
+          description: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
     }
   };
 
@@ -206,7 +360,26 @@ export function EmailThreads() {
       await loadEmails();
     } catch (error) {
       console.error('Error sending reply:', error);
-      toast.error('Error sending reply');
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        toast.error('Error sending reply');
+      }
     } finally {
       setIsSendingReply(false);
     }
@@ -256,24 +429,54 @@ export function EmailThreads() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedLabel} onValueChange={setSelectedLabel}>
-            <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Select a label..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableLabels.length === 0 ? (
-                <SelectItem value="none" disabled>
-                  No custom labels found
-                </SelectItem>
-              ) : (
-                availableLabels.map((label) => (
-                  <SelectItem key={label.id} value={label.name}>
-                    {label.name}
+          <div className="space-y-3">
+            <Select value={selectedLabel} onValueChange={setSelectedLabel}>
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder="Select a label..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableLabels.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No custom labels found
                   </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+                ) : (
+                  availableLabels.map((label) => (
+                    <SelectItem key={label.id} value={label.name}>
+                      {label.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            
+            {/* Label Management - Show delete buttons for all labels */}
+            {availableLabels.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Manage Labels</p>
+                <div className="flex flex-wrap gap-2">
+                  {availableLabels.map((label) => (
+                    <div 
+                      key={label.id}
+                      className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-1.5 text-sm"
+                    >
+                      <span className="font-medium">{label.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteLabel(label.id, label.name);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -444,10 +647,44 @@ export function EmailThreads() {
         <TabsContent value="responses" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Replies</CardTitle>
-              <CardDescription>
-                {filteredReplies.length} repl{filteredReplies.length !== 1 ? 'ies' : 'y'} to emails with label "{selectedLabel}"
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Replies</CardTitle>
+                  <CardDescription>
+                    {filteredReplies.length} repl{filteredReplies.length !== 1 ? 'ies' : 'y'} to emails with label "{selectedLabel}"
+                  </CardDescription>
+                </div>
+                {filteredReplies.length > 0 && (
+                  <div className="flex items-center space-x-3">
+                    {selectedEmailIds.size > 0 && (
+                      <Button
+                        onClick={handleAnalyzeSentiment}
+                        disabled={isAnalyzingSentiment}
+                        className="bg-primary"
+                      >
+                        {isAnalyzingSentiment ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyseren...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Analyze Sentiment ({selectedEmailIds.size})
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={handleSelectAllEmails}
+                      size="sm"
+                    >
+                      {selectedEmailIds.size === filteredReplies.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -476,11 +713,18 @@ export function EmailThreads() {
                   {filteredReplies.map((email) => (
                     <div 
                       key={email.id} 
-                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => handleEmailClick(email)}
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          checked={selectedEmailIds.has(email.id)}
+                          onCheckedChange={() => handleToggleEmailSelection(email.id)}
+                          className="mt-1"
+                        />
+                        <div 
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleEmailClick(email)}
+                        >
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="font-medium">{email.from}</h3>
                             <Badge variant="success" className="text-xs">

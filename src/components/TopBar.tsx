@@ -1,9 +1,10 @@
-import { Bell, Search, HelpCircle, Building2, ChevronDown } from "lucide-react"
+import { Bell, Search, HelpCircle, Building2, ChevronDown, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { supabase } from "@/lib/supabaseClient"
+import { reAuthenticateWithGoogle } from "@/lib/api/reauth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -365,6 +366,21 @@ export function TopBar() {
                 <DropdownMenuItem onClick={() => navigate('/configuration')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={async () => {
+                    try {
+                      await reAuthenticateWithGoogle()
+                      toast.success("Re-authenticating with Google...")
+                    } catch (error) {
+                      console.error("Re-authentication failed:", error)
+                      toast.error("Re-authentication failed. Please try again.")
+                    }
+                  }}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-connect Gmail
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

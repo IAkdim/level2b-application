@@ -20,6 +20,7 @@ import {
 } from '@/lib/api/usageLimits'
 import type { EmailTemplate } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { eventBus } from '@/lib/eventBus'
 import {
   getCompanySettings,
   saveCompanySettings,
@@ -142,6 +143,12 @@ export default function Templates() {
   // Load saved templates on mount
   useEffect(() => {
     loadTemplates()
+  }, [loadTemplates])
+
+  // Listen for template saved events from other components (e.g., BulkEmailDialog)
+  useEffect(() => {
+    const unsubscribe = eventBus.on('templateSaved', loadTemplates)
+    return unsubscribe
   }, [loadTemplates])
 
   const handleGenerateTemplate = async () => {
@@ -726,13 +733,13 @@ export default function Templates() {
                   {quickSettings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                       >
                         <X className="h-3 w-3" />
                       </button>

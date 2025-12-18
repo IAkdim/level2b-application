@@ -17,7 +17,7 @@ export async function getLeads(
   pagination?: PaginationParams
 ): Promise<PaginatedResponse<Lead>> {
   const page = pagination?.page || 1
-  const limit = pagination?.limit || 50
+  const limit = pagination?.limit || 500
   const offset = (page - 1) * limit
 
   let query = supabase

@@ -463,13 +463,13 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                   {settings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-red-500"
+                        className="text-gray-500 dark:text-gray-400 hover:text-red-500"
                       >
                         <X className="h-3 w-3" />
                       </button>

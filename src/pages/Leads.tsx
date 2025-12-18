@@ -19,7 +19,7 @@ import { useOrganization } from "@/contexts/OrganizationContext"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
-import { ImportCSVDialog } from "@/components/ImportCSVDialog"
+import { ImportLeadsDialog } from "@/components/ImportLeadsDialog"
 import { BulkEmailDialog } from "@/components/BulkEmailDialog"
 import { getDailyUsage, getTimeUntilReset, type DailyUsage } from "@/lib/api/usageLimits"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
@@ -124,9 +124,36 @@ export function Leads() {
 
     try {
       await deleteLead.mutateAsync(lead.id)
+      toast.success(`${lead.name} deleted successfully`)
     } catch (error) {
       console.error("Failed to delete lead:", error)
-      alert("Failed to delete lead")
+      toast.error("Failed to delete lead")
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedLeads.size === 0) {
+      toast.error("No leads selected")
+      return
+    }
+
+    const count = selectedLeads.size
+    if (!confirm(`Are you sure you want to delete ${count} lead${count !== 1 ? 's' : ''}? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const deletePromises = Array.from(selectedLeads).map(leadId => 
+        deleteLead.mutateAsync(leadId)
+      )
+      
+      await Promise.all(deletePromises)
+      
+      toast.success(`${count} lead${count !== 1 ? 's' : ''} deleted successfully`)
+      setSelectedLeads(new Set())
+    } catch (error) {
+      console.error("Failed to delete leads:", error)
+      toast.error("Failed to delete some leads")
     }
   }
 
@@ -189,19 +216,28 @@ export function Leads() {
             </div>
             <div className="flex space-x-3">
               {selectedLeads.size > 0 && (
-                <Button
-                  variant="default"
-                  onClick={() => setShowBulkEmailDialog(true)}
-                  className="bg-primary"
-                  disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
-                </Button>
+                <>
+                  <Button
+                    variant="default"
+                    onClick={() => setShowBulkEmailDialog(true)}
+                    className="bg-primary"
+                    disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleBulkDelete}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
+                  </Button>
+                </>
               )}
               <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                Import Leads
               </Button>
               <Button onClick={() => setShowAddDialog(true)}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -212,25 +248,25 @@ export function Leads() {
 
           {/* Daily Email Usage Card */}
           {!isLoadingUsage && dailyUsage && (
-            <Card className="border-blue-200 bg-blue-50/50">
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Zap className="h-5 w-5 text-blue-600" />
+                    <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <div>
-                      <h3 className="font-semibold text-blue-900">
+                      <h3 className="font-semibold text-blue-900 dark:text-blue-100">
                         Daily Email Sending
                       </h3>
-                      <p className="text-sm text-blue-800 mt-0.5">
+                      <p className="text-sm text-blue-800 dark:text-blue-300 mt-0.5">
                         {dailyUsage.emailsRemaining} of {dailyUsage.emailLimit} emails remaining today
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {dailyUsage.emailsRemaining}/{dailyUsage.emailLimit}
                     </div>
-                    <p className="text-xs text-blue-700 mt-1">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                       Resets in {getTimeUntilReset()}
                     </p>
                   </div>
@@ -238,9 +274,9 @@ export function Leads() {
                 
                 {/* Progress bar */}
                 <div className="mt-4">
-                  <div className="w-full bg-blue-200 rounded-full h-2">
+                  <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
                       style={{ 
                         width: `${Math.min(100, Math.max(0, (dailyUsage.emailsSent / dailyUsage.emailLimit) * 100))}%` 
                       }}
@@ -250,7 +286,7 @@ export function Leads() {
 
                 {/* Warning when close to limit */}
                 {dailyUsage.emailsRemaining <= 10 && dailyUsage.emailsRemaining > 0 && (
-                  <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     Only {dailyUsage.emailsRemaining} email{dailyUsage.emailsRemaining === 1 ? '' : 's'} left today
                   </p>
@@ -258,7 +294,7 @@ export function Leads() {
 
                 {/* Limit reached */}
                 {dailyUsage.emailsRemaining === 0 && (
-                  <p className="text-sm text-blue-900 mt-3 font-medium flex items-center gap-2">
+                  <p className="text-sm text-blue-900 dark:text-blue-100 mt-3 font-medium flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Daily email limit reached. Sending will reset in {getTimeUntilReset()}
                   </p>
@@ -475,8 +511,8 @@ export function Leads() {
           {/* Add Lead Dialog */}
           <AddLeadDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
 
-          {/* Import CSV Dialog */}
-          <ImportCSVDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
+          {/* Import Leads Dialog */}
+          <ImportLeadsDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
 
           {/* Edit Lead Dialog */}
           <EditLeadDialog
