@@ -70,13 +70,13 @@ export function EmailThreads() {
     try {
       console.log("Loading emails for label:", selectedLabel);
       
-      // Haal ALLE emails met het label op (gelezen + ongelezen)
+      // Fetch ALL emails with the label (read + unread)
       const sent = await getEmailsByLabel(selectedLabel, 100);
       console.log("Sent emails loaded:", sent.length);
       setSentEmails(sent);
 
       // Haal reacties op emails met dit label
-      const repliesData = await getRepliesByLabel(selectedLabel, false); // Haal alle replies op, niet alleen unread
+      const repliesData = await getRepliesByLabel(selectedLabel, false); // Fetch all replies, not just unread
       console.log("Replies loaded:", repliesData.length);
       setReplies(repliesData);
       
@@ -84,7 +84,7 @@ export function EmailThreads() {
     } catch (error) {
       console.error("Error loading emails:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`Er is een fout opgetreden bij het laden van emails:\n${errorMessage}\n\nControleer of:\n- Je bent ingelogd met Google\n- Gmail permissies hebt gegeven\n- Het label "${selectedLabel}" bestaat in Gmail`);
+      alert(`An error occurred while loading emails:\n${errorMessage}\n\nCheck that:\n- You are logged in with Google\n- You have granted Gmail permissions\n- The label "${selectedLabel}" exists in Gmail`);
     } finally {
       setIsLoading(false);
     }
@@ -163,16 +163,16 @@ export function EmailThreads() {
       const generatedReply = await generateSalesReply(context);
 
       if (generatedReply.error) {
-        toast.error(`Fout bij genereren reply: ${generatedReply.error}`);
-        return;
+        toast.error(`Error generating reply: ${generatedReply.error}`)
+        return
       }
 
       setReplySubject(generatedReply.subject);
       setReplyBody(generatedReply.body);
-      toast.success(`AI reply gegenereerd (${generatedReply.tone})`);
+      toast.success(`AI reply generated (${generatedReply.tone})`)
     } catch (error) {
       console.error('Error generating AI reply:', error);
-      toast.error('Fout bij genereren AI reply');
+      toast.error('Error generating AI reply')
     } finally {
       setIsGeneratingReply(false);
     }
@@ -180,7 +180,7 @@ export function EmailThreads() {
 
   const handleSendReply = async () => {
     if (!selectedEmail || !replyBody.trim()) {
-      toast.error('Vul een bericht in om te versturen');
+      toast.error('Please enter a message to send');
       return;
     }
 
@@ -197,7 +197,7 @@ export function EmailThreads() {
         selectedLabel // Add label to sent reply
       );
 
-      toast.success(`Reply verzonden naar ${recipientEmail}`);
+      toast.success(`Reply sent to ${recipientEmail}`);
       setIsReplyDialogOpen(false);
       setReplyBody("");
       setReplySubject("");
@@ -206,7 +206,7 @@ export function EmailThreads() {
       await loadEmails();
     } catch (error) {
       console.error('Error sending reply:', error);
-      toast.error('Fout bij versturen reply');
+      toast.error('Error sending reply');
     } finally {
       setIsSendingReply(false);
     }
@@ -219,11 +219,11 @@ export function EmailThreads() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Email Threads</h1>
           <p className="text-muted-foreground">
-            Overzicht van email conversations met prospects
+            Overview of email conversations with prospects
           </p>
           {lastRefresh && (
             <p className="text-xs text-muted-foreground mt-1">
-              Laatste update: {formatRelativeTime(lastRefresh.toISOString())}
+              Last update: {formatRelativeTime(lastRefresh.toISOString())}
             </p>
           )}
         </div>
@@ -236,13 +236,13 @@ export function EmailThreads() {
             disabled={isRefreshing || isLoading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Ververs
+            Refresh
           </Button>
 
           {/* Filter toggle */}
           <Button variant="outline" size="sm" onClick={() => setShowFilters(v => !v)}>
             <Search className="mr-2 h-4 w-4" />
-            {showFilters ? 'Verberg' : 'Toon'} Filters
+            {showFilters ? 'Hide' : 'Show'} Filters
           </Button>
         </div>
       </div>
@@ -252,18 +252,18 @@ export function EmailThreads() {
         <CardHeader>
           <CardTitle className="text-base">Gmail Label</CardTitle>
           <CardDescription>
-            Selecteer het label van je outreach campagne
+            Select the label of your outreach campaign
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Select value={selectedLabel} onValueChange={setSelectedLabel}>
             <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Selecteer een label..." />
+              <SelectValue placeholder="Select a label..." />
             </SelectTrigger>
             <SelectContent>
               {availableLabels.length === 0 ? (
                 <SelectItem value="none" disabled>
-                  Geen custom labels gevonden
+                  No custom labels found
                 </SelectItem>
               ) : (
                 availableLabels.map((label) => (
@@ -281,25 +281,25 @@ export function EmailThreads() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Verzonden</CardTitle>
+            <CardTitle className="text-sm font-medium">Sent</CardTitle>
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{sentEmails.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Emails verzonden met label
+              Emails sent with label
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reacties</CardTitle>
+            <CardTitle className="text-sm font-medium">Replies</CardTitle>
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{replies.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Nieuwe reacties ontvangen
+              New replies received
             </p>
           </CardContent>
         </Card>
@@ -315,7 +315,7 @@ export function EmailThreads() {
                 : 0}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Percentage reacties
+              Percentage replies
             </p>
           </CardContent>
         </Card>
@@ -342,20 +342,20 @@ export function EmailThreads() {
         <Card>
           <CardHeader>
             <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter emails op basis van inhoud</CardDescription>
+            <CardDescription>Filter emails based on content</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex space-x-4">
               <div className="flex-1">
                 <Label htmlFor="search-threads" className="sr-only">
-                  Zoek emails
+                  Search emails
                 </Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
                   <Input
                     id="search-threads"
                     type="text"
-                    placeholder="Zoek op afzender, onderwerp, of bericht..."
+                    placeholder="Search by sender, subject, or message..."
                     className="pl-10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -371,10 +371,10 @@ export function EmailThreads() {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "sent" | "responses")}>
         <TabsList>
           <TabsTrigger value="sent">
-            Verzonden ({filteredSent.length})
+            Sent ({filteredSent.length})
           </TabsTrigger>
           <TabsTrigger value="responses">
-            Reacties ({filteredReplies.length})
+            Replies ({filteredReplies.length})
           </TabsTrigger>
         </TabsList>
 
@@ -382,9 +382,9 @@ export function EmailThreads() {
         <TabsContent value="sent" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Verzonden Emails</CardTitle>
+              <CardTitle>Sent Emails</CardTitle>
               <CardDescription>
-                {filteredSent.length} email{filteredSent.length !== 1 ? 's' : ''} verzonden met label "{selectedLabel}"
+                {filteredSent.length} email{filteredSent.length !== 1 ? 's' : ''} sent with label "{selectedLabel}"
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -396,14 +396,14 @@ export function EmailThreads() {
                 <div className="text-center py-16">
                   <Mail className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    Selecteer een label om emails te bekijken
+                    Select a label to view emails
                   </p>
                 </div>
               ) : filteredSent.length === 0 ? (
                 <div className="text-center py-16">
                   <Mail className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    Geen verzonden emails met dit label
+                    No sent emails with this label
                   </p>
                 </div>
               ) : (
@@ -419,7 +419,7 @@ export function EmailThreads() {
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="font-medium">{email.to}</h3>
                             <Badge variant="secondary" className="text-xs">
-                              Verzonden
+                              Sent
                             </Badge>
                           </div>
                           <p className="font-medium text-sm mb-1">{email.subject}</p>
@@ -444,9 +444,9 @@ export function EmailThreads() {
         <TabsContent value="responses" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Reacties</CardTitle>
+              <CardTitle>Replies</CardTitle>
               <CardDescription>
-                {filteredReplies.length} reactie{filteredReplies.length !== 1 ? 's' : ''} op emails met label "{selectedLabel}"
+                {filteredReplies.length} repl{filteredReplies.length !== 1 ? 'ies' : 'y'} to emails with label "{selectedLabel}"
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -458,17 +458,17 @@ export function EmailThreads() {
                 <div className="text-center py-16">
                   <Mail className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    Selecteer een label om reacties te bekijken
+                    Select a label to view replies
                   </p>
                 </div>
               ) : filteredReplies.length === 0 ? (
                 <div className="text-center py-16">
                   <Mail className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground font-medium mb-1">
-                    Nog geen reacties ontvangen
+                    No replies received yet
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Nieuwe reacties verschijnen hier automatisch
+                    New replies will appear here automatically
                   </p>
                 </div>
               ) : (
@@ -484,7 +484,7 @@ export function EmailThreads() {
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="font-medium">{email.from}</h3>
                             <Badge variant="success" className="text-xs">
-                              Nieuwe Reactie
+                              New Reply
                             </Badge>
                             {email.sentiment && (
                               <Badge 
@@ -495,9 +495,9 @@ export function EmailThreads() {
                                 }
                                 className="text-xs"
                               >
-                                {email.sentiment.sentiment === 'positive' ? '🟢 Positief' :
-                                 email.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
-                                 '🔴 Niet Geïnteresseerd'}
+                                {email.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                                 email.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
+                                 '🔴 Not Interested'}
                               </Badge>
                             )}
                           </div>
@@ -508,7 +508,7 @@ export function EmailThreads() {
                           {email.sentiment && (
                             <>
                               <p className="text-xs text-muted-foreground italic mb-2">
-                                AI Analyse: {email.sentiment.reasoning}
+                                AI Analysis: {email.sentiment.reasoning}
                               </p>
                               {email.sentiment.error && (
                                 <p className="text-xs text-red-500 mb-2">
@@ -521,7 +521,7 @@ export function EmailThreads() {
                             <span>{formatRelativeTime(email.date.toISOString())}</span>
                             <span>Thread ID: {email.threadId.substring(0, 8)}...</span>
                             {email.sentiment && !email.sentiment.error && (
-                              <span>Zekerheid: {Math.round(email.sentiment.confidence * 100)}%</span>
+                              <span>Confidence: {Math.round(email.sentiment.confidence * 100)}%</span>
                             )}
                           </div>
                         </div>
@@ -546,15 +546,15 @@ export function EmailThreads() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-foreground">Van:</span>
+                        <span className="font-semibold text-foreground">From:</span>
                         <span className="text-foreground">{selectedEmail.from}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-foreground">Aan:</span>
+                        <span className="font-semibold text-foreground">To:</span>
                         <span className="text-foreground">{selectedEmail.to}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-foreground">Datum:</span>
+                        <span className="font-semibold text-foreground">Date:</span>
                         <span className="text-foreground">{selectedEmail.date.toLocaleString('nl-NL', { 
                           dateStyle: 'long', 
                           timeStyle: 'short' 
@@ -571,9 +571,9 @@ export function EmailThreads() {
                           }
                           className="text-sm"
                         >
-                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
-                           '🔴 Niet Geïnteresseerd'}
+                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
+                           '🔴 Not Interested'}
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
@@ -587,7 +587,7 @@ export function EmailThreads() {
               <div className="mt-6 space-y-6">
                 {/* Email Body */}
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Bericht</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Message</h3>
                   <div className="border rounded-lg p-4 bg-muted/30">
                     <div className="prose prose-sm max-w-none whitespace-pre-wrap">
                       {selectedEmail.body || selectedEmail.snippet}
@@ -598,14 +598,14 @@ export function EmailThreads() {
                 {/* AI Sentiment Analysis */}
                 {selectedEmail.sentiment && (
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">AI Sentiment Analyse</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">AI Sentiment Analysis</h3>
                     
                     {selectedEmail.sentiment.error ? (
                       <div className="border border-red-200 rounded-lg p-4 bg-red-50 dark:bg-red-950/20">
                         <div className="flex items-start space-x-3">
                           <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
                           <div className="flex-1">
-                            <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">Analyse Mislukt</h4>
+                            <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">Analysis Failed</h4>
                             <p className="text-sm text-red-700 dark:text-red-300">{selectedEmail.sentiment.error}</p>
                           </div>
                         </div>
@@ -616,13 +616,13 @@ export function EmailThreads() {
                           <div className="border rounded-lg p-4 bg-muted/30">
                             <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
                             <div className="text-2xl font-bold">
-                              {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
-                               selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
-                               '🔴 Niet Geïnteresseerd'}
+                              {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                               selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
+                               '🔴 Not Interested'}
                             </div>
                           </div>
                           <div className="border rounded-lg p-4 bg-muted/30">
-                            <div className="text-xs text-muted-foreground mb-1">Zekerheid</div>
+                            <div className="text-xs text-muted-foreground mb-1">Confidence</div>
                             <div className="text-2xl font-bold">
                               {Math.round(selectedEmail.sentiment.confidence * 100)}%
                             </div>
@@ -630,7 +630,7 @@ export function EmailThreads() {
                         </div>
                         
                         <div className="border rounded-lg p-4 bg-muted/30">
-                          <div className="text-xs text-muted-foreground mb-2 font-semibold">AI Redenering</div>
+                          <div className="text-xs text-muted-foreground mb-2 font-semibold">AI Reasoning</div>
                           <p className="text-sm leading-relaxed">
                             {selectedEmail.sentiment.reasoning}
                           </p>
@@ -664,9 +664,9 @@ export function EmailThreads() {
                   }}
                 >
                   <Mail className="mr-2 h-4 w-4" />
-                  Beantwoorden
+                  Reply
                 </Button>
-                <Button onClick={handleCloseDialog}>Sluiten</Button>
+                <Button onClick={handleCloseDialog}>Close</Button>
               </div>
             </>
           )}
@@ -679,11 +679,11 @@ export function EmailThreads() {
           {selectedEmail && (
             <>
               <DialogHeader>
-                <DialogTitle>Reply op email</DialogTitle>
+                <DialogTitle>Reply to email</DialogTitle>
                 <DialogDescription>
                   <div className="space-y-1 mt-2">
                     <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-foreground">Aan:</span>
+                      <span className="font-semibold text-foreground">To:</span>
                       <span className="text-foreground">{selectedEmail.from}</span>
                     </div>
                     {selectedEmail.sentiment && (
@@ -719,12 +719,12 @@ export function EmailThreads() {
                     {isGeneratingReply ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        AI genereert reply...
+                        AI generating reply...
                       </>
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Genereer AI Reply
+                        Generate AI Reply
                       </>
                     )}
                   </Button>
@@ -732,7 +732,7 @@ export function EmailThreads() {
 
                 {/* Original Email Preview */}
                 <div className="border rounded-lg p-3 bg-muted/30">
-                  <div className="text-xs font-semibold text-muted-foreground mb-2">ORIGINELE EMAIL</div>
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">ORIGINAL EMAIL</div>
                   <div className="text-sm font-medium mb-1">{selectedEmail.subject}</div>
                   <div className="text-sm text-muted-foreground line-clamp-3">
                     {selectedEmail.body || selectedEmail.snippet}
@@ -742,7 +742,7 @@ export function EmailThreads() {
                 {/* Reply Form */}
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="reply-subject">Onderwerp</Label>
+                    <Label htmlFor="reply-subject">Subject</Label>
                     <Input
                       id="reply-subject"
                       value={replySubject}
@@ -751,12 +751,12 @@ export function EmailThreads() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="reply-body">Bericht</Label>
+                    <Label htmlFor="reply-body">Message</Label>
                     <Textarea
                       id="reply-body"
                       value={replyBody}
                       onChange={(e) => setReplyBody(e.target.value)}
-                      placeholder="Schrijf je reply hier..."
+                      placeholder="Write your reply here..."
                       rows={12}
                       className="font-mono text-sm"
                     />
@@ -775,7 +775,7 @@ export function EmailThreads() {
                     }}
                     disabled={isSendingReply}
                   >
-                    Annuleren
+                    Cancel
                   </Button>
                   <Button
                     onClick={handleSendReply}
@@ -784,12 +784,12 @@ export function EmailThreads() {
                     {isSendingReply ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Versturen...
+                        Sending...
                       </>
                     ) : (
                       <>
                         <Send className="mr-2 h-4 w-4" />
-                        Verstuur Reply
+                        Send Reply
                       </>
                     )}
                   </Button>

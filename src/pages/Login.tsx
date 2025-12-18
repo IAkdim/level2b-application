@@ -30,7 +30,7 @@ export function Login() {
         setIsLoading(false)
       }
     } catch (err) {
-      setError("Er is iets misgegaan. Probeer het opnieuw.")
+      setError("Something went wrong. Please try again.")
       setIsLoading(false)
     }
   }
@@ -55,10 +55,10 @@ export function Login() {
           {/* Tagline */}
           <div className="space-y-6 max-w-md">
             <h1 className="text-4xl font-bold leading-tight">
-              Automatiseer je sales meetings en verhoog je conversie
+              Automate your sales meetings and increase your conversion
             </h1>
             <p className="text-terracotta-100 text-lg">
-              Level2b helpt je om efficiënter te werken met slimme automatisering en intelligente lead management.
+              Level2b helps you work more efficiently with smart automation and intelligent lead management.
             </p>
           </div>
         </div>
@@ -70,8 +70,8 @@ export function Login() {
               <Mail className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold mb-1">Geautomatiseerde Email Outreach</h3>
-              <p className="text-sm text-terracotta-100">Stuur gepersonaliseerde emails op schaal</p>
+              <h3 className="font-semibold mb-1">Automated Email Outreach</h3>
+              <p className="text-sm text-terracotta-100">Send personalised emails at scale</p>
             </div>
           </div>
 
@@ -81,7 +81,7 @@ export function Login() {
             </div>
             <div>
               <h3 className="font-semibold mb-1">Smart Meeting Scheduling</h3>
-              <p className="text-sm text-terracotta-100">Plan meetings automatisch met je leads</p>
+              <p className="text-sm text-terracotta-100">Schedule meetings automatically with your leads</p>
             </div>
           </div>
 
@@ -91,7 +91,7 @@ export function Login() {
             </div>
             <div>
               <h3 className="font-semibold mb-1">Real-time Analytics</h3>
-              <p className="text-sm text-terracotta-100">Inzicht in je sales performance</p>
+              <p className="text-sm text-terracotta-100">Insights into your sales performance</p>
             </div>
           </div>
 
@@ -123,10 +123,10 @@ export function Login() {
           <div className="bg-card rounded-2xl shadow-xl border border-border p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                Welkom terug
+                Welcome back
               </h2>
               <p className="text-muted-foreground">
-                Log in om verder te gaan met Level2b
+                Log in to continue with Level2b
               </p>
             </div>
 
@@ -147,7 +147,7 @@ export function Login() {
               className="w-full flex items-center justify-center gap-3 h-12 text-base font-medium border-2 hover:bg-muted transition-all"
             >
               <FcGoogle className="w-6 h-6" />
-              {isLoading ? "Bezig met inloggen..." : "Inloggen met Google"}
+              {isLoading ? "Logging in..." : "Log in with Google"}
             </Button>
 
             <div className="mt-8 pt-6 border-t border-border">
@@ -167,9 +167,9 @@ export function Login() {
           {/* Additional info */}
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Nog geen account?{" "}
+              Don't have an account?{" "}
               <button className="text-primary font-medium hover:underline">
-                Neem contact op voor een demo
+                Contact us for a demo
               </button>
             </p>
           </div>

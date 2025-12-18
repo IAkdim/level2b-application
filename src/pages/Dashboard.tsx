@@ -119,24 +119,24 @@ export function Dashboard() {
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Zojuist'
-    if (diffMins < 60) return `${diffMins} minuten geleden`
-    if (diffHours < 24) return `${diffHours} uur geleden`
-    if (diffDays === 1) return 'Gisteren'
-    if (diffDays < 7) return `${diffDays} dagen geleden`
-    return date.toLocaleDateString('nl-NL')
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} minutes ago`
+    if (diffHours < 24) return `${diffHours} hours ago`
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString('en-GB')
   }
 
   function getActivityDescription(activity: Activity): string {
     switch (activity.type) {
       case 'email':
-        return `Email verzonden naar ${activity.lead_name}`
+        return `Email sent to ${activity.lead_name}`
       case 'call':
-        return `Gesprek met ${activity.lead_name}`
+        return `Call with ${activity.lead_name}`
       case 'meeting':
-        return `Meeting gepland met ${activity.lead_name}`
+        return `Meeting scheduled with ${activity.lead_name}`
       case 'note':
-        return `Notitie toegevoegd aan ${activity.lead_name}`
+        return `Note added to ${activity.lead_name}`
       default:
         return activity.description
     }
@@ -144,17 +144,17 @@ export function Dashboard() {
 
   const statsCards = [
     {
-      name: "Totaal Emails Verzonden",
+      name: "Total Emails Sent",
       value: stats.totalEmails.toLocaleString(),
       icon: Mail,
     },
     {
-      name: "Actieve Leads",
+      name: "Active Leads",
       value: stats.activeLeads.toLocaleString(),
       icon: Users,
     },
     {
-      name: "Meetings Gepland",
+      name: "Meetings Scheduled",
       value: stats.meetingsBooked.toLocaleString(),
       icon: Calendar,
     },
@@ -179,7 +179,7 @@ export function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          Overzicht van je AI emailer prestaties
+          Overview of your AI emailer performance
         </p>
       </div>
 
@@ -203,11 +203,11 @@ export function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold">Recente Activiteit</h2>
-              <p className="text-sm text-muted-foreground">Laatste updates van je leads</p>
+              <h2 className="text-base font-semibold">Recent Activity</h2>
+              <p className="text-sm text-muted-foreground">Latest updates from your leads</p>
             </div>
             <Button variant="ghost" size="sm" className="gap-1" onClick={() => navigate('/leads')}>
-              Bekijk alles
+              View all
               <ArrowUpRight className="h-3 w-3" />
             </Button>
           </div>
@@ -215,7 +215,7 @@ export function Dashboard() {
           <div className="space-y-2 bg-muted/30 rounded-lg p-6 border border-border/30">
             {activities.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Nog geen activiteiten
+                No activities yet
               </div>
             ) : (
               activities.map((activity) => (
@@ -239,19 +239,19 @@ export function Dashboard() {
         <div className="space-y-6">
           <div>
             <h2 className="text-base font-semibold">Quick Actions</h2>
-            <p className="text-sm text-muted-foreground">Snelle acties voor je workflow</p>
+            <p className="text-sm text-muted-foreground">Quick actions for your workflow</p>
           </div>
 
           <Card className="border-border/30">
             <CardContent className="pt-6 space-y-2">
               <Button size="sm" className="w-full" onClick={() => navigate('/outreach/templates')}>
-                Nieuwe Template
+                New Template
               </Button>
               <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/outreach/leads')}>
-                Leads Beheren
+                Manage Leads
               </Button>
               <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/analytics')}>
-                Analytics Bekijken
+                View Analytics
               </Button>
             </CardContent>
           </Card>

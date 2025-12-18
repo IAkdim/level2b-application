@@ -94,7 +94,7 @@ export function TopBar() {
       }
     } catch (error) {
       console.error('Error handling notification click:', error)
-      toast.error('Fout bij verwerken van notificatie')
+      toast.error('Error processing notification')
     }
   }
 
@@ -103,10 +103,10 @@ export function TopBar() {
       await markAllAsRead()
       setUnreadCount(0)
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-      toast.success('Alle notificaties gemarkeerd als gelezen')
+      toast.success('All notifications marked as read')
     } catch (error) {
       console.error('Error marking all as read:', error)
-      toast.error('Fout bij markeren als gelezen')
+      toast.error('Error marking as read')
     }
   }
 
@@ -121,7 +121,7 @@ export function TopBar() {
       }
     } catch (error) {
       console.error('Error deleting notification:', error)
-      toast.error('Fout bij verwijderen van notificatie')
+      toast.error('Error deleting notification')
     }
   }
 
@@ -133,12 +133,12 @@ export function TopBar() {
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Zojuist'
-    if (diffMins < 60) return `${diffMins} minuten geleden`
-    if (diffHours < 24) return `${diffHours} uur geleden`
-    if (diffDays === 1) return 'Gisteren'
-    if (diffDays < 7) return `${diffDays} dagen geleden`
-    return date.toLocaleDateString('nl-NL')
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} minutes ago`
+    if (diffHours < 24) return `${diffHours} hours ago`
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString('en-GB')
   }
 
   useEffect(() => {
@@ -266,7 +266,7 @@ export function TopBar() {
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
                 <div className="flex items-center justify-between p-4 pb-2">
-                  <h3 className="font-semibold">Notificaties</h3>
+                  <h3 className="font-semibold">Notifications</h3>
                   {unreadCount > 0 && (
                     <Button 
                       variant="ghost" 
@@ -274,7 +274,7 @@ export function TopBar() {
                       className="h-8 text-xs"
                       onClick={handleMarkAllAsRead}
                     >
-                      Alles gelezen
+                      Mark all read
                     </Button>
                   )}
                 </div>
@@ -288,7 +288,7 @@ export function TopBar() {
                     ) : notifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <Bell className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">Geen notificaties</p>
+                        <p className="text-sm text-muted-foreground">No notifications</p>
                       </div>
                     ) : (
                       notifications.map((notification) => (
