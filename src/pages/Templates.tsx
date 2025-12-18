@@ -50,7 +50,6 @@ import {
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
 
 
 export default function Templates() {
@@ -239,7 +238,7 @@ export default function Templates() {
         uniqueSellingPoints: settings.unique_selling_points,
         targetAudience: settings.target_audience!,
         industry: settings.industry,
-        calendlyLink: settings.calendly_link,
+        calendlyLink: settings.calendly_scheduling_url,
         additionalContext: additionalContext.trim() || undefined,
         language: selectedLanguage,
       })

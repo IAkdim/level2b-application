@@ -191,6 +191,7 @@ export interface CreateEmailTemplateInput {
   name: string
   subject: string
   body: string
+  language?: Language
   company_info?: Record<string, any>
   additional_context?: string
 }
