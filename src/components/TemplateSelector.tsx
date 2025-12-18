@@ -33,12 +33,13 @@ import type { EmailTemplate } from '@/types/crm'
 import { toast } from 'sonner'
 
 interface TemplateSelectorProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onTemplateSelected: (subject: string, body: string) => void
+  embedded?: boolean
 }
 
-export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: TemplateSelectorProps) {
+export function TemplateSelector({ open, onOpenChange, onTemplateSelected, embedded = false }: TemplateSelectorProps) {
   const { selectedOrg } = useOrganization()
   const [activeTab, setActiveTab] = useState<'select' | 'generate'>('select')
   
@@ -259,7 +260,9 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
     }
 
     onTemplateSelected(template.subject, template.body)
-    onOpenChange(false)
+    if (!embedded && onOpenChange) {
+      onOpenChange(false)
+    }
     resetState()
   }
 
@@ -292,43 +295,37 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
 
   const handleClose = () => {
     resetState()
-    onOpenChange(false)
+    if (!embedded && onOpenChange) {
+      onOpenChange(false)
+    }
   }
 
-  return (
+  // Render the main content (tabs with template selection/generation)
+  const renderContent = () => (
     <>
-      <Dialog open={open} onOpenChange={handleClose} modal>
-        <DialogPortal>
-          <DialogOverlay className="z-[60]" />
-          <DialogPrimitive.Content 
-            className="fixed left-[50%] top-[50%] z-[60] grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto"
-            key={selectedOrg?.id}
-          >
-            <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogPrimitive.Close>
-          <DialogHeader>
-            <DialogTitle>Select or Generate Email Template</DialogTitle>
-            <DialogDescription>
-              Choose from saved templates or generate a new one with AI
-            </DialogDescription>
-          </DialogHeader>
+      {!embedded && (
+        <DialogHeader>
+          <DialogTitle>Select or Generate Email Template</DialogTitle>
+          <DialogDescription>
+            Choose from saved templates or generate a new one with AI
+          </DialogDescription>
+        </DialogHeader>
+      )}
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'select' | 'generate')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="select" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Saved Templates
-              </TabsTrigger>
-              <TabsTrigger value="generate" className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                Generate New
-              </TabsTrigger>
-            </TabsList>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'select' | 'generate')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="select" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Saved Templates
+          </TabsTrigger>
+          <TabsTrigger value="generate" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Generate New
+          </TabsTrigger>
+        </TabsList>
 
-            {/* Saved Templates Tab */}
-            <TabsContent value="select" className="space-y-4">
+        {/* Saved Templates Tab */}
+        <TabsContent value="select" className="space-y-4">
               {isLoadingTemplates ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -478,12 +475,16 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
               )}
             </TabsContent>
           </Tabs>
-          </DialogPrimitive.Content>
-        </DialogPortal>
-      </Dialog>
+        </>
+  )
 
-      {/* Quick Settings Dialog */}
-      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} modal>
+  // If embedded, render content directly without Dialog wrapper
+  if (embedded) {
+    return (
+      <>
+        {renderContent()}
+        {/* Quick Settings Dialog - always rendered as a separate dialog */}
+        <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} modal>
         <DialogPortal>
           <DialogOverlay className="z-[70]" />
           <DialogPrimitive.Content 
@@ -585,6 +586,147 @@ export function TemplateSelector({ open, onOpenChange, onTemplateSelected }: Tem
                           })
                         }}
                         className="ml-2"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowSettingsDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleQuickSettingsSave}>
+              Save & Generate
+            </Button>
+          </div>
+          </DialogPrimitive.Content>
+        </DialogPortal>
+      </Dialog>
+      </>
+    )
+  }
+
+  // If not embedded, render with Dialog wrapper
+  return (
+    <>
+      <Dialog open={open} onOpenChange={handleClose} modal>
+        <DialogPortal>
+          <DialogOverlay className="z-[60]" />
+          <DialogPrimitive.Content 
+            className="fixed left-[50%] top-[50%] z-[60] grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto"
+            key={selectedOrg?.id}
+          >
+            <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+            {renderContent()}
+          </DialogPrimitive.Content>
+        </DialogPortal>
+      </Dialog>
+
+      {/* Quick Settings Dialog */}
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} modal>
+        <DialogPortal>
+          <DialogOverlay className="z-[70]" />
+          <DialogPrimitive.Content 
+            className="fixed left-[50%] top-[50%] z-[70] grid w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg"
+            key={selectedOrg?.id}
+          >
+            <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          <DialogHeader>
+            <DialogTitle>Complete Company Information</DialogTitle>
+            <DialogDescription>
+              Fill in your company details to generate better templates
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="company_name">
+                Company Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="company_name"
+                value={quickSettings.company_name || ''}
+                onChange={(e) => setQuickSettings({ ...quickSettings, company_name: e.target.value })}
+                placeholder="Your company name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="product_service">
+                Product/Service <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="product_service"
+                value={quickSettings.product_service || ''}
+                onChange={(e) => setQuickSettings({ ...quickSettings, product_service: e.target.value })}
+                placeholder="What you offer"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="target_audience">
+                Target Audience <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="target_audience"
+                value={quickSettings.target_audience || ''}
+                onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
+                placeholder="Who you're targeting"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company_description">Company Description</Label>
+              <Textarea
+                id="company_description"
+                value={quickSettings.company_description || ''}
+                onChange={(e) => setQuickSettings({ ...quickSettings, company_description: e.target.value })}
+                placeholder="Brief description of your company"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unique_selling_points">
+                Unique Selling Points
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="unique_selling_points"
+                  value={uspInput}
+                  onChange={(e) => setUspInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddUsp()
+                    }
+                  }}
+                  placeholder="Add a USP and press Enter"
+                />
+                <Button type="button" size="icon" onClick={handleAddUsp}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {quickSettings.unique_selling_points && quickSettings.unique_selling_points.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {quickSettings.unique_selling_points.map((usp, index) => (
+                    <Badge key={index} variant="secondary" className="gap-1">
+                      {usp}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUsp(index)}
+                        className="ml-1 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>

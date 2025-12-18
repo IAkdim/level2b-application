@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2 } from "lucide-react"
+import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, ArrowLeft } from "lucide-react"
 import { sendBatchEmails } from "@/lib/api/gmail"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
 import { useOrganization } from "@/contexts/OrganizationContext"
@@ -31,7 +31,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const [isHtml, setIsHtml] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
-  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [currentView, setCurrentView] = useState<'email' | 'template'>('email')
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
   const [isComplete, setIsComplete] = useState(false)
 
@@ -198,6 +198,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
     setSendResult(null)
     setSendingProgress({ current: 0, total: 0, success: 0, failed: 0 })
     setIsComplete(false)
+    setCurrentView('email')
   }
 
   const handleClose = () => {
@@ -210,37 +211,40 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const handleTemplateSelected = (templateSubject: string, templateBody: string) => {
     setSubject(templateSubject)
     setBody(templateBody)
+    setCurrentView('email')
     toast.success('Template loaded')
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[100]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Bulk Email Versturen
-            </DialogTitle>
-            <DialogDescription>
-              Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
-              {selectedLeads.length === 1 ? "lead" : "leads"}
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Email Form View */}
+        {currentView === 'email' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Bulk Email Versturen
+              </DialogTitle>
+              <DialogDescription>
+                Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
+                {selectedLeads.length === 1 ? "lead" : "leads"}
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Template Selector Button */}
-            <div className="flex justify-end">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowTemplateSelector(true)}
-                disabled={isSending}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Select or Generate Template
-              </Button>
-            </div>
+            <div className="space-y-4 py-4">
+              {/* Template Selector Button */}
+              <div className="flex justify-end">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentView('template')}
+                  disabled={isSending}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Select or Generate Template
+                </Button>
+              </div>
 
           {/* Sending Progress */}
           {isSending && (
@@ -408,15 +412,38 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
             )}
           </Button>
         </DialogFooter>
+        </>
+      )}
+
+      {/* Template Selector View */}
+      {currentView === 'template' && (
+        <>
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentView('email')}
+                className="mr-2"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Terug
+              </Button>
+              <div>
+                <DialogTitle>Select or Generate Email Template</DialogTitle>
+                <DialogDescription>
+                  Choose from saved templates or generate a new one with AI
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <TemplateSelector
+            onTemplateSelected={handleTemplateSelected}
+            embedded={true}
+          />
+        </>
+      )}
       </DialogContent>
     </Dialog>
-
-    {/* Template Selector Dialog */}
-    <TemplateSelector
-      open={showTemplateSelector}
-      onOpenChange={setShowTemplateSelector}
-      onTemplateSelected={handleTemplateSelected}
-    />
-  </>
   )
 }
