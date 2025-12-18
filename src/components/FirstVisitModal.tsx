@@ -37,10 +37,10 @@ export function FirstVisitModal() {
       <Card className="w-full max-w-3xl">
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
-            <CardTitle>Welkom bij Level2B</CardTitle>
-            <CardDescription>Zo werkt de flow in een paar stappen</CardDescription>
+            <CardTitle>Welcome to Level2B</CardTitle>
+            <CardDescription>How the workflow works in a few steps</CardDescription>
           </div>
-          <button aria-label="Sluiten" onClick={close} className="text-gray-500 hover:text-gray-700">
+          <button aria-label="Close" onClick={close} className="text-gray-500 hover:text-gray-700">
             <X className="h-5 w-5" />
           </button>
         </CardHeader>
@@ -49,36 +49,36 @@ export function FirstVisitModal() {
             <li className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
               <Users className="mt-1 h-5 w-5 text-gray-500" />
               <div>
-                <p className="font-medium">1. Importeer of beheer Leads</p>
-                <p className="text-sm text-gray-500">Ga naar Outreach → Leads om prospects toe te voegen of te filteren.</p>
+                <p className="font-medium">1. Import or manage Leads</p>
+                <p className="text-sm text-gray-500">Go to Outreach → Leads to add or filter prospects.</p>
               </div>
             </li>
             <li className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
               <FileText className="mt-1 h-5 w-5 text-gray-500" />
               <div>
-                <p className="font-medium">2. Maak een Template</p>
-                <p className="text-sm text-gray-500">Gebruik Outreach → Templates om met Claude AI een template te genereren.</p>
+                <p className="font-medium">2. Create a Template</p>
+                <p className="text-sm text-gray-500">Use Outreach → Templates to generate a template with Claude AI.</p>
               </div>
             </li>
             <li className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
               <Mail className="mt-1 h-5 w-5 text-gray-500" />
               <div>
                 <p className="font-medium">3. Start Outreach</p>
-                <p className="text-sm text-gray-500">Verstuur de template naar geselecteerde leads en volg de resultaten.</p>
+                <p className="text-sm text-gray-500">Send the template to selected leads and track the results.</p>
               </div>
             </li>
             <li className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
               <Calendar className="mt-1 h-5 w-5 text-gray-500" />
               <div>
-                <p className="font-medium">4. Plan Meetings</p>
-                <p className="text-sm text-gray-500">Bekijk ingeplande afspraken onder Meetings en synchroniseer met Calendly.</p>
+                <p className="font-medium">4. Schedule Meetings</p>
+                <p className="text-sm text-gray-500">View scheduled appointments under Meetings and synchronise with Calendly.</p>
               </div>
             </li>
           </ol>
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button variant="ghost" onClick={close}>Later bekijken</Button>
-            <Button onClick={close}>Aan de slag</Button>
+            <Button variant="ghost" onClick={close}>View later</Button>
+            <Button onClick={close}>Get started</Button>
           </div>
         </CardContent>
       </Card>

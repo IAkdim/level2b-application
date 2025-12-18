@@ -84,15 +84,15 @@ export function validateSettingsForTemplateGeneration(
  */
 export function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
-    company_name: 'Bedrijfsnaam',
-    company_description: 'Bedrijfsomschrijving',
+    company_name: 'Company name',
+    company_description: 'Company description',
     product_service: 'Product/Service',
     unique_selling_points: 'Unique Selling Points (USPs)',
-    target_audience: 'Doelgroep',
-    industry: 'Industrie',
+    target_audience: 'Target audience',
+    industry: 'Industry',
     website_url: 'Website',
     contact_email: 'Contact Email',
-    contact_phone: 'Telefoonnummer',
+    contact_phone: 'Phone number',
     calendly_link: 'Calendly Link',
   }
   return labels[fieldName] || fieldName

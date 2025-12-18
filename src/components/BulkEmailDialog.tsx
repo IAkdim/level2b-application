@@ -6,17 +6,22 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Mail, Tag } from "lucide-react"
 import { sendBatchEmails } from "@/lib/api/gmail"
+import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
+import { useOrganization } from "@/contexts/OrganizationContext"
 import type { Lead } from "@/types/crm"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "sonner"
 
 interface BulkEmailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   selectedLeads: Lead[]
+  onEmailsSent?: () => void
 }
 
-export function BulkEmailDialog({ open, onOpenChange, selectedLeads }: BulkEmailDialogProps) {
+export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSent }: BulkEmailDialogProps) {
+  const { selectedOrg } = useOrganization()
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [labelName, setLabelName] = useState("")
@@ -31,7 +36,12 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads }: BulkEmail
     }
 
     if (selectedLeads.length === 0) {
-      alert("Geen leads geselecteerd")
+      alert("No leads selected")
+      return
+    }
+
+    if (!selectedOrg?.id) {
+      alert("Geen organisatie geselecteerd")
       return
     }
 
@@ -39,6 +49,31 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads }: BulkEmail
     setSendResult(null)
 
     try {
+      // Check daily email limit
+      const limitCheck = await checkUsageLimit(selectedOrg.id, 'email')
+      
+      if (!limitCheck.allowed) {
+        const errorMsg = formatUsageLimitError(limitCheck.error!)
+        const resetTime = getTimeUntilReset()
+        toast.error(`Dagelijkse email limiet bereikt. Reset over ${resetTime}`, {
+          description: errorMsg,
+          duration: 5000
+        })
+        setIsSending(false)
+        return
+      }
+
+      // Check if we can send the requested number of emails
+      const emailsRemaining = limitCheck.usage?.emailsRemaining || 0
+      if (selectedLeads.length > emailsRemaining) {
+        toast.error(`Kan niet ${selectedLeads.length} emails versturen`, {
+          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag. Reset over ${getTimeUntilReset()}`,
+          duration: 5000
+        })
+        setIsSending(false)
+        return
+      }
+
       console.log("Starting to send emails to", selectedLeads.length, "leads");
       
       // Personaliseer emails met lead data
@@ -74,10 +109,25 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads }: BulkEmail
       const messageIds = await sendBatchEmails(emails, labelName || undefined)
       console.log("Batch send completed. Message IDs:", messageIds);
 
+      // Increment email usage counter for successful sends
+      if (messageIds.length > 0) {
+        try {
+          await incrementUsage(selectedOrg.id, 'email', messageIds.length)
+        } catch (error) {
+          console.error('Error incrementing email usage:', error)
+          // Don't fail the send if usage tracking fails
+        }
+      }
+
       setSendResult({
         success: messageIds.length,
         failed: selectedLeads.length - messageIds.length,
       })
+
+      // Call callback to refresh usage
+      if (messageIds.length > 0 && onEmailsSent) {
+        onEmailsSent()
+      }
 
       if (messageIds.length === selectedLeads.length) {
         // All successful

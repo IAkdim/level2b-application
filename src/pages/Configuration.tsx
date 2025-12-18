@@ -20,8 +20,8 @@ interface ConfigSection {
 const configSections: ConfigSection[] = [
   {
     id: "company",
-    title: "Bedrijfsinformatie",
-    description: "Info voor template generatie",
+    title: "Company Information",
+    description: "Info for template generation",
     icon: Building2
   },
   {
@@ -195,7 +195,7 @@ export function Configuration() {
           placeholder="Use {{sender_name}}, {{company}}, {{phone}} for dynamic values"
         />
         <p className="text-xs text-muted-foreground">
-          Variables: sender_name, company, phone (gebruik dubbele accolades)
+          Variables: sender_name, company, phone (use double braces)
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -439,7 +439,7 @@ export function Configuration() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
           <p className="text-muted-foreground mt-1">
-            Beheer je account instellingen en voorkeuren
+            Manage your account settings and preferences
           </p>
         </div>
         <Button onClick={handleSaveSettings} size="sm">
@@ -488,8 +488,8 @@ export function Configuration() {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                API keys en gevoelige instellingen worden veilig beheerd op server-side.
-                Klanten hebben geen toegang tot deze configuraties.
+                API keys and sensitive settings are securely managed server-side.
+                Customers do not have access to these configurations.
               </p>
             </CardContent>
           </Card>
@@ -508,7 +508,7 @@ export function Configuration() {
               {/* Calendly Integration */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Calendly Integratie</CardTitle>
+                  <CardTitle className="text-lg">Calendly Integration</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CompanySettingsForm showOnlyCalendly />
@@ -518,15 +518,15 @@ export function Configuration() {
               {/* Google Integration - Placeholder */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Google Integratie</CardTitle>
+                  <CardTitle className="text-lg">Google Integration</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Verbind je Google account voor Gmail integratie en Google Calendar synchronisatie.
+                    Connect your Google account for Gmail integration and Google Calendar synchronisation.
                   </p>
                   <Button variant="outline" disabled>
                     <Mail className="mr-2 h-4 w-4" />
-                    Binnenkort beschikbaar
+                    Available soon
                   </Button>
                 </CardContent>
               </Card>

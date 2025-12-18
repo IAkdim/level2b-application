@@ -23,8 +23,8 @@ function getStatusVariant(status: Meeting['status']): 'default' | 'secondary' | 
 
 function getStatusLabel(status: Meeting['status']): string {
   const labels = {
-    active: 'Actief',
-    canceled: 'Geannuleerd'
+    active: 'Active',
+    canceled: 'Cancelled'
   }
   return labels[status] || status
 }
@@ -61,7 +61,7 @@ export function Meetings() {
       setMeetings(data)
     } catch (error) {
       console.error('[Meetings] Error loading meetings:', error)
-      toast.error('Fout bij laden van meetings')
+      toast.error('Error loading meetings')
     } finally {
       setIsLoading(false)
     }
@@ -95,17 +95,17 @@ export function Meetings() {
       await loadMeetings()
       
       if (result.synced > 0) {
-        toast.success(`${result.synced} nieuwe meeting(s) gesynchroniseerd!`)
+        toast.success(`${result.synced} new meeting(s) synchronised!`)
       } else if (result.skipped > 0) {
-        toast.info(`${result.skipped} meeting(s) waren al gesynchroniseerd`)
+        toast.info(`${result.skipped} meeting(s) were already synchronised`)
       } else if (result.total > 0) {
-        toast.info('Meetings gecheckt, geen wijzigingen')
+        toast.info('Meetings checked, no changes')
       } else {
-        toast.info('Geen meetings gevonden in Calendly')
+        toast.info('No meetings found in Calendly')
       }
     } catch (error) {
       console.error('[Meetings] Error syncing meetings:', error)
-      toast.error('Fout bij synchroniseren van meetings')
+      toast.error('Error synchronising meetings')
     } finally {
       console.log('[Meetings] Setting isSyncing to false')
       setIsSyncing(false)
@@ -130,7 +130,7 @@ export function Meetings() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Meetings</h1>
           <p className="text-muted-foreground">
-            Automatische synchronisatie van Calendly meetings met je CRM
+            Automatic synchronisation of Calendly meetings with your CRM
           </p>
         </div>
         <div className="flex space-x-3">
@@ -144,7 +144,7 @@ export function Meetings() {
               {isSyncing ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  Synchroniseren...
+                  Synchronising...
                 </>
               ) : (
                 <>
@@ -164,9 +164,9 @@ export function Meetings() {
             <div className="flex items-start gap-3">
               <CalendarCheck className="h-5 w-5 text-amber-600 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-amber-900">Calendly niet verbonden</p>
+                <p className="font-semibold text-amber-900">Calendly not connected</p>
                 <p className="text-sm text-amber-800 mt-1">
-                  Verbind je Calendly account in de configuratie om meetings automatisch te synchroniseren.
+                  Connect your Calendly account in configuration to automatically synchronise meetings.
                 </p>
                 <Button
                   onClick={() => window.location.href = '/configuration?tab=company'}
@@ -174,7 +174,7 @@ export function Meetings() {
                   size="sm"
                   className="mt-3"
                 >
-                  Ga naar Configuratie
+                  Go to Configuration
                 </Button>
               </div>
             </div>
@@ -186,7 +186,7 @@ export function Meetings() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Totaal</CardTitle>
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -195,7 +195,7 @@ export function Meetings() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gepland</CardTitle>
+            <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
             <Calendar className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
@@ -206,7 +206,7 @@ export function Meetings() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Voltooid</CardTitle>
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
             <Calendar className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -217,7 +217,7 @@ export function Meetings() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Geannuleerd</CardTitle>
+            <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
             <Calendar className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
@@ -257,14 +257,14 @@ export function Meetings() {
               </Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
 <SelectTrigger id="status-filter">
-                  <SelectValue placeholder="Alle statussen" />
+                  <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle statussen</SelectItem>
-                  <SelectItem value="scheduled">Gepland</SelectItem>
-                  <SelectItem value="confirmed">Bevestigd</SelectItem>
-                  <SelectItem value="completed">Voltooid</SelectItem>
-                  <SelectItem value="canceled">Geannuleerd</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="canceled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -277,7 +277,7 @@ export function Meetings() {
         <CardHeader>
           <CardTitle>Meetings</CardTitle>
           <CardDescription>
-            {isLoading ? 'Laden...' : `${filteredMeetings.length} van ${meetings.length} meetings`}
+            {isLoading ? 'Loading...' : `${filteredMeetings.length} of ${meetings.length} meetings`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -289,7 +289,7 @@ export function Meetings() {
             <div className="space-y-4">
               {filteredMeetings.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  Geen meetings gevonden
+                  No meetings found
                 </p>
               ) : (
                 filteredMeetings.map((meeting) => {

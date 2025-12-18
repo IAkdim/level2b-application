@@ -108,7 +108,7 @@ function getEmailBody(payload: GmailMessage['payload']): string {
       }
     }
     
-    // Als geen text/plain, probeer text/html
+    // If no text/plain, try text/html
     for (const part of payload.parts) {
       if (part.mimeType === 'text/html' && part.body?.data) {
         return decodeBase64Url(part.body.data)
@@ -261,7 +261,7 @@ export async function getEmailsByLabel(
 }
 
 /**
- * Haal alleen nieuwe (ongelezen) emails op met een specifiek label
+ * Fetch only new (unread) emails with a specific label
  * @param labelName - De naam van het Gmail label (bijv. "INBOX", "SENT", of een custom label)
  * @param maxResults - Maximum aantal emails om op te halen (standaard 10)
  * @param markAsRead - Markeer emails automatisch als gelezen na ophalen (standaard true)
@@ -373,7 +373,7 @@ export async function getUnreadEmailsByLabel(
     // Filter out null values (failed fetches)
     const validEmails = emails.filter((email): email is Email => email !== null)
     
-    // Stap 3: Markeer alle emails als gelezen indien gewenst
+    // Step 3: Mark all emails as read if desired
     if (markAsRead && validEmails.length > 0) {
       const messageIds = validEmails.map(email => email.id)
       const markedCount = await markEmailsAsRead(messageIds)
@@ -587,7 +587,7 @@ export async function sendEmail(
 /**
  * Verstuur meerdere emails in batch
  * @param emails - Array van email objecten met to, subject, body
- * @param labelName - Optioneel: Label om aan alle verzonden emails toe te voegen
+ * @param labelName - Optional: Label to add to all sent emails
  * @returns Array van message IDs van verzonden emails
  */
 export async function sendBatchEmails(
@@ -657,7 +657,7 @@ async function ensureLabelExists(labelName: string): Promise<string | null> {
       throw new Error("Niet geautoriseerd. Log opnieuw in.")
     }
     
-    // Haal alle labels op
+    // Fetch all labels
     const labels = await getGmailLabels()
     
     // Check of label al bestaat
@@ -774,7 +774,7 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
       return []
     }
     
-    // Parse alle messages in de thread
+    // Parse all messages in the thread
     const emails: Email[] = threadData.messages.map((message: GmailMessage) => {
       const headers = message.payload.headers
       return {
@@ -800,9 +800,9 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
 }
 
 /**
- * Haal alle reacties op emails met een specifiek label
+ * Fetch all replies to emails with a specific label
  * @param labelName - Label naam om reacties voor op te halen
- * @param onlyUnread - Alleen ongelezen reacties ophalen (standaard true)
+ * @param onlyUnread - Only fetch unread replies (default true)
  * @param analyzeSentiments - Voer sentiment analyse uit op reacties (standaard true)
  * @returns Array van emails die reacties zijn op gelabelde emails
  */
@@ -824,7 +824,7 @@ export async function getRepliesByLabel(
     
     console.log("Getting replies for label:", labelName, "My email:", myEmail);
     
-    // Haal eerst alle emails met het label op
+    // First fetch all emails with the label
     const labeledEmails = await getEmailsByLabel(labelName, 100)
     
     console.log("Found labeled emails:", labeledEmails.length);
@@ -833,7 +833,7 @@ export async function getRepliesByLabel(
       return []
     }
     
-    // Haal alle threads op voor deze emails
+    // Fetch all threads for these emails
     const threadIds = [...new Set(labeledEmails.map(e => e.threadId))]
     
     console.log("Checking threads:", threadIds.length);
@@ -845,7 +845,7 @@ export async function getRepliesByLabel(
       
       console.log(`Thread ${threadId}: ${threadEmails.length} emails`);
       
-      // Filter alleen INKOMENDE reacties (niet van jou verstuurd)
+      // Filter only INCOMING replies (not sent by you)
       const replies = threadEmails.filter(email => {
         const hasLabel = email.labelIds.includes(labelName)
         const isUnread = email.labelIds.includes('UNREAD')
@@ -856,7 +856,7 @@ export async function getRepliesByLabel(
         // 1. NIET het originele email met het label
         // 2. NIET van jou verstuurd (check from address)
         // 3. IN je inbox (dus ontvangen)
-        // 4. Optioneel: alleen ongelezen
+        // 4. Optional: only unread
         const isReply = !hasLabel && !isSentByMe && isInbox && (!onlyUnread || isUnread)
         
         if (isReply) {
@@ -994,7 +994,7 @@ export async function markEmailsAsRead(messageIds: string[]): Promise<number> {
 }
 
 /**
- * Haal alle beschikbare labels op
+ * Fetch all available labels
  * @returns Array van label objecten met id en name
  */
 export async function getGmailLabels(): Promise<Array<{ id: string; name: string }>> {

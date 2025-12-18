@@ -35,13 +35,13 @@ export function GuideDialog() {
         <DialogHeader>
           <DialogTitle className="text-2xl">Level2b Platform Guide</DialogTitle>
           <DialogDescription>
-            Leer hoe je Level2b effectief kunt gebruiken voor je sales en outreach
+            Learn how to use Level2b effectively for your sales and outreach
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overzicht</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="leads">Leads</TabsTrigger>
             <TabsTrigger value="outreach">Outreach</TabsTrigger>
             <TabsTrigger value="meetings">Meetings</TabsTrigger>
@@ -52,9 +52,9 @@ export function GuideDialog() {
             {/* Overview Tab */}
             <TabsContent value="overview" className="space-y-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Welkom bij Level2b!</h3>
+                <h3 className="text-lg font-semibold">Welcome to Level2b!</h3>
                 <p className="text-muted-foreground">
-                  Level2b is jouw complete CRM platform voor sales en outreach. Deze guide helpt je om snel aan de slag te gaan.
+                  Level2b is your complete CRM platform for sales and outreach. This guide will help you get started quickly.
                 </p>
               </div>
 
@@ -62,22 +62,22 @@ export function GuideDialog() {
                 <FeatureCard
                   icon={<Users className="h-6 w-6" />}
                   title="Lead Management"
-                  description="Beheer al je leads op één plek met filtering, tags, en status tracking."
+                  description="Manage all your leads in one place with filtering, tags, and status tracking."
                 />
                 <FeatureCard
                   icon={<Sparkles className="h-6 w-6" />}
                   title="AI Email Templates"
-                  description="Genereer overtuigende cold emails met AI op basis van jouw bedrijfsinfo."
+                  description="Generate convincing cold emails with AI based on your company info."
                 />
                 <FeatureCard
                   icon={<Calendar className="h-6 w-6" />}
                   title="Meeting Scheduling"
-                  description="Synchroniseer Calendly meetings en houd alle afspraken bij."
+                  description="Synchronise Calendly meetings and track all appointments."
                 />
                 <FeatureCard
                   icon={<BarChart3 className="h-6 w-6" />}
                   title="Analytics & Insights"
-                  description="Krijg inzicht in je sales performance met real-time analytics."
+                  description="Gain insight into your sales performance with real-time analytics."
                 />
               </div>
 
@@ -87,11 +87,11 @@ export function GuideDialog() {
                   Quick Start Checklist
                 </h4>
                 <ul className="space-y-2 ml-7 text-sm">
-                  <li>✅ Configureer je bedrijfsinformatie in Settings</li>
-                  <li>✅ Voeg je eerste leads toe</li>
-                  <li>✅ Genereer een email template met AI</li>
-                  <li>✅ Plan je eerste meeting</li>
-                  <li>✅ Bekijk je analytics dashboard</li>
+                  <li>✅ Configure your company information in Settings</li>
+                  <li>✅ Add your first leads</li>
+                  <li>✅ Generate an email template with AI</li>
+                  <li>✅ Schedule your first meeting</li>
+                  <li>✅ View your analytics dashboard</li>
                 </ul>
               </div>
             </TabsContent>
@@ -104,37 +104,37 @@ export function GuideDialog() {
                   Lead Management
                 </h3>
                 <p className="text-muted-foreground">
-                  Beheer en organiseer al je prospects en klanten effectief.
+                  Manage and organise all your prospects and customers effectively.
                 </p>
               </div>
 
               <GuideSection
-                title="Leads Toevoegen"
+                title="Adding Leads"
                 steps={[
-                  'Klik op "Nieuwe Lead" in de Leads pagina',
-                  'Vul naam, email, bedrijf en andere details in',
-                  'Voeg tags toe voor betere organisatie (bijv. "webdesigner", "mkb")',
-                  'Stel een status in (New, Contacted, Meeting Scheduled, etc.)',
+                  'Click "New Lead" in the Leads page',
+                  'Fill in name, email, company and other details',
+                  'Add tags for better organisation (e.g. "webdesigner", "SME")',
+                  'Set a status (New, Contacted, Meeting Scheduled, etc.)',
                 ]}
               />
 
               <GuideSection
-                title="Leads Organiseren"
+                title="Organising Leads"
                 steps={[
-                  'Filter op status, sentiment, of tags via de sidebar',
-                  'Gebruik de zoekbalk om snel leads te vinden',
-                  'Sorteer op naam, bedrijf, of datum',
-                  'Gebruik bulk acties voor efficiënt beheer',
+                  'Filter by status, sentiment, or tags via the sidebar',
+                  'Use the search bar to quickly find leads',
+                  'Sort by name, company, or date',
+                  'Use bulk actions for efficient management',
                 ]}
               />
 
               <GuideSection
                 title="Lead Details"
                 steps={[
-                  'Klik op een lead om details te bekijken',
-                  'Voeg notities toe voor belangrijke info',
-                  'Bekijk activiteiten en interacties',
-                  'Beheer taken en follow-ups',
+                  'Click on a lead to view details',
+                  'Add notes for important info',
+                  'View activities and interactions',
+                  'Manage tasks and follow-ups',
                 ]}
               />
             </TabsContent>
@@ -147,31 +147,31 @@ export function GuideDialog() {
                   Outreach & Templates
                 </h3>
                 <p className="text-muted-foreground">
-                  Creëer effectieve cold emails met AI-ondersteuning.
+                  Create effective cold emails with AI support.
                 </p>
               </div>
 
               <GuideSection
-                title="Email Templates Genereren"
+                title="Generate Email Templates"
                 steps={[
-                  'Ga naar Outreach → Templates',
-                  'Klik op "Nieuwe Template Genereren"',
-                  'Vul je bedrijfsinformatie in (wordt opgeslagen voor volgende keer)',
-                  'Voeg optioneel extra context toe (specifieke use case, recente resultaten)',
-                  'Klik op "Genereer Template"',
-                  'Review en pas aan indien nodig',
-                  'Klik op "Opslaan" om de template te bewaren',
+                  'Go to Outreach → Templates',
+                  'Click "Generate New Template"',
+                  'Fill in your company information (saved for next time)',
+                  'Optionally add extra context (specific use case, recent results)',
+                  'Click "Generate Template"',
+                  'Review and adjust if needed',
+                  'Click "Save" to save the template',
                 ]}
               />
 
               <GuideSection
-                title="Templates Gebruiken"
+                title="Using Templates"
                 steps={[
-                  'Opgeslagen templates verschijnen in de lijst',
-                  'Klik op "Kopieer Template" om naar clipboard te kopiëren',
-                  'Plak in je email client',
-                  'Personaliseer voor specifieke lead',
-                  'Usage wordt automatisch bijgehouden',
+                  'Saved templates appear in the list',
+                  'Click "Copy Template" to copy to clipboard',
+                  'Paste in your email client',
+                  'Personalise for specific lead',
+                  'Usage is automatically tracked',
                 ]}
               />
 
@@ -181,10 +181,10 @@ export function GuideDialog() {
                   AI Template Tips
                 </h4>
                 <ul className="space-y-1 text-sm">
-                  <li>• Wees specifiek in je bedrijfsomschrijving</li>
-                  <li>• Voeg concrete USPs toe (niet alleen "innovatief")</li>
-                  <li>• Gebruik de extra context voor specifieke situaties</li>
-                  <li>• Vergeet je Calendly link niet voor directe boekingen</li>
+                  <li>• Be specific in your company description</li>
+                  <li>• Add concrete USPs (not just "innovative")</li>
+                  <li>• Use the extra context for specific situations</li>
+                  <li>• Don't forget your Calendly link for direct bookings</li>
                 </ul>
               </div>
             </TabsContent>
@@ -197,37 +197,37 @@ export function GuideDialog() {
                   Meetings & Calendly
                 </h3>
                 <p className="text-muted-foreground">
-                  Synchroniseer en beheer al je meetings op één plek.
+                  Synchronise and manage all your meetings in one place.
                 </p>
               </div>
 
               <GuideSection
-                title="Calendly Synchronisatie"
+                title="Calendly Synchronisation"
                 steps={[
-                  'Configureer je Calendly API key in Settings',
-                  'Meetings worden automatisch gesynchroniseerd',
-                  'Bekijk alle geplande en voltooide meetings',
-                  'Filter op status (Active/Canceled)',
+                  'Configure your Calendly API key in Settings',
+                  'Meetings are automatically synchronised',
+                  'View all scheduled and completed meetings',
+                  'Filter by status (Active/Cancelled)',
                 ]}
               />
 
               <GuideSection
                 title="Meeting Details"
                 steps={[
-                  'Zie lead naam, email, en contactinfo',
-                  'Bekijk meeting tijdstip en locatie',
-                  'Vragen en antwoorden van de lead',
-                  'Link direct naar je lead profile',
+                  'See lead name, email, and contact info',
+                  'View meeting time and location',
+                  'Questions and answers from the lead',
+                  'Link directly to your lead profile',
                 ]}
               />
 
               <div className="bg-muted p-4 rounded-lg">
                 <h4 className="font-semibold mb-2">Meeting Best Practices</h4>
                 <ul className="space-y-1 text-sm">
-                  <li>• Voeg je Calendly link toe aan email templates</li>
-                  <li>• Check meetings dagelijks voor voorbereiding</li>
-                  <li>• Maak notities na elk gesprek in de lead details</li>
-                  <li>• Update lead status na meeting (bijv. naar "Proposal")</li>
+                  <li>• Add your Calendly link to email templates</li>
+                  <li>• Check meetings daily for preparation</li>
+                  <li>• Make notes after each conversation in the lead details</li>
+                  <li>• Update lead status after meeting (e.g. to "Proposal")</li>
                 </ul>
               </div>
             </TabsContent>
@@ -240,37 +240,37 @@ export function GuideDialog() {
                   Analytics & Reporting
                 </h3>
                 <p className="text-muted-foreground">
-                  Krijg inzicht in je sales performance en optimaliseer je aanpak.
+                  Gain insight into your sales performance and optimise your approach.
                 </p>
               </div>
 
               <GuideSection
                 title="Key Metrics"
                 steps={[
-                  'Total Leads - Totaal aantal leads in het systeem',
-                  'New This Month - Groei van je lead database',
-                  'Meeting Scheduled - Conversie naar meetings',
-                  'Response Rate - Effectiviteit van je outreach',
+                  'Total Leads - Total number of leads in the system',
+                  'New This Month - Growth of your lead database',
+                  'Meeting Scheduled - Conversion to meetings',
+                  'Response Rate - Effectiveness of your outreach',
                 ]}
               />
 
               <GuideSection
-                title="Visualisaties"
+                title="Visualisations"
                 steps={[
-                  'Lead Status Distribution - Waar zitten je leads in de funnel?',
-                  'Monthly Trends - Groei over tijd',
-                  'Source Performance - Welke kanalen werken het best?',
-                  'Sentiment Analysis - Hoe receptief zijn je leads?',
+                  'Lead Status Distribution - Where are your leads in the funnel?',
+                  'Monthly Trends - Growth over time',
+                  'Source Performance - Which channels work best?',
+                  'Sentiment Analysis - How receptive are your leads?',
                 ]}
               />
 
               <div className="bg-muted p-4 rounded-lg">
                 <h4 className="font-semibold mb-2">Analytics Tips</h4>
                 <ul className="space-y-1 text-sm">
-                  <li>• Check weekly voor trends en patronen</li>
-                  <li>• Focus op conversie ratio naar meetings</li>
-                  <li>• Optimaliseer je aanpak op basis van sentiment</li>
-                  <li>• Gebruik source tags om beste kanalen te identificeren</li>
+                  <li>• Check weekly for trends and patterns</li>
+                  <li>• Focus on conversion ratio to meetings</li>
+                  <li>• Optimise your approach based on sentiment</li>
+                  <li>• Use source tags to identify best channels</li>
                 </ul>
               </div>
             </TabsContent>
@@ -279,10 +279,10 @@ export function GuideDialog() {
           <div className="flex justify-between items-center pt-4 border-t">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MessageSquare className="h-4 w-4" />
-              <span>Vragen? Gebruik de Feedback knop!</span>
+              <span>Questions? Use the Feedback button!</span>
             </div>
             <Button onClick={() => setIsOpen(false)}>
-              Sluiten
+              Close
             </Button>
           </div>
         </Tabs>
