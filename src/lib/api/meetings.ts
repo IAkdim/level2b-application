@@ -5,25 +5,28 @@ export interface Meeting {
   id: string
   org_id: string
   lead_id: string | null
-  title: string
-  description: string | null
-  scheduled_at: string
-  end_time: string | null
-  duration_minutes: number | null
+  // Calendly Data
+  calendly_event_id: string
+  calendly_uri: string
+  event_type_name: string
+  event_type_uri: string
+  // Meeting Details
+  name: string
+  email: string
+  status: 'active' | 'canceled'
+  start_time: string
+  end_time: string
   location: string | null
-  meeting_url: string | null
-  status: 'scheduled' | 'confirmed' | 'completed' | 'canceled' | 'no_show' | 'rescheduled'
-  calendly_event_uri: string | null
-  calendly_invitee_uri: string | null
-  calendly_cancel_url: string | null
-  calendly_reschedule_url: string | null
-  attendee_name: string | null
-  attendee_email: string | null
-  attendee_timezone: string | null
-  created_by: string | null
-  canceled_by: string | null
-  canceled_at: string | null
+  // Invitee Information
+  invitee_name: string | null
+  invitee_email: string | null
+  invitee_timezone: string | null
+  // Additional Data
   cancel_reason: string | null
+  cancellation_reason: string | null
+  rescheduled: boolean
+  questions_and_answers: any[]
+  tracking: Record<string, any>
   metadata: Record<string, any>
   created_at: string
   updated_at: string
@@ -42,7 +45,7 @@ export interface Meeting {
 export async function getMeetings(orgId: string): Promise<Meeting[]> {
   console.log('[getMeetings] Fetching meetings for orgId:', orgId)
   const { data, error } = await supabase
-    .from('meetings')
+    .from('calendly_meetings')
     .select(`
       *,
       lead:leads (
@@ -53,7 +56,7 @@ export async function getMeetings(orgId: string): Promise<Meeting[]> {
       )
     `)
     .eq('org_id', orgId)
-    .order('scheduled_at', { ascending: false })
+    .order('start_time', { ascending: false })
 
   console.log('[getMeetings] Query result:', { dataLength: data?.length, error })
 
@@ -72,7 +75,7 @@ export async function getUpcomingMeetings(orgId: string): Promise<Meeting[]> {
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
-    .from('meetings')
+    .from('calendly_meetings')
     .select(`
       *,
       lead:leads (

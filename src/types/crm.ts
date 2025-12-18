@@ -158,6 +158,85 @@ export interface UpdateNoteInput {
 }
 
 // ============================================================================
+// EMAIL TEMPLATE
+// ============================================================================
+export interface EmailTemplate {
+  id: string
+  org_id: string
+  
+  // Template content
+  name: string
+  subject: string
+  body: string
+  
+  // Generation metadata
+  company_info?: Record<string, any>
+  additional_context?: string
+  
+  // Usage tracking
+  times_used: number
+  last_used_at?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateEmailTemplateInput {
+  name: string
+  subject: string
+  body: string
+  company_info?: Record<string, any>
+  additional_context?: string
+}
+
+export interface UpdateEmailTemplateInput {
+  name?: string
+  subject?: string
+  body?: string
+  company_info?: Record<string, any>
+  additional_context?: string
+}
+
+// ============================================================================
+// FEEDBACK
+// ============================================================================
+export type FeedbackType = 'bug' | 'feature' | 'improvement' | 'other'
+export type FeedbackStatus = 'new' | 'in_review' | 'planned' | 'completed' | 'rejected'
+
+export interface Feedback {
+  id: string
+  org_id: string
+  user_id?: string
+  
+  // Feedback content
+  type: FeedbackType
+  message: string
+  rating?: number
+  
+  // Optional metadata
+  page_url?: string
+  user_agent?: string
+  metadata?: Record<string, any>
+  
+  // Status tracking
+  status: FeedbackStatus
+  admin_notes?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateFeedbackInput {
+  type: FeedbackType
+  message: string
+  rating?: number
+  page_url?: string
+  metadata?: Record<string, any>
+}
+
+// ============================================================================
 // DEAL
 // ============================================================================
 export interface Deal {

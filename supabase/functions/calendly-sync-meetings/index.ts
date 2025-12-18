@@ -91,9 +91,9 @@ Deno.serve(async (req) => {
         
         // Check if event already exists
         const { data: existingMeeting } = await supabase
-          .from('meetings')
+          .from('calendly_meetings')
           .select('id')
-          .eq('calendly_event_uri', event.uri)
+          .eq('calendly_uri', event.uri)
           .single()
 
         if (existingMeeting) {
@@ -160,27 +160,33 @@ Deno.serve(async (req) => {
         
         // Create meeting record
         const { error: insertError } = await supabase
-          .from('meetings')
+          .from('calendly_meetings')
           .insert({
             org_id: orgId,
             lead_id: lead?.id || null,
-            title: event.name,
-            scheduled_at: event.start_time,
+            calendly_event_id: event.uri.split('/').pop(),
+            calendly_uri: event.uri,
+            event_type_name: event.event_type ? event.event_type.split('/').pop() : event.name,
+            event_type_uri: event.event_type || '',
+            name: event.name,
+            email: invitee.email,
+            status: event.status === 'canceled' ? 'canceled' : 'active',
+            start_time: event.start_time,
             end_time: event.end_time,
-            duration_minutes: durationMinutes,
-            location: event.location?.type || 'Online',
-            meeting_url: event.location?.join_url || invitee.scheduling_url,
-            status: meetingStatus,
-            calendly_event_uri: event.uri,
-            calendly_invitee_uri: invitee.uri,
-            calendly_cancel_url: invitee.cancel_url,
-            calendly_reschedule_url: invitee.reschedule_url,
-            attendee_name: invitee.name,
-            attendee_email: invitee.email,
-            attendee_timezone: invitee.timezone,
+            location: event.location?.join_url || event.location?.type || 'Online',
+            invitee_name: invitee.name,
+            invitee_email: invitee.email,
+            invitee_timezone: invitee.timezone,
+            cancel_reason: invitee.cancel_reason || null,
+            cancellation_reason: invitee.cancellation_reason || null,
+            rescheduled: invitee.rescheduled || false,
+            questions_and_answers: invitee.questions_and_answers || [],
+            tracking: invitee.tracking || {},
             metadata: {
               calendly_event_type: event.event_type,
-              questions_and_answers: invitee.questions_and_answers || [],
+              calendly_invitee_uri: invitee.uri,
+              calendly_cancel_url: invitee.cancel_url,
+              calendly_reschedule_url: invitee.reschedule_url,
               event_status: event.status,
             },
           })

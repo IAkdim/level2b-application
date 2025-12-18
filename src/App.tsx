@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react"
 import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { GuideDialog } from "@/components/GuideDialog"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
 
@@ -17,6 +18,7 @@ const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.M
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
 const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
+const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
 const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
@@ -79,10 +81,13 @@ function App() {
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/configuration" element={<Configuration />} />
                             <Route path="/organization" element={<OrganizationManagement />} />
+                            <Route path="/profile" element={<Profile />} />
                           </Routes>
                         </Suspense>
                       </main>
                     </div>
+                    {/* Guide Dialog - globally available */}
+                    <GuideDialog />
                   </div>
                 </ProtectedRoute>
               }
