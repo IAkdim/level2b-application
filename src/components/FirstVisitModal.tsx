@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { X, Mail, Users, FileText, Calendar, Check, Minimize2, Maximize2, ChevronRight } from "lucide-react"
+import { X, Mail, Users, FileText, Calendar, Check, Minimize2, Maximize2, ChevronRight, LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -15,7 +15,7 @@ interface OnboardingTask {
   id: string
   title: string
   description: string
-  icon: typeof Users
+  icon: LucideIcon
   completed: boolean
   checkType: 'manual' | 'leads' | 'templates' | 'emails' | 'meetings'
   actionUrl?: string
