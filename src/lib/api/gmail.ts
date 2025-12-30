@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient"
 import { analyzeSentiment, type SentimentAnalysis } from "./claude-secure"
 import { AuthenticationError } from "./reauth"
+import { rateLimiter } from "./rateLimiter"
 
 interface GmailMessage {
   id: string
@@ -508,6 +509,15 @@ export async function sendEmail(
 ): Promise<string | null> {
   try {
     console.log("sendEmail called with:", { to, subject: subject.substring(0, 50), labelName, isHtml });
+    
+    // Check rate limit first
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const rateCheck = await rateLimiter.checkLimit('email_send', session.user.id)
+      if (!rateCheck.allowed) {
+        throw new Error(rateCheck.message || 'Email sending rate limit exceeded. Please try again later.')
+      }
+    }
     
     const accessToken = await getGmailAccessToken()
     

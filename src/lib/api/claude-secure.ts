@@ -2,6 +2,7 @@
 // SECURE versie - gebruikt backend API in plaats van directe Claude calls
 
 import { supabase } from '@/lib/supabaseClient'
+import { rateLimiter } from './rateLimiter'
 
 export type EmailSentiment = 'not_interested' | 'doubtful' | 'positive'
 
@@ -37,6 +38,18 @@ export async function analyzeSentiment(
         confidence: 0,
         reasoning: 'Authentication required',
         error: 'Not logged in. Please log in again to use sentiment analysis.',
+      }
+    }
+
+    // Check rate limit
+    const rateCheck = await rateLimiter.checkLimit('ai', session.user.id)
+    if (!rateCheck.allowed) {
+      console.error('❌ Rate limit exceeded for AI API')
+      return {
+        sentiment: 'doubtful',
+        confidence: 0,
+        reasoning: 'Rate limit exceeded',
+        error: rateCheck.message || 'Too many requests. Please try again later.',
       }
     }
 

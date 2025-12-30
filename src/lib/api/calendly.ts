@@ -1,5 +1,6 @@
 // API functions for Calendly integration
 import { supabase } from '../supabaseClient'
+import { rateLimiter } from './rateLimiter'
 
 export interface CalendlyEventType {
   uri: string
@@ -123,6 +124,15 @@ export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
  * Get available Calendly event types (scheduling links)
  */
 export async function getCalendlyEventTypes(orgId: string): Promise<CalendlyEventType[]> {
+  // Rate limit check
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    const rateCheck = await rateLimiter.checkLimit('calendly', session.user.id)
+    if (!rateCheck.allowed) {
+      throw new Error(rateCheck.message || 'Too many Calendly API requests. Please try again later.')
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('calendly-get-event-types', {
     body: { orgId },
   })
