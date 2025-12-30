@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
+import { getUserSettings, getDefaultSettings, type UserSettings } from "@/lib/api/userSettings"
+import { supabase } from "@/lib/supabaseClient"
 
 interface BulkEmailDialogProps {
   open: boolean
@@ -38,6 +40,24 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const [isComplete, setIsComplete] = useState(false)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
+
+  // Load user settings and templates when dialog opens
+  useEffect(() => {
+    async function loadUserSettings() {
+      if (!open || !selectedOrg?.id) return
+      
+      try {
+        const settings = await getUserSettings(selectedOrg.id)
+        setUserSettings(settings || getDefaultSettings() as UserSettings)
+      } catch (error) {
+        console.error('Error loading user settings:', error)
+        setUserSettings(getDefaultSettings() as UserSettings)
+      }
+    }
+    
+    loadUserSettings()
+  }, [open, selectedOrg?.id])
 
   // Load saved templates when dialog opens
   useEffect(() => {
@@ -120,13 +140,14 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         throw authError // Re-throw if it's a different error
       }
 
-      // Check daily email limit
+      // Check daily email limit from user settings or default
+      const dailyLimit = userSettings?.campaign_daily_send_limit || 50
       const limitCheck = await checkUsageLimit(selectedOrg.id, 'email')
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
         const resetTime = getTimeUntilReset()
-        toast.error(`Dagelijkse email limiet bereikt. Reset over ${resetTime}`, {
+        toast.error(`Dagelijkse email limiet bereikt (${dailyLimit}). Reset over ${resetTime}`, {
           description: errorMsg,
           duration: 5000
         })
@@ -138,7 +159,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       const emailsRemaining = limitCheck.usage?.emailsRemaining || 0
       if (selectedLeads.length > emailsRemaining) {
         toast.error(`Kan niet ${selectedLeads.length} emails versturen`, {
-          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag. Reset over ${getTimeUntilReset()}`,
+          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag (limiet: ${dailyLimit}). Reset over ${getTimeUntilReset()}`,
           duration: 5000
         })
         setIsSending(false)
@@ -146,6 +167,9 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       }
 
       console.log("Starting to send emails to", selectedLeads.length, "leads");
+      
+      // Get user info for signature
+      const { data: { user } } = await supabase.auth.getUser()
       
       // Personaliseer emails met lead data
       const emails = selectedLeads.map((lead) => {
@@ -159,6 +183,16 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           .replace(/\{name\}/g, lead.name)
           .replace(/\{company\}/g, lead.company || "uw bedrijf")
           .replace(/\{title\}/g, lead.title || "")
+        
+        // Add email signature if configured
+        if (userSettings?.email_signature) {
+          const signature = userSettings.email_signature
+            .replace(/\{\{sender_name\}\}/g, userSettings.full_name || user?.email || '')
+            .replace(/\{\{company\}\}/g, selectedOrg?.name || '')
+            .replace(/\{\{phone\}\}/g, '') // Add phone to user settings if needed
+          
+          personalizedBody += `\n\n${signature}`
+        }
 
         console.log("Preparing email for:", lead.email, {
           subject: personalizedSubject,
