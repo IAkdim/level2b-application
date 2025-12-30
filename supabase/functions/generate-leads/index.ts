@@ -117,8 +117,7 @@ async function generateFromGoogleMaps(
     const searchData = await searchResponse.json()
 
     if (searchData.status !== 'OK' || !searchData.results) {
-      console.error('Google Maps search failed:', searchData.status)
-      return generateMockLeads(niche, location, maxLeads, 'google_maps')
+      throw new Error(`Google Maps search failed: ${searchData.status}. Please check your API key and quota.`)
     }
 
     const places = searchData.results.slice(0, maxLeads)
@@ -156,7 +155,7 @@ async function generateFromGoogleMaps(
     }
   } catch (error) {
     console.error('Error in Google Maps generation:', error)
-    return generateMockLeads(niche, location, maxLeads, 'google_maps')
+    throw error
   }
 
   return leads
@@ -175,8 +174,7 @@ async function generateFromSocialMedia(
   const searchEngineId = Deno.env.get('GOOGLE_CUSTOM_SEARCH_ENGINE_ID')
   
   if (!apiKey || !searchEngineId) {
-    console.warn('No Google Custom Search credentials found, using mock data')
-    return generateMockLeads(niche, location, maxLeads, 'social_media')
+    throw new Error('Google Custom Search not configured. Please add GOOGLE_CUSTOM_SEARCH_API_KEY and GOOGLE_CUSTOM_SEARCH_ENGINE_ID in Supabase Edge Function secrets.')
   }
 
   try {
@@ -193,7 +191,7 @@ async function generateFromSocialMedia(
     }
   } catch (error) {
     console.error('Error in social media generation:', error)
-    return generateMockLeads(niche, location, maxLeads, 'social_media')
+    throw error
   }
 
   return leads.slice(0, maxLeads)
@@ -293,26 +291,6 @@ function extractNameFromText(text: string): string | undefined {
   }
   
   return undefined
-}
-
-function generateMockLeads(niche: string, location: string, count: number, source: string): Lead[] {
-  const mockLeads: Lead[] = []
-  const companies = ['TechCorp', 'InnovateLab', 'DataStream', 'CloudVentures', 'SmartSolutions', 'NextGen Systems', 'AlphaServices', 'BetaGroup', 'GammaEnterprise', 'DeltaConsulting']
-  const emailDomains = ['example.com', 'business.com', 'corp.io', 'tech.nl']
-  
-  for (let i = 0; i < count; i++) {
-    const companyName = companies[i % companies.length] + ` ${location}`
-    mockLeads.push({
-      company: companyName,
-      contact_name: `Contact ${i + 1}`,
-      email: `contact${i + 1}@${emailDomains[i % emailDomains.length]}`,
-      phone: `+31 6 ${Math.floor(10000000 + Math.random() * 90000000)}`,
-      website: `https://www.${companyName.toLowerCase().replace(/\s+/g, '')}.com`,
-      source: `${source === 'google_maps' ? 'Google Maps' : 'Social Media'} - Mock Data`,
-    })
-  }
-  
-  return mockLeads
 }
 
 async function saveLeadsToDatabase(

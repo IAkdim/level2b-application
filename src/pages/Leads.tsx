@@ -74,7 +74,7 @@ export function Leads() {
   const debouncedSearch = useDebounce(searchTerm, 300)
 
   // Fetch leads with server-side filters and sorting
-  const { data: leadsData, isLoading: leadsLoading } = useLeads({
+  const { data: leadsData, isLoading: leadsLoading, refetch } = useLeads({
     status: statusFilter.length > 0 ? statusFilter : undefined,
     sentiment: sentimentFilter.length > 0 ? sentimentFilter : undefined,
     source: sourceFilter.length > 0 ? sourceFilter : undefined,

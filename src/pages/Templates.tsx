@@ -341,7 +341,6 @@ export default function Templates() {
       toast.error(`Could not save template: ${errorMsg}`)
     }
   }
-  }
 
   const handleDeleteTemplate = async (id: string) => {
     if (!confirm('Are you sure you want to delete this template?')) return
