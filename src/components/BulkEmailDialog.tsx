@@ -195,21 +195,21 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       
       // Check if it's an authentication error
       if (isAuthenticationError(error)) {
-        toast.error("Google Re-authentication Required", {
-          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
-          duration: 10000,
-          action: {
-            label: "Re-connect Gmail",
-            onClick: async () => {
-              try {
-                await reAuthenticateWithGoogle()
-              } catch (reAuthError) {
-                console.error("Re-authentication failed:", reAuthError)
-                toast.error("Re-authentication failed. Please try again.")
-              }
-            }
-          }
+        toast.info("Gmail opnieuw verbinden...", {
+          description: "Je wordt doorgestuurd naar Google om opnieuw in te loggen.",
+          duration: 3000
         })
+        
+        // Automatically redirect to Google re-authentication
+        try {
+          await reAuthenticateWithGoogle()
+        } catch (reAuthError) {
+          console.error("Re-authentication failed:", reAuthError)
+          toast.error("Re-authenticatie mislukt", {
+            description: "Probeer het later opnieuw of neem contact op met support.",
+            duration: 5000
+          })
+        }
       } else {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         toast.error("Error sending emails", {
