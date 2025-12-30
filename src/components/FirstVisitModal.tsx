@@ -94,10 +94,20 @@ export function FirstVisitModal() {
 
       if (savedTasks) {
         const parsed = JSON.parse(savedTasks)
-        setTasks(parsed)
+        
+        // Merge saved state with default tasks to restore icon components
+        const mergedTasks = DEFAULT_TASKS.map(defaultTask => {
+          const savedTask = parsed.find((t: any) => t.id === defaultTask.id)
+          return savedTask ? {
+            ...defaultTask,
+            completed: savedTask.completed
+          } : defaultTask
+        })
+        
+        setTasks(mergedTasks)
         
         // Check if all completed
-        const allCompleted = parsed.every((t: OnboardingTask) => t.completed)
+        const allCompleted = mergedTasks.every((t: OnboardingTask) => t.completed)
         if (!allCompleted) {
           setOpen(true)
         }
