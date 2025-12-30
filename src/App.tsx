@@ -14,6 +14,7 @@ const Leads = lazy(() => import("@/pages/Leads").then(m => ({ default: m.Leads }
 const LeadDetail = lazy(() => import("@/pages/LeadDetail").then(m => ({ default: m.LeadDetail })))
 const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ default: m.EmailThreads })))
 const Templates = lazy(() => import("@/pages/Templates"))
+const PipelineView = lazy(() => import("@/pages/PipelineView").then(m => ({ default: m.PipelineView })))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
@@ -77,6 +78,7 @@ function App() {
                               <Route path="email-threads" element={<EmailThreads />} />
                               <Route path="templates" element={<Templates />} />
                             </Route>
+                            <Route path="/pipeline" element={<PipelineView />} />
                             <Route path="/meetings" element={<Meetings />} />
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/configuration" element={<Configuration />} />

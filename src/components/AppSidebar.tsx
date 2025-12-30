@@ -14,6 +14,7 @@ import {
   Building2,
   Send,
   Star,
+  LayoutList,
 } from "lucide-react"
 import { eventBus } from "@/lib/eventBus"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: "Dashboard", href: "/", icon: Home, shortcut: "⌘D" },
   { name: "Outreach", href: "/outreach/leads", icon: Users, shortcut: "⌘O" },
+  { name: "Pipeline", href: "/pipeline", icon: LayoutList, shortcut: "⌘P" },
   { name: "Meetings", href: "/meetings", icon: Calendar, shortcut: "⌘M" },
   { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "⌘A" },
   { name: "Organization", href: "/organization", icon: Building2, shortcut: "⌘G" },

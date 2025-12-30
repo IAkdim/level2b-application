@@ -253,6 +253,9 @@ export interface Deal {
   stage: DealStage
   probability?: number
 
+  // Assignment
+  assigned_to?: string
+
   // Dates
   expected_close_date?: string
   actual_close_date?: string
@@ -273,6 +276,11 @@ export interface Deal {
     email: string
     company?: string
   }
+  assignee?: {
+    id: string
+    full_name?: string
+    email?: string
+  }
 }
 
 export interface CreateDealInput {
@@ -282,6 +290,7 @@ export interface CreateDealInput {
   currency?: string
   stage?: DealStage
   probability?: number
+  assigned_to?: string
   expected_close_date?: string
   notes?: string
 }
@@ -292,6 +301,7 @@ export interface UpdateDealInput {
   currency?: string
   stage?: DealStage
   probability?: number
+  assigned_to?: string
   expected_close_date?: string
   actual_close_date?: string
   notes?: string
@@ -331,4 +341,20 @@ export interface TaskFilters {
   lead_id?: string
   due_before?: string
   due_after?: string
+}
+
+export interface DealFilters {
+  stage?: DealStage | DealStage[]
+  value_min?: number
+  value_max?: number
+  expected_close_before?: string
+  expected_close_after?: string
+  search?: string
+  sortBy?: 'title' | 'value' | 'expected_close_date' | 'created_at'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface DealWithTaskCount extends Deal {
+  task_count?: number
+  pending_task_count?: number
 }
