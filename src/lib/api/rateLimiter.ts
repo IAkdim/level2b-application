@@ -165,7 +165,6 @@ class RateLimiter {
       maxRequests,
       windowMs,
     })
-    console.log(`✓ Updated rate limit for ${category}: ${maxRequests} requests per ${windowMs / 1000}s`)
   }
 
   /**

@@ -52,9 +52,6 @@ export async function updateOrganizationSettings(
   orgId: string,
   updates: Partial<OrganizationSettings>
 ): Promise<void> {
-  console.log('[updateOrganizationSettings] Saving settings for org:', orgId)
-  console.log('[updateOrganizationSettings] Updates:', updates)
-  
   // First, try to update existing row
   const { data: updateData, error: updateError } = await supabase
     .from('organization_settings')
@@ -62,11 +59,8 @@ export async function updateOrganizationSettings(
     .eq('org_id', orgId)
     .select()
 
-  console.log('[updateOrganizationSettings] Update result:', { updateData, updateError })
-
   // If update succeeded and returned data, we're done
   if (updateData && updateData.length > 0) {
-    console.log('[updateOrganizationSettings] Update successful')
     return
   }
 
@@ -77,20 +71,15 @@ export async function updateOrganizationSettings(
   }
 
   // If update succeeded but no rows affected, insert new row
-  console.log('[updateOrganizationSettings] No existing row, inserting new one')
   const { data: insertData, error: insertError } = await supabase
     .from('organization_settings')
     .insert({ org_id: orgId, ...updates })
     .select()
 
-  console.log('[updateOrganizationSettings] Insert result:', { insertData, insertError })
-
   if (insertError) {
     console.error('[updateOrganizationSettings] Insert error:', insertError)
     throw insertError
   }
-  
-  console.log('[updateOrganizationSettings] Settings saved successfully')
 }
 
 /**
@@ -98,13 +87,9 @@ export async function updateOrganizationSettings(
  * Returns the authorization URL to redirect the user to
  */
 export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
-  console.log('[calendly.ts] initiateCalendlyOAuth called with orgId:', orgId)
-  
   const { data, error } = await supabase.functions.invoke('calendly-oauth-init', {
     body: { orgId },
   })
-
-  console.log('[calendly.ts] Edge function response:', { data, error })
 
   if (error) {
     console.error('[calendly.ts] Error initiating Calendly OAuth:', error)
@@ -116,7 +101,6 @@ export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
     throw new Error(data.error)
   }
 
-  console.log('[calendly.ts] Returning authUrl:', data.authUrl)
   return data.authUrl
 }
 

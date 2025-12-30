@@ -66,11 +66,9 @@ export function TopBar() {
 
   async function loadNotifications() {
     try {
-      console.log('Loading notifications...')
       setIsLoadingNotifications(true)
       const notifs = await getNotifications(20)
       const count = await getUnreadCount()
-      console.log('Notifications loaded:', notifs.length, 'notifications, unread:', count)
       setNotifications(notifs)
       setUnreadCount(count)
     } catch (error) {
@@ -190,7 +188,6 @@ export function TopBar() {
     
     try {
       subscription = subscribeToNotifications((newNotification) => {
-        console.log('New notification received:', newNotification)
         setNotifications(prev => [newNotification, ...prev])
         setUnreadCount(prev => prev + 1)
         

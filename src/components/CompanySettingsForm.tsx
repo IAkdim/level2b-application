@@ -63,11 +63,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   }
 
   const loadSettings = async (organizationId: string) => {
-    console.log('[CompanySettingsForm] Loading settings for org:', organizationId)
     try {
       setIsLoading(true)
       const data = await getOrganizationSettings(organizationId)
-      console.log('[CompanySettingsForm] Settings loaded:', data)
       
       // Always set settings, even if data is null
       setSettings({
@@ -85,11 +83,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
       // If connected, load event types
       if (connected && data) {
-        console.log('[CompanySettingsForm] Loading event types...')
         await loadEventTypes(organizationId)
         setSelectedEventTypeUri(data.calendly_event_type_uri || '')
       }
-      console.log('[CompanySettingsForm] Settings load complete')
     } catch (error) {
       console.error('[CompanySettingsForm] Error loading settings:', error)
       toast.error('Error loading settings')
@@ -103,7 +99,6 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
         industry: '',
       })
     } finally {
-      console.log('[CompanySettingsForm] Setting isLoading to false')
       setIsLoading(false)
     }
   }
@@ -120,7 +115,6 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   useEffect(() => {
     const handleSettingsUpdate = () => {
       if (selectedOrg?.id) {
-        console.log('[CompanySettingsForm] Settings updated event received, reloading...')
         loadSettings(selectedOrg.id)
       }
     }

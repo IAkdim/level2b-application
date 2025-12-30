@@ -85,16 +85,12 @@ export function EmailThreads() {
 
     setIsLoading(true);
     try {
-      console.log("Loading emails for label:", selectedLabel);
-      
       // Fetch ALL emails with the label (read + unread)
       const sent = await getEmailsByLabel(selectedLabel, 100);
-      console.log("Sent emails loaded:", sent.length);
       setSentEmails(sent);
 
       // Haal reacties op emails met dit label (zonder sentiment analyse)
       const repliesData = await getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
-      console.log("Replies loaded:", repliesData.length);
       setReplies(repliesData);
       
       setLastRefresh(new Date());
@@ -302,12 +298,10 @@ export function EmailThreads() {
   };
 
   const handleReplyClick = (email: Email) => {
-    console.log('Reply button clicked for email:', email.id);
     setSelectedEmail(email);
     setReplySubject(`Re: ${email.subject}`);
     setReplyBody("");
     setIsReplyDialogOpen(true);
-    console.log('Reply dialog should be open now');
   };
 
   const handleGenerateAIReply = async () => {

@@ -21,11 +21,6 @@ export async function analyzeSentiment(
   emailSubject: string
 ): Promise<SentimentAnalysis> {
   try {
-    console.log('Analyzing sentiment via secure backend:', {
-      subject: emailSubject,
-      bodyLength: emailBody.length,
-    })
-
     // Get current session for authentication
     const {
       data: { session },
@@ -53,8 +48,6 @@ export async function analyzeSentiment(
       }
     }
 
-    console.log('Calling Edge Function with auth token...')
-
     // Call Supabase Edge Function (SECURE - API key on server)
     const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
       body: {
@@ -62,8 +55,6 @@ export async function analyzeSentiment(
         emailSubject,
       },
     })
-
-    console.log('Edge Function response:', { data, error })
 
     if (error) {
       console.error('❌ Error from sentiment API:', error)
@@ -118,7 +109,6 @@ export async function analyzeSentiment(
       }
     }
 
-    console.log('✓ Sentiment analysis result:', data)
     return data as SentimentAnalysis
   } catch (error) {
     console.error('❌ Exception in analyzeSentiment:', error)
@@ -136,29 +126,6 @@ export async function analyzeSentiment(
       error: userMessage,
     }
   }
-}
-
-/**
- * Batch sentiment analyse voor meerdere emails
- */
-export async function analyzeSentimentBatch(
-  emails: Array<{ body: string; subject: string; id: string }>
-): Promise<Map<string, SentimentAnalysis>> {
-  const results = new Map<string, SentimentAnalysis>()
-
-  for (const email of emails) {
-    try {
-      const analysis = await analyzeSentiment(email.body, email.subject)
-      results.set(email.id, analysis)
-
-      // Kleine delay tussen requests om rate limiting te voorkomen
-      await new Promise((resolve) => setTimeout(resolve, 500))
-    } catch (error) {
-      console.error(`Failed to analyze sentiment for email ${email.id}:`, error)
-    }
-  }
-
-  return results
 }
 
 export interface EmailReplyContext {
@@ -185,11 +152,6 @@ export async function generateSalesReply(
   context: EmailReplyContext
 ): Promise<GeneratedReply> {
   try {
-    console.log('Generating sales reply via secure backend:', {
-      sentiment: context.sentiment,
-      recipientEmail: context.recipientEmail,
-    })
-
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -212,16 +174,12 @@ export async function generateSalesReply(
         error: error.message || 'Unknown error',
       }
     }
-
-    console.log('Raw Edge Function response:', data)
-    console.log('Response type:', typeof data)
     
     // Handle case where response might be a string instead of parsed JSON
     let parsedData = data
     if (typeof data === 'string') {
       try {
         parsedData = JSON.parse(data)
-        console.log('Parsed string response to JSON:', parsedData)
       } catch (parseError) {
         console.error('Failed to parse response string:', parseError)
         return {
@@ -237,16 +195,12 @@ export async function generateSalesReply(
     if (parsedData && typeof parsedData.body === 'string') {
       const trimmedBody = parsedData.body.trim()
       if (trimmedBody.startsWith('{') && trimmedBody.includes('"body"')) {
-        console.log('⚠️ Detected nested JSON structure in body field, extracting manually...')
-        
         // Extract using regex - find the actual body content between quotes
         const bodyMatch = trimmedBody.match(/"body":\s*"((?:[^"\\]|\\.)*)"/s)
         const subjectMatch = trimmedBody.match(/"subject":\s*"([^"]*)"/)
         const toneMatch = trimmedBody.match(/"tone":\s*"((?:[^"\\]|\\.)*)"/)
         
         if (bodyMatch && bodyMatch[1]) {
-          console.log('✓ Successfully extracted fields using regex')
-          
           // Unescape the body content
           let extractedBody = bodyMatch[1]
             .replace(/\\n/g, '\n')
@@ -259,15 +213,12 @@ export async function generateSalesReply(
             body: extractedBody,
             tone: toneMatch ? toneMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : parsedData.tone,
           }
-        } else {
-          console.log('Could not extract body using regex, keeping original')
         }
       }
       
       // Final cleanup: remove any remaining escape sequences from body
       if (parsedData.body && typeof parsedData.body === 'string') {
         if (parsedData.body.includes('\\n') || parsedData.body.includes('\\"')) {
-          console.log('Cleaning remaining escape sequences from body...')
           parsedData.body = parsedData.body
             .replace(/\\n/g, '\n')
             .replace(/\\"/g, '"')
@@ -276,8 +227,6 @@ export async function generateSalesReply(
       }
     }
 
-    console.log('Final parsed reply:', parsedData)
-    console.log('Body preview:', parsedData.body?.substring(0, 150))
     return parsedData as GeneratedReply
   } catch (error) {
     console.error('Error generating reply:', error)

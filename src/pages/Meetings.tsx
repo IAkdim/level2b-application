@@ -51,18 +51,13 @@ export function Meetings() {
   }, [selectedOrg])
 
   const loadMeetings = async () => {
-    console.log('[Meetings] loadMeetings called')
     if (!selectedOrg) {
-      console.log('[Meetings] No selectedOrg, returning')
       return
     }
 
     try {
       setIsLoading(true)
-      console.log('[Meetings] Fetching meetings for org:', selectedOrg.id)
       const data = await getMeetings(selectedOrg.id)
-      console.log('[Meetings] Meetings loaded:', data.length, 'meetings')
-      console.log('[Meetings] First meeting:', data[0])
       setMeetings(data)
     } catch (error) {
       console.error('[Meetings] Error loading meetings:', error)
@@ -84,17 +79,11 @@ export function Meetings() {
   }
 
   const handleSyncMeetings = async () => {
-    console.log('[Meetings] handleSyncMeetings called')
-    console.log('[Meetings] selectedOrg:', selectedOrg)
-    
     if (!selectedOrg) return
 
     setIsSyncing(true)
     try {
-      console.log('[Meetings] Calling syncCalendlyMeetings...')
       const result = await syncCalendlyMeetings(selectedOrg.id)
-      console.log('[Meetings] Sync result:', JSON.stringify(result))
-      console.log('[Meetings] Synced:', result.synced, 'Skipped:', result.skipped, 'Total:', result.total)
       
       // Always refresh the meetings list after sync
       await loadMeetings()
@@ -112,7 +101,6 @@ export function Meetings() {
       console.error('[Meetings] Error syncing meetings:', error)
       toast.error('Error synchronising meetings')
     } finally {
-      console.log('[Meetings] Setting isSyncing to false')
       setIsSyncing(false)
     }
   }

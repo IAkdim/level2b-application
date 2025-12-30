@@ -312,9 +312,7 @@ export default function Templates() {
   }
 
   const handleSaveTemplate = async () => {
-    console.log('handleSaveTemplate called')
     if (!generatedTemplate) {
-      console.log('No generated template to save')
       return
     }
 
@@ -324,7 +322,6 @@ export default function Templates() {
     }
 
     try {
-      console.log('Saving template to database...')
       const settings = await getOrganizationSettings(selectedOrg.id)
       const result = await saveEmailTemplate(selectedOrg.id, {
         name: templateName,
@@ -334,20 +331,16 @@ export default function Templates() {
         company_info: settings || undefined,
         additional_context: additionalContext || undefined,
       })
-      console.log('Template saved successfully:', result)
-      console.log('About to show toast and close dialog...')
       toast.success('Template opgeslagen!')
-      console.log('Toast shown, reloading templates...')
       await loadTemplates() // Reload templates
-      console.log('Templates reloaded, closing dialog...')
       setShowGenerateDialog(false) // Close the GENERATE dialog (not preview)
       setGeneratedTemplate(null) // Reset generated template
-      console.log('Dialog closed and template reset')
     } catch (error) {
       console.error('Error saving template:', error)
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
       toast.error(`Could not save template: ${errorMsg}`)
     }
+  }
   }
 
   const handleDeleteTemplate = async (id: string) => {
