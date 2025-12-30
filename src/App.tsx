@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { GuideDialog } from "@/components/GuideDialog"
+import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
 import { Toaster } from "@/components/ui/sonner"
@@ -89,6 +90,8 @@ function App() {
                     </div>
                     {/* Guide Dialog - globally available */}
                     <GuideDialog />
+                    {/* First visit onboarding modal */}
+                    <FirstVisitModal />
                   </div>
                 </ProtectedRoute>
               }
