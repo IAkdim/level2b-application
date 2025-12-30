@@ -31,7 +31,13 @@ export async function analyzeSentiment(
     } = await supabase.auth.getSession()
 
     if (!session) {
-      throw new Error('Not authenticated')
+      console.error('❌ No active session found')
+      return {
+        sentiment: 'doubtful',
+        confidence: 0,
+        reasoning: 'Authentication required',
+        error: 'Not logged in. Please log in again to use sentiment analysis.',
+      }
     }
 
     console.log('Calling Edge Function with auth token...')
@@ -47,26 +53,74 @@ export async function analyzeSentiment(
     console.log('Edge Function response:', { data, error })
 
     if (error) {
-      console.error('Error from sentiment API:', error)
-      const errorMessage = `${error.message || 'Unknown error'}`
+      console.error('❌ Error from sentiment API:', error)
+      
+      // Parse error details
+      let userMessage = 'An error occurred while analyzing sentiment.'
+      let technicalDetails = error.message || 'Unknown error'
+      
+      // Check for specific error types and extract backend error details
+      if (error.message?.includes('FunctionsHttpError')) {
+        userMessage = 'Sentiment analysis service is currently unavailable.'
+        
+        // Try to get more details from context
+        if (error.context) {
+          try {
+            const errorContext = typeof error.context === 'string' 
+              ? JSON.parse(error.context) 
+              : error.context
+            
+            if (errorContext?.error) {
+              technicalDetails = errorContext.error
+              // Use the backend error as the main message if available
+              userMessage = errorContext.error
+            }
+          } catch (e) {
+            console.error('Failed to parse error context:', e)
+          }
+        }
+      } else if (error.message?.includes('timeout')) {
+        userMessage = 'Sentiment analysis is taking too long. Please try again later.'
+      } else if (error.message?.includes('API key')) {
+        userMessage = 'API configuration error. Please contact support.'
+      }
+      
+      console.error('Technical details:', technicalDetails)
+      
       return {
         sentiment: 'doubtful',
         confidence: 0,
-        reasoning: 'Edge Function Error',
-        error: errorMessage,
+        reasoning: 'Analysis unavailable',
+        error: userMessage,
       }
     }
 
-    console.log('Sentiment analysis result:', data)
+    if (!data) {
+      console.error('❌ No data returned from Edge Function')
+      return {
+        sentiment: 'doubtful',
+        confidence: 0,
+        reasoning: 'No result',
+        error: 'Sentiment analysis returned no result. Please try again.',
+      }
+    }
+
+    console.log('✓ Sentiment analysis result:', data)
     return data as SentimentAnalysis
   } catch (error) {
-    console.error('Error analyzing sentiment:', error)
+    console.error('❌ Exception in analyzeSentiment:', error)
     const errorMessage = error instanceof Error ? error.message : String(error)
+    
+    let userMessage = 'Unexpected error during sentiment analysis.'
+    if (errorMessage.includes('network')) {
+      userMessage = 'Network error. Please check your internet connection.'
+    }
+    
     return {
       sentiment: 'doubtful',
       confidence: 0,
-      reasoning: 'Exception Error',
-      error: errorMessage,
+      reasoning: 'Error occurred',
+      error: userMessage,
     }
   }
 }

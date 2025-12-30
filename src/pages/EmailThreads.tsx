@@ -151,6 +151,7 @@ export function EmailThreads() {
     const selectedEmails = replies.filter(r => selectedEmailIds.has(r.id));
     let successCount = 0;
     let errorCount = 0;
+    let lastError: string | null = null;
 
     toast.info(`Sentiment analyse gestart voor ${selectedEmails.length} email${selectedEmails.length !== 1 ? 's' : ''}...`);
 
@@ -158,16 +159,31 @@ export function EmailThreads() {
       try {
         const sentiment = await analyzeSentiment(email.body, email.subject);
         
-        // Update de email in de state
-        setReplies(prevReplies => 
-          prevReplies.map(r => 
-            r.id === email.id ? { ...r, sentiment } : r
-          )
-        );
-        
-        successCount++;
+        // Check if the sentiment analysis returned an error
+        if (sentiment.error) {
+          console.error(`Sentiment analysis error for email ${email.id}:`, sentiment.error);
+          lastError = sentiment.error;
+          errorCount++;
+          
+          // Still update the email with the error sentiment
+          setReplies(prevReplies => 
+            prevReplies.map(r => 
+              r.id === email.id ? { ...r, sentiment } : r
+            )
+          );
+        } else {
+          // Update de email in de state
+          setReplies(prevReplies => 
+            prevReplies.map(r => 
+              r.id === email.id ? { ...r, sentiment } : r
+            )
+          );
+          
+          successCount++;
+        }
       } catch (error) {
         console.error(`Failed to analyze sentiment for email ${email.id}:`, error);
+        lastError = error instanceof Error ? error.message : String(error);
         errorCount++;
       }
     }
@@ -181,7 +197,7 @@ export function EmailThreads() {
       });
     } else {
       toast.error("Sentiment analyse mislukt", {
-        description: "Geen emails konden worden geanalyseerd"
+        description: lastError || "Geen emails konden worden geanalyseerd"
       });
     }
   };
