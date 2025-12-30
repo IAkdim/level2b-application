@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles, Clock } from "lucide-react"
-import { sendBatchEmails } from "@/lib/api/gmail"
+import { sendBatchEmails, checkGmailAuthentication } from "@/lib/api/gmail"
 import { getEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
 import type { EmailTemplate } from "@/types/crm"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
@@ -94,6 +94,32 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
     setSendingProgress({ current: 0, total: selectedLeads.length, success: 0, failed: 0 })
 
     try {
+      // Check Gmail authentication first
+      try {
+        await checkGmailAuthentication()
+      } catch (authError) {
+        // Authentication error detected - redirect to Google OAuth
+        if (isAuthenticationError(authError)) {
+          toast.info("Gmail opnieuw verbinden...", {
+            description: "Je wordt doorgestuurd naar Google om opnieuw in te loggen.",
+            duration: 3000
+          })
+          
+          // Automatically redirect to Google re-authentication
+          try {
+            await reAuthenticateWithGoogle()
+          } catch (reAuthError) {
+            console.error("Re-authentication failed:", reAuthError)
+            toast.error("Re-authenticatie mislukt", {
+              description: "Probeer het later opnieuw of neem contact op met support.",
+              duration: 5000
+            })
+          }
+          return // Stop sending process
+        }
+        throw authError // Re-throw if it's a different error
+      }
+
       // Check daily email limit
       const limitCheck = await checkUsageLimit(selectedOrg.id, 'email')
       

@@ -76,6 +76,17 @@ async function getGmailAccessToken(): Promise<string | null> {
 }
 
 /**
+ * Check if Gmail authentication is valid before sending emails
+ * @throws {AuthenticationError} if authentication is required
+ */
+export async function checkGmailAuthentication(): Promise<void> {
+  const token = await getGmailAccessToken()
+  if (!token) {
+    throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
+  }
+}
+
+/**
  * Decode base64url gecodeerde string
  */
 function decodeBase64Url(str: string): string {
