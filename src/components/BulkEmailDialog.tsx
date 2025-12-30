@@ -245,20 +245,21 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Bulk Email Versturen
-          </DialogTitle>
-          <DialogDescription>
-            Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
-            {selectedLeads.length === 1 ? "lead" : "leads"}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Bulk Email Versturen
+            </DialogTitle>
+            <DialogDescription>
+              Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
+              {selectedLeads.length === 1 ? "lead" : "leads"}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4">
           {/* Saved Templates Section */}
           {savedTemplates.length > 0 && (
             <div className="space-y-3">
@@ -315,39 +316,6 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
                 <Sparkles className="mr-2 h-4 w-4" />
                 Maak nieuwe template
               </Button>
-            </div>
-          )}
-
-          {/* Sending Progress */}
-          {isSending && (
-            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {isComplete ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 animate-in zoom-in duration-300" />
-                  ) : (
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
-                  )}
-                  <span className="font-medium text-sm">
-                    {isComplete ? "Verzenden voltooid!" : "Emails versturen..."}
-                  </span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {sendingProgress.current} / {sendingProgress.total}
-                </span>
-              </div>
-              
-              <Progress 
-                value={(sendingProgress.current / sendingProgress.total) * 100} 
-                className="h-2"
-              />
-              
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span className="text-green-600 dark:text-green-400">✓ {sendingProgress.success} geslaagd</span>
-                {sendingProgress.failed > 0 && (
-                  <span className="text-red-600 dark:text-red-400">✗ {sendingProgress.failed} mislukt</span>
-                )}
-              </div>
             </div>
           )}
 
@@ -486,5 +454,73 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Progress Dialog - Appears on top when sending */}
+    <Dialog open={isSending} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {isComplete ? (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                Verzenden voltooid!
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                Emails versturen...
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {isComplete 
+              ? `${sendingProgress.success} email${sendingProgress.success !== 1 ? 's' : ''} succesvol verzonden`
+              : `Bezig met verzenden naar ${selectedLeads.length} ${selectedLeads.length === 1 ? 'lead' : 'leads'}`
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Voortgang</span>
+            <span className="font-medium">
+              {sendingProgress.current} / {sendingProgress.total}
+            </span>
+          </div>
+
+          <Progress 
+            value={(sendingProgress.current / sendingProgress.total) * 100} 
+            className="h-3"
+          />
+
+          <div className="flex justify-between text-sm pt-2">
+            <span className="text-green-600 dark:text-green-400 font-medium">
+              ✓ {sendingProgress.success} geslaagd
+            </span>
+            {sendingProgress.failed > 0 && (
+              <span className="text-red-600 dark:text-red-400 font-medium">
+                ✗ {sendingProgress.failed} mislukt
+              </span>
+            )}
+          </div>
+        </div>
+
+        {isComplete && (
+          <DialogFooter>
+            <Button onClick={() => {
+              setIsSending(false)
+              setIsComplete(false)
+              if (sendingProgress.success > 0) {
+                onOpenChange(false)
+                resetForm()
+              }
+            }}>
+              Sluiten
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
