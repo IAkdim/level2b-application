@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { X, Mail, Users, FileText, Calendar, Check, Minimize2, Maximize2, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -17,6 +18,8 @@ interface OnboardingTask {
   icon: typeof Users
   completed: boolean
   checkType: 'manual' | 'leads' | 'templates' | 'emails' | 'meetings'
+  actionUrl?: string
+  actionType?: 'navigate' | 'external'
 }
 
 const DEFAULT_TASKS: OnboardingTask[] = [
@@ -26,7 +29,9 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     description: 'Link your Gmail to start sending emails',
     icon: Mail,
     completed: false,
-    checkType: 'manual'
+    checkType: 'manual',
+    actionUrl: '/configuration',
+    actionType: 'navigate'
   },
   {
     id: 'add-leads',
@@ -34,7 +39,9 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     description: 'Import or manually add leads to your CRM',
     icon: Users,
     completed: false,
-    checkType: 'leads'
+    checkType: 'leads',
+    actionUrl: '/outreach/leads',
+    actionType: 'navigate'
   },
   {
     id: 'create-template',
@@ -42,7 +49,9 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     description: 'Use AI to generate your first outreach template',
     icon: FileText,
     completed: false,
-    checkType: 'templates'
+    checkType: 'templates',
+    actionUrl: '/outreach/templates',
+    actionType: 'navigate'
   },
   {
     id: 'send-email',
@@ -50,7 +59,9 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     description: 'Send a test email to verify everything works',
     icon: Mail,
     completed: false,
-    checkType: 'emails'
+    checkType: 'emails',
+    actionUrl: '/outreach/email-threads',
+    actionType: 'navigate'
   },
   {
     id: 'connect-calendly',
@@ -58,11 +69,14 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     description: 'Link Calendly to track meeting bookings',
     icon: Calendar,
     completed: false,
-    checkType: 'meetings'
+    checkType: 'meetings',
+    actionUrl: '/configuration',
+    actionType: 'navigate'
   }
 ]
 
 export function FirstVisitModal() {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [tasks, setTasks] = useState<OnboardingTask[]>(DEFAULT_TASKS)
@@ -195,6 +209,23 @@ export function FirstVisitModal() {
     saveTasks(newTasks)
   }
 
+  const handleTaskClick = (task: OnboardingTask) => {
+    // If task is already completed, don't navigate
+    if (task.completed) return
+
+    // Navigate to the task's action URL
+    if (task.actionUrl) {
+      if (task.actionType === 'navigate') {
+        // Minimize modal and navigate
+        setMinimized(true)
+        navigate(task.actionUrl)
+      } else if (task.actionType === 'external') {
+        // Open in new tab
+        window.open(task.actionUrl, '_blank')
+      }
+    }
+  }
+
   const skipAll = () => {
     try {
       localStorage.setItem(DISMISSED_KEY, 'true')
@@ -315,11 +346,11 @@ export function FirstVisitModal() {
               return (
                 <div
                   key={task.id}
-                  onClick={() => task.checkType === 'manual' && toggleTask(task.id)}
+                  onClick={() => handleTaskClick(task)}
                   className={`flex items-start gap-4 rounded-lg border p-4 transition-all ${
                     task.completed
                       ? 'bg-muted/50 border-green-500/50'
-                      : 'hover:bg-muted/50 cursor-pointer'
+                      : 'hover:bg-muted/50 hover:border-primary/50 cursor-pointer'
                   }`}
                 >
                   <div
@@ -343,7 +374,7 @@ export function FirstVisitModal() {
                       {task.description}
                     </p>
                   </div>
-                  {!task.completed && task.checkType === 'manual' && (
+                  {!task.completed && (
                     <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
                   )}
                 </div>
