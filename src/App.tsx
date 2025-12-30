@@ -18,6 +18,7 @@ const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ defa
 const Templates = lazy(() => import("@/pages/Templates"))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
+const ApiMonitoring = lazy(() => import("@/pages/ApiMonitoring"))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
 const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
@@ -81,6 +82,7 @@ function App() {
                             </Route>
                             <Route path="/meetings" element={<Meetings />} />
                             <Route path="/analytics" element={<Analytics />} />
+                            <Route path="/api-monitoring" element={<ApiMonitoring />} />
                             <Route path="/configuration" element={<Configuration />} />
                             <Route path="/organization" element={<OrganizationManagement />} />
                             <Route path="/profile" element={<Profile />} />

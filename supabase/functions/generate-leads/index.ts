@@ -31,6 +31,10 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const startTime = Date.now()
+  let userId: string | undefined
+  let orgId: string | undefined
+
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -42,6 +46,12 @@ serve(async (req) => {
       }
     )
 
+    // Create admin client for rate limiting (uses service role)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
     // Verify authentication
     const {
       data: { user },
@@ -51,10 +61,32 @@ serve(async (req) => {
       throw new Error('Not authenticated')
     }
 
+    userId = user.id
+
     const body: GenerateLeadsRequest = await req.json()
-    const { method, niche, location, maxLeads, emailProvider, orgId } = body
+    const { method, niche, location, maxLeads, emailProvider, orgId: requestOrgId } = body
+    orgId = requestOrgId
 
     console.log('Starting lead generation:', { method, niche, location, maxLeads })
+
+    // ✅ RATE LIMITING CHECK
+    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc(
+      'get_hourly_rate_limit',
+      { p_user_id: userId, p_org_id: orgId }
+    )
+
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError)
+      throw new Error('Rate limit check failed')
+    }
+
+    const rateLimit = rateLimitData?.[0]
+    if (rateLimit && rateLimit.limit_remaining < maxLeads) {
+      throw new Error(
+        `Rate limit exceeded. You can generate ${rateLimit.limit_remaining} more leads this hour. ` +
+        `Limit resets at ${new Date(rateLimit.hour_start).getHours() + 1}:00.`
+      )
+    }
 
     let leads: Lead[] = []
 
@@ -66,6 +98,28 @@ serve(async (req) => {
 
     // Save leads to database
     const savedLeads = await saveLeadsToDatabase(supabaseClient, leads, orgId, method)
+
+    // ✅ INCREMENT RATE LIMIT
+    await supabaseAdmin.rpc('increment_rate_limit', {
+      p_user_id: userId,
+      p_org_id: orgId,
+      p_leads_count: savedLeads.length
+    })
+
+    // ✅ LOG API USAGE (success)
+    const duration = Date.now() - startTime
+    await supabaseAdmin.from('api_usage_logs').insert({
+      organization_id: orgId,
+      user_id: userId,
+      endpoint: 'generate-leads',
+      method: method,
+      leads_requested: maxLeads,
+      leads_generated: savedLeads.length,
+      success: true,
+      duration_ms: duration,
+      ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+      user_agent: req.headers.get('user-agent')
+    })
 
     return new Response(
       JSON.stringify({
@@ -80,6 +134,34 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error generating leads:', error)
+
+    // ✅ LOG API USAGE (failure)
+    if (userId && orgId) {
+      try {
+        const supabaseAdmin = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+        
+        const duration = Date.now() - startTime
+        await supabaseAdmin.from('api_usage_logs').insert({
+          organization_id: orgId,
+          user_id: userId,
+          endpoint: 'generate-leads',
+          method: 'unknown',
+          leads_requested: 0,
+          leads_generated: 0,
+          success: false,
+          error_message: error.message || 'Unknown error',
+          duration_ms: duration,
+          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+          user_agent: req.headers.get('user-agent')
+        })
+      } catch (logError) {
+        console.error('Failed to log error:', logError)
+      }
+    }
+
     return new Response(
       JSON.stringify({
         error: error.message || 'Failed to generate leads',
