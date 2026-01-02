@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react"
 import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
 import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
@@ -26,6 +27,15 @@ const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
 const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
+
+// Dev Dashboard pages
+const DevDashboardLayout = lazy(() => import("@/components/DevDashboardLayout"))
+const DevOverview = lazy(() => import("@/pages/dev/DevOverview"))
+const DevUsers = lazy(() => import("@/pages/dev/DevUsers"))
+const DevUserDetail = lazy(() => import("@/pages/dev/DevUserDetail"))
+const DevLogs = lazy(() => import("@/pages/dev/DevLogs"))
+const DevFeatureFlags = lazy(() => import("@/pages/dev/DevFeatureFlags"))
+const DevSettings = lazy(() => import("@/pages/dev/DevSettings"))
 
 const queryClient = new QueryClient()
 
@@ -59,6 +69,24 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Developer Dashboard - admin only */}
+              <Route
+                path="/dev/*"
+                element={
+                  <AdminRoute>
+                    <DevDashboardLayout />
+                  </AdminRoute>
+                }
+              >
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<DevOverview />} />
+                <Route path="users" element={<DevUsers />} />
+                <Route path="users/:userId" element={<DevUserDetail />} />
+                <Route path="logs" element={<DevLogs />} />
+                <Route path="flags" element={<DevFeatureFlags />} />
+                <Route path="settings" element={<DevSettings />} />
+              </Route>
 
             {/* Protected app routes */}
             <Route
