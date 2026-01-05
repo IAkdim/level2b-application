@@ -136,6 +136,7 @@ export interface EmailReplyContext {
   sentiment: EmailSentiment
   companyName?: string
   productService?: string
+  language?: string // en, nl, de, fr, es, it, pt
 }
 
 export interface GeneratedReply {

@@ -224,17 +224,17 @@ export default function DevUserDetail() {
           </CardContent>
         </Card>
 
-        {/* Organizations */}
-        <Card className="bg-slate-900 border-slate-800">
+        {/* Organisations */}
+        <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-slate-200 flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Organizations ({user.organizations?.length || 0})
+            <CardTitle className="text-slate-100 text-xl flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Organisations ({user.organizations?.length || 0})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {!user.organizations || user.organizations.length === 0 ? (
-              <p className="text-slate-400 text-sm">No organizations</p>
+              <p className="text-slate-400 text-sm">No organisations</p>
             ) : (
               <div className="space-y-3">
                 {user.organizations.map((org) => (

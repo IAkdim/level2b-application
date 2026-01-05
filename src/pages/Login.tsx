@@ -101,7 +101,7 @@ export function Login() {
             </div>
             <div>
               <h3 className="font-semibold mb-1">Team Collaboration</h3>
-              <p className="text-sm text-terracotta-100">Werk samen aan je sales doelen</p>
+              <p className="text-sm text-terracotta-100">Work together on your sales goals</p>
             </div>
           </div>
         </div>
@@ -152,11 +152,11 @@ export function Login() {
 
             <div className="mt-8 pt-6 border-t border-border">
               <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                Door in te loggen ga je akkoord met onze{" "}
+                By logging in, you agree to our{" "}
                 <a href="#" className="text-primary hover:underline">
-                  Algemene Voorwaarden
+                  Terms of Service
                 </a>{" "}
-                en{" "}
+                and{" "}
                 <a href="#" className="text-primary hover:underline">
                   Privacy Policy
                 </a>

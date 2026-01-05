@@ -15,6 +15,7 @@ import { generateSalesReply, type EmailReplyContext, analyzeSentiment } from "@/
 import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth";
 import { formatRelativeTime } from "@/lib/utils/formatters";
 import { toast } from "sonner";
+import type { Language } from "@/types/crm";
 
 export function EmailThreads() {
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
@@ -36,6 +37,7 @@ export function EmailThreads() {
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
+  const [replyLanguage, setReplyLanguage] = useState<Language>('en'); // User-selected language for AI replies
 
   // Fetch available labels on mount
   useEffect(() => {
@@ -137,8 +139,8 @@ export function EmailThreads() {
 
   const handleAnalyzeSentiment = async () => {
     if (selectedEmailIds.size === 0) {
-      toast.error("Selecteer eerst emails", {
-        description: "Selecteer minimaal één email om sentiment te analyseren"
+      toast.error("Select emails first", {
+        description: "Select at least one email to analyse sentiment"
       });
       return;
     }
@@ -149,7 +151,7 @@ export function EmailThreads() {
     let errorCount = 0;
     let lastError: string | null = null;
 
-    toast.info(`Sentiment analyse gestart voor ${selectedEmails.length} email${selectedEmails.length !== 1 ? 's' : ''}...`);
+    toast.info(`Sentiment analysis started for ${selectedEmails.length} email${selectedEmails.length !== 1 ? 's' : ''}...`);
 
     for (const email of selectedEmails) {
       try {
@@ -188,12 +190,12 @@ export function EmailThreads() {
     setSelectedEmailIds(new Set()); // Clear selection
 
     if (successCount > 0) {
-      toast.success(`Sentiment analyse voltooid`, {
-        description: `${successCount} email${successCount !== 1 ? 's' : ''} geanalyseerd${errorCount > 0 ? `, ${errorCount} mislukt` : ''}`
+      toast.success(`Sentiment analysis completed`, {
+        description: `${successCount} email${successCount !== 1 ? 's' : ''} analysed${errorCount > 0 ? `, ${errorCount} failed` : ''}`
       });
     } else {
-      toast.error("Sentiment analyse mislukt", {
-        description: lastError || "Geen emails konden worden geanalyseerd"
+      toast.error("Sentiment analysis failed", {
+        description: lastError || "No emails could be analysed"
       });
     }
   };
@@ -322,6 +324,7 @@ export function EmailThreads() {
         sentiment: selectedEmail.sentiment?.sentiment || 'doubtful',
         companyName: 'jullie bedrijf',
         productService: 'jullie dienstverlening',
+        language: replyLanguage, // Pass user-selected language
       };
 
       const generatedReply = await generateSalesReply(context);
@@ -951,9 +954,9 @@ export function EmailThreads() {
                           }
                           className="text-xs"
                         >
-                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
-                           '🔴 Niet Geïnteresseerd'}
+                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
+                           '🔴 Not Interested'}
                         </Badge>
                       </div>
                     )}
@@ -962,6 +965,28 @@ export function EmailThreads() {
               </DialogHeader>
 
               <div className="space-y-4 mt-4">
+                {/* Language Selector for AI Reply */}
+                <div className="space-y-2">
+                  <Label htmlFor="reply-language">AI Reply Language</Label>
+                  <Select value={replyLanguage} onValueChange={(value) => setReplyLanguage(value as Language)}>
+                    <SelectTrigger id="reply-language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">🇬🇧 English</SelectItem>
+                      <SelectItem value="nl">🇳🇱 Nederlands</SelectItem>
+                      <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                      <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                      <SelectItem value="es">🇪🇸 Español</SelectItem>
+                      <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                      <SelectItem value="pt">🇵🇹 Português</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select the language for AI-generated replies
+                  </p>
+                </div>
+
                 {/* AI Generate Button */}
                 <div className="flex justify-end">
                   <Button

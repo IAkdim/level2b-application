@@ -53,7 +53,7 @@ export default function ApiMonitoring() {
   if (!selectedOrg) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Please select an organization</p>
+        <p className="text-muted-foreground">Please select an organisation</p>
       </div>
     )
   }

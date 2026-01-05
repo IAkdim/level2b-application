@@ -109,20 +109,20 @@ export default function DevOverview() {
           </CardContent>
         </Card>
 
-        {/* Organizations */}
-        <Card className="bg-slate-900 border-slate-800">
+        {/* Organisations */}
+        <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-200">
-              Organizations
+            <CardTitle className="text-sm font-medium text-slate-400">
+              Organisations
             </CardTitle>
-            <Building2 className="h-4 w-4 text-slate-400" />
+            <Building className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-slate-100">
+            <div className="text-2xl font-bold text-slate-100">
               {stats?.total_organizations || 0}
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Active organizations
+              Active organisations
             </p>
           </CardContent>
         </Card>

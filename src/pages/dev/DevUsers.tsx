@@ -91,7 +91,7 @@ export default function DevUsers() {
                 <TableHead className="text-slate-400">User ID</TableHead>
                 <TableHead className="text-slate-400">Email</TableHead>
                 <TableHead className="text-slate-400">Status</TableHead>
-                <TableHead className="text-slate-400">Organizations</TableHead>
+                <TableHead className="text-slate-400">Organisations</TableHead>
                 <TableHead className="text-slate-400">Created</TableHead>
                 <TableHead className="text-slate-400">Last Sign In</TableHead>
               </TableRow>

@@ -11,6 +11,7 @@ interface EmailReplyContext {
   sentiment: 'positive' | 'doubtful' | 'not_interested'
   companyName?: string
   productService?: string
+  language?: string // en, nl, de, fr, es, it, pt
 }
 
 interface GeneratedReply {
@@ -57,80 +58,103 @@ Deno.serve(async (req) => {
     const sentiment = context.sentiment || 'doubtful'
     console.log('Using sentiment:', sentiment)
 
+    // Language mapping
+    const languageNames: Record<string, string> = {
+      en: 'English (British)',
+      nl: 'Dutch (Nederlands)',
+      de: 'German (Deutsch)',
+      fr: 'French (Français)',
+      es: 'Spanish (Español)',
+      it: 'Italian (Italiano)',
+      pt: 'Portuguese (Português)',
+    }
+    
+    const targetLanguage = context.language || 'en'
+    const languageName = languageNames[targetLanguage] || 'English (British)'
+    
+    console.log('Using language:', languageName)
+
     // Bepaal de prompt strategie op basis van sentiment
     let strategyPrompt = ''
     
     if (sentiment === 'positive') {
-      strategyPrompt = `De prospect is POSITIEF en geïnteresseerd. Jouw doel:
-- Bedank voor de interesse en enthousiasme
-- Stel voor om een meeting te plannen via Calendly
-- Houd de toon professioneel maar enthousiast
-- Maak duidelijk wat ze kunnen verwachten in de meeting
-- Sluit af met een directe call-to-action om een tijdslot te kiezen`
+      strategyPrompt = `The prospect is POSITIVE and interested. Your goal:
+- Thank them for their interest and enthusiasm
+- Suggest scheduling a meeting
+- Keep the tone professional but enthusiastic
+- Make clear what they can expect in the meeting
+- Close with a direct call-to-action to choose a time slot`
     } else if (sentiment === 'doubtful') {
-      strategyPrompt = `De prospect is TWIJFELEND en heeft twijfels. Jouw doel:
-- Erken hun twijfels op een empathische manier
-- Geef concrete voordelen en waardepropositie
-- Gebruik social proof (andere klanten, resultaten) als dat relevant is
-- Bied aan om specifieke vragen te beantwoorden
-- Stel voor om een vrijblijvend gesprek te plannen om hun vragen te beantwoorden
-- Gebruik een overtuigende maar niet pusherige toon`
+      strategyPrompt = `The prospect is DOUBTFUL and has concerns. Your goal:
+- Acknowledge their doubts in an empathetic way
+- Provide concrete benefits and value proposition
+- Use social proof (other clients, results) if relevant
+- Offer to answer specific questions
+- Suggest a non-committal conversation to address their questions
+- Use a persuasive but not pushy tone`
     } else {
-      strategyPrompt = `De prospect lijkt NIET GEÏNTERESSEERD. Jouw doel:
-- Accepteer hun positie met respect
-- Stel open vragen om de echte bezwaren te achterhalen
-- Probeer te begrijpen wat hun grootste zorgen/uitdagingen zijn
-- Bied waarde zonder direct te verkopen
-- Houd de deur open voor toekomstige conversaties
-- Gebruik een nieuwsgierige, consultative toon`
+      strategyPrompt = `The prospect seems NOT INTERESTED. Your goal:
+- Accept their position with respect
+- Ask open questions to understand the real objections
+- Try to understand what their biggest concerns/challenges are
+- Offer value without directly selling
+- Keep the door open for future conversations
+- Use a curious, consultative tone`
     }
 
-    const systemPrompt = `Je bent een expert B2B sales professional met jarenlange ervaring in consultative selling. 
-Je schrijft persoonlijke, overtuigende email responses die klanten helpen en waarde bieden.
+    const systemPrompt = `You are an expert B2B sales professional with years of experience in consultative selling. 
+You write personalised, persuasive email responses that help clients and provide value.
+
+CRITICAL LANGUAGE REQUIREMENT:
+Write the ENTIRE email response in ${languageName}.
+- Subject line: in ${languageName}
+- Email body: in ${languageName}
+- All text content: in ${languageName}
+- Tone description can be in English (for internal reference)
 
 CONTEXT:
-Sentiment van de prospect: ${sentiment.toUpperCase()}
-Bedrijfsnaam: ${context.companyName || 'jouw bedrijf'}
-Product/Service: ${context.productService || 'jullie dienstverlening'}
+Prospect's sentiment: ${sentiment.toUpperCase()}
+Company name: ${context.companyName || 'your company'}
+Product/Service: ${context.productService || 'your services'}
 
-STRATEGIE:
+STRATEGY:
 ${strategyPrompt}
 
-STIJL RICHTLIJNEN:
-- Schrijf in het Nederlands
-- Gebruik een professionele maar warme toon
-- Personaliseer de email (gebruik de naam van de prospect)
-- Houd het beknopt (max 150 woorden)
-- Eindig met een duidelijke vraag of call-to-action
-- De email moet klinken als geschreven door een mens, niet door AI
+STYLE GUIDELINES:
+- Write in ${languageName}
+- Use a professional but warm tone
+- Personalise the email (use the prospect's name)
+- Keep it concise (max 150 words)
+- End with a clear question or call-to-action
+- The email should sound human-written, not AI-generated
 
-KRITIEK - EMAIL AFSLUITING:
-- NOOIT "Met vriendelijke groet" gebruiken
-- NOOIT een handtekening toevoegen
-- NOOIT placeholders zoals [Naam], [Jouw naam], [Bedrijf] gebruiken
-- De email stopt direct na de laatste zin of vraag
-- Voorbeeld GOED: "Laten we in contact blijven. Wanneer je er klaar voor bent, hoor ik het graag."
-- Voorbeeld FOUT: "Laten we in contact blijven.\n\nMet vriendelijke groet,\n[Jouw naam]"
+CRITICAL - EMAIL CLOSING:
+- NEVER use formal closings like "Best regards", "Kind regards", "Sincerely", "Met vriendelijke groet"
+- NEVER add a signature block
+- NEVER use placeholders like [Name], [Your name], [Company]
+- The email stops directly after the last sentence or question
+- Example GOOD: "Let's stay in touch. When you're ready, I'd love to hear from you."
+- Example BAD: "Let's stay in touch.\\n\\nBest regards,\\n[Your name]"
 
-De body moet eindigen waar de inhoud eindigt - zonder groet of naam.`
+The body must end where the content ends - without formal closing or signature.`
 
-    const userPrompt = `Originele email onderwerp: "${context.originalSubject}"
+    const userPrompt = `Original email subject: "${context.originalSubject}"
 
-Originele email van ${context.recipientName} (${context.recipientEmail}):
+Original email from ${context.recipientName} (${context.recipientEmail}):
 """
 ${context.originalBody}
 """
 
-Schrijf nu een perfecte sales reply email. 
+Write a perfect sales reply email now.
 
-BELANGRIJK: Geef ALLEEN een JSON object terug met exact deze structuur:
+IMPORTANT: Return ONLY a JSON object with exactly this structure:
 {
-  "subject": "Re: [origineel onderwerp]",
-  "body": "[email body tekst - GEEN JSON, ALLEEN PLAIN TEXT]",
-  "tone": "[beschrijving van de gebruikte tone/aanpak]"
+  "subject": "Re: [original subject]",
+  "body": "[email body text - NO JSON, ONLY PLAIN TEXT in ${languageName}]",
+  "tone": "[description of the tone/approach used]"
 }
 
-De "body" field moet ALLEEN de email tekst bevatten, GEEN JSON formatting.`
+The "body" field must ONLY contain the email text in ${languageName}, NO JSON formatting.`
 
     console.log('Calling Claude API...')
 

@@ -152,7 +152,7 @@ export default function DevFeatureFlags() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500">
-              Coming later: Enable flags for specific users or organizations
+              Coming later: Enable flags for specific users or organisations
             </p>
           </CardContent>
         </Card>

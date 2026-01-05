@@ -331,7 +331,7 @@ export default function Templates() {
         company_info: settings || undefined,
         additional_context: additionalContext || undefined,
       })
-      toast.success('Template opgeslagen!')
+      toast.success('Template saved!')
       await loadTemplates() // Reload templates
       setShowGenerateDialog(false) // Close the GENERATE dialog (not preview)
       setGeneratedTemplate(null) // Reset generated template
@@ -380,7 +380,7 @@ export default function Templates() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cold Email Templates</h1>
           <p className="text-muted-foreground mt-1">
-            Generate persuasive cold emails with AI
+            Generate Persuasive Cold Emails with AI
           </p>
         </div>
         <Button 
@@ -663,9 +663,9 @@ export default function Templates() {
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Fill in Company Information</DialogTitle>
+            <DialogTitle>Company Information</DialogTitle>
             <DialogDescription>
-              Fill in the fields below to generate a template
+              Complete the fields below to generate a template
             </DialogDescription>
           </DialogHeader>
           
@@ -689,7 +689,7 @@ export default function Templates() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="quick_company_name">
-                Company name <span className="text-red-500">*</span>
+                Company Name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_company_name"
@@ -714,7 +714,7 @@ export default function Templates() {
 
             <div className="space-y-2">
               <Label htmlFor="quick_target_audience">
-                Target audience <span className="text-red-500">*</span>
+                Target Audience <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_target_audience"
