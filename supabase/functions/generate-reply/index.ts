@@ -86,9 +86,10 @@ Deno.serve(async (req) => {
       strategyPrompt = `The prospect is POSITIVE and interested. Your goal:
 - Thank them warmly for their interest
 - Briefly confirm what ${context.productService || 'your service'} offers
-- Actively invite them to schedule a meeting${includeCalendlyLink ? ' using the Calendly link provided' : ''}
+- Express enthusiasm about helping them
 - Keep tone professional but enthusiastic
-- End with a clear call-to-action${includeCalendlyLink ? ': use the calendar link to book a time' : ': suggest they reply to schedule a call'}`
+- End with a natural closing like "I would be happy to discuss this further" or "Let me know if you have any questions"
+- Do NOT mention scheduling, meetings, calendars, or booking calls - the system will add that automatically`
     } else if (sentiment === 'neutral') {
       includeCalendlyLink = false
       strategyPrompt = `The prospect is NEUTRAL - interested but uncertain. Your goal:
@@ -124,7 +125,6 @@ Prospect's name: "${context.recipientName}"
 Your name: ${context.userName ? `"${context.userName}"` : '(use natural fallback like "there")'}
 Company name: ${context.companyName ? `"${context.companyName}"` : '(use natural fallback)'}
 Product/Service: ${context.productService ? `"${context.productService}"` : '"your services"'}
-${includeCalendlyLink && context.calendlyLink ? `Calendly link: ${context.calendlyLink}` : 'No calendar link available'}
 Prospect's sentiment: ${sentiment.toUpperCase()}
 
 STRATEGY:
@@ -142,6 +142,7 @@ ABSOLUTE RULES - NEVER VIOLATE:
 - Use the actual values provided above directly in your text
 - If a value is marked as "use natural fallback", write naturally without specifying the name (e.g., "Hi there," instead of "Hi [Name],")
 - Start emails with the prospect's name "${context.recipientName}" if appropriate, or use a natural greeting
+- For POSITIVE sentiment: NEVER mention scheduling, booking, calendars, meetings, or availability - the system handles this automatically
 - The output must be 100% send-ready with NO editing needed
 
 CRITICAL - EMAIL CLOSING:
@@ -167,7 +168,6 @@ USE THESE EXACT VALUES IN YOUR EMAIL (NO PLACEHOLDERS):
 ${context.userName ? `- Your name: "${context.userName}"` : '- If you need your name, use a natural fallback (e.g., just skip it or say "I" or "we")'}
 ${context.companyName ? `- Company: "${context.companyName}"` : ''}
 ${context.productService ? `- Product/Service: "${context.productService}"` : ''}
-${includeCalendlyLink && context.calendlyLink ? `- INCLUDE THIS CALENDLY LINK: ${context.calendlyLink}` : '- Do NOT include any calendar links'}
 
 CRITICAL REMINDERS:
 - Write directly to ${context.recipientName} - use this name, not [Name] or [Prospect's Name]
@@ -292,6 +292,24 @@ The "body" field must be 100% ready to send - NO brackets, NO placeholders, NO [
     }
 
     console.log('Final result:', JSON.stringify(result).substring(0, 200))
+
+    // System-side CTA injection for positive sentiment
+    if (sentiment === 'positive' && context.calendlyLink) {
+      const ctaTemplates: Record<string, string> = {
+        en: `\n\nI would love to discuss this further with you. Please feel free to book a time that works best for you:\n${context.calendlyLink}`,
+        nl: `\n\nIk bespreek dit graag verder met je. Plan gerust een moment in dat jou het beste uitkomt:\n${context.calendlyLink}`,
+        de: `\n\nIch würde dies gerne weiter mit Ihnen besprechen. Buchen Sie gerne einen Termin, der Ihnen am besten passt:\n${context.calendlyLink}`,
+        fr: `\n\nJ'aimerais en discuter davantage avec vous. N'hésitez pas à réserver un créneau qui vous convient le mieux:\n${context.calendlyLink}`,
+        es: `\n\nMe encantaría discutir esto más a fondo contigo. No dudes en reservar un horario que te funcione mejor:\n${context.calendlyLink}`,
+        it: `\n\nMi piacerebbe discuterne ulteriormente con te. Sentiti libero di prenotare un orario che funziona meglio per te:\n${context.calendlyLink}`,
+        pt: `\n\nGostaria de discutir isso mais detalhadamente contigo. Sinta-se à vontade para marcar um horário que funcione melhor para ti:\n${context.calendlyLink}`,
+      }
+      
+      const ctaBlock = ctaTemplates[targetLanguage] || ctaTemplates['en']
+      result.body = result.body + ctaBlock
+      
+      console.log('✓ Added meeting CTA block for positive sentiment')
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
