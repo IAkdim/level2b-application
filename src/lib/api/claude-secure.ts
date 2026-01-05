@@ -133,9 +133,11 @@ export interface EmailReplyContext {
   recipientEmail: string
   originalSubject: string
   originalBody: string
-  sentiment: EmailSentiment
+  sentiment: 'positive' | 'neutral' | 'negative'
+  userName?: string
   companyName?: string
   productService?: string
+  calendlyLink?: string
   language?: string // en, nl, de, fr, es, it, pt
 }
 

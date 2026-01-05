@@ -16,8 +16,11 @@ import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reaut
 import { formatRelativeTime } from "@/lib/utils/formatters";
 import { toast } from "sonner";
 import type { Language } from "@/types/crm";
+import { supabase } from "@/lib/supabaseClient";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 export function EmailThreads() {
+  const { selectedOrg } = useOrganization();
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [replies, setReplies] = useState<Email[]>([]);
@@ -311,20 +314,63 @@ export function EmailThreads() {
 
     setIsGeneratingReply(true);
     try {
-      // Extract recipient name from email address
+      // Get current session for user data
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Not authenticated');
+        return;
+      }
+
+      // Extract recipient info
       const fromMatch = selectedEmail.from.match(/<(.+)>/);
       const recipientEmail = fromMatch ? fromMatch[1] : selectedEmail.from;
       const recipientName = selectedEmail.from.split('<')[0].trim() || recipientEmail.split('@')[0];
+
+      // Get user profile for user name
+      const { data: profile } = await supabase
+        .from('users')
+        .select('full_name, email')
+        .eq('id', session.user.id)
+        .single();
+
+      const userName = profile?.full_name || profile?.email?.split('@')[0] || 'there';
+
+      // Get organization settings for company info and Calendly link
+      let companyName: string | undefined;
+      let productService: string | undefined;
+      let calendlyLink: string | undefined;
+
+      if (selectedOrg?.id) {
+        const { data: orgSettings } = await supabase
+          .from('organization_settings')
+          .select('company_name, product_service, calendly_scheduling_url')
+          .eq('org_id', selectedOrg.id)
+          .single();
+
+        companyName = orgSettings?.company_name;
+        productService = orgSettings?.product_service;
+        calendlyLink = orgSettings?.calendly_scheduling_url;
+      }
+
+      // Map sentiment to correct types
+      let sentimentType: 'positive' | 'neutral' | 'negative' = 'neutral';
+      if (selectedEmail.sentiment?.sentiment === 'positive') {
+        sentimentType = 'positive';
+      } else if (selectedEmail.sentiment?.sentiment === 'not_interested') {
+        sentimentType = 'negative';
+      }
 
       const context: EmailReplyContext = {
         recipientName,
         recipientEmail,
         originalSubject: selectedEmail.subject,
         originalBody: selectedEmail.body || selectedEmail.snippet,
-        sentiment: selectedEmail.sentiment?.sentiment || 'doubtful',
-        companyName: 'jullie bedrijf',
-        productService: 'jullie dienstverlening',
-        language: replyLanguage, // Pass user-selected language
+        sentiment: sentimentType,
+        userName,
+        companyName,
+        productService,
+        calendlyLink,
+        language: replyLanguage,
       };
 
       const generatedReply = await generateSalesReply(context);

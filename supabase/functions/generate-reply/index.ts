@@ -8,9 +8,11 @@ interface EmailReplyContext {
   recipientEmail: string
   originalSubject: string
   originalBody: string
-  sentiment: 'positive' | 'doubtful' | 'not_interested'
+  sentiment: 'positive' | 'neutral' | 'negative'
+  userName?: string
   companyName?: string
   productService?: string
+  calendlyLink?: string
   language?: string // en, nl, de, fr, es, it, pt
 }
 
@@ -55,7 +57,7 @@ Deno.serve(async (req) => {
     }
 
     // Default sentiment if not provided
-    const sentiment = context.sentiment || 'doubtful'
+    const sentiment = context.sentiment || 'neutral'
     console.log('Using sentiment:', sentiment)
 
     // Language mapping
@@ -73,33 +75,38 @@ Deno.serve(async (req) => {
     const languageName = languageNames[targetLanguage] || 'English (British)'
     
     console.log('Using language:', languageName)
+    console.log('Calendly link:', context.calendlyLink || 'not provided')
 
-    // Bepaal de prompt strategie op basis van sentiment
+    // Build strategy based on sentiment
     let strategyPrompt = ''
+    let includeCalendlyLink = false
     
     if (sentiment === 'positive') {
+      includeCalendlyLink = !!context.calendlyLink
       strategyPrompt = `The prospect is POSITIVE and interested. Your goal:
-- Thank them for their interest and enthusiasm
-- Suggest scheduling a meeting
-- Keep the tone professional but enthusiastic
-- Make clear what they can expect in the meeting
-- Close with a direct call-to-action to choose a time slot`
-    } else if (sentiment === 'doubtful') {
-      strategyPrompt = `The prospect is DOUBTFUL and has concerns. Your goal:
-- Acknowledge their doubts in an empathetic way
-- Provide concrete benefits and value proposition
-- Use social proof (other clients, results) if relevant
-- Offer to answer specific questions
-- Suggest a non-committal conversation to address their questions
-- Use a persuasive but not pushy tone`
+- Thank them warmly for their interest
+- Briefly confirm what ${context.productService || 'your service'} offers
+- Actively invite them to schedule a meeting${includeCalendlyLink ? ' using the Calendly link provided' : ''}
+- Keep tone professional but enthusiastic
+- End with a clear call-to-action${includeCalendlyLink ? ': use the calendar link to book a time' : ': suggest they reply to schedule a call'}`
+    } else if (sentiment === 'neutral') {
+      includeCalendlyLink = false
+      strategyPrompt = `The prospect is NEUTRAL - interested but uncertain. Your goal:
+- Acknowledge their inquiry professionally
+- Explain clearly what ${context.productService || 'your service'} does and the value it provides
+- Address potential concerns proactively
+- End with an open invitation to ask questions or discuss further
+- Do NOT push for a meeting
+- Do NOT include a Calendly link`
     } else {
-      strategyPrompt = `The prospect seems NOT INTERESTED. Your goal:
-- Accept their position with respect
-- Ask open questions to understand the real objections
-- Try to understand what their biggest concerns/challenges are
-- Offer value without directly selling
-- Keep the door open for future conversations
-- Use a curious, consultative tone`
+      includeCalendlyLink = false
+      strategyPrompt = `The prospect is NEGATIVE or not interested. Your goal:
+- Thank them respectfully for their time and response
+- Accept their decision gracefully
+- Leave the door open for future contact if their needs change
+- Keep it brief and professional
+- Do NOT push for a meeting
+- Do NOT include a Calendly link`
     }
 
     const systemPrompt = `You are an expert B2B sales professional with years of experience in consultative selling. 
@@ -147,14 +154,20 @@ ${context.originalBody}
 
 Write a perfect sales reply email now.
 
+REMINDER: 
+- Use the prospect's name "${context.recipientName}" directly
+- Write in ${languageName}
+- NO placeholders anywhere
+${includeCalendlyLink && context.calendlyLink ? `- Include this Calendly link: ${context.calendlyLink}` : '- Do NOT include any calendar links'}
+
 IMPORTANT: Return ONLY a JSON object with exactly this structure:
 {
-  "subject": "Re: [original subject]",
-  "body": "[email body text - NO JSON, ONLY PLAIN TEXT in ${languageName}]",
-  "tone": "[description of the tone/approach used]"
+  "subject": "Re: ${context.originalSubject}",
+  "body": "[email body text in ${languageName} - PLAIN TEXT, no placeholders, no signature]",
+  "tone": "[tone description in English]"
 }
 
-The "body" field must ONLY contain the email text in ${languageName}, NO JSON formatting.`
+The "body" field must be complete, send-ready email text with NO placeholders.`
 
     console.log('Calling Claude API...')
 
