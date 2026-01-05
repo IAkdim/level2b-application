@@ -119,10 +119,13 @@ Write the ENTIRE email response in ${languageName}.
 - All text content: in ${languageName}
 - Tone description can be in English (for internal reference)
 
-CONTEXT:
+CRITICAL DATA PROVIDED TO YOU:
+Prospect's name: "${context.recipientName}"
+Your name: ${context.userName ? `"${context.userName}"` : '(use natural fallback like "there")'}
+Company name: ${context.companyName ? `"${context.companyName}"` : '(use natural fallback)'}
+Product/Service: ${context.productService ? `"${context.productService}"` : '"your services"'}
+${includeCalendlyLink && context.calendlyLink ? `Calendly link: ${context.calendlyLink}` : 'No calendar link available'}
 Prospect's sentiment: ${sentiment.toUpperCase()}
-Company name: ${context.companyName || 'your company'}
-Product/Service: ${context.productService || 'your services'}
 
 STRATEGY:
 ${strategyPrompt}
@@ -130,15 +133,20 @@ ${strategyPrompt}
 STYLE GUIDELINES:
 - Write in ${languageName}
 - Use a professional but warm tone
-- Personalise the email (use the prospect's name)
 - Keep it concise (max 150 words)
 - End with a clear question or call-to-action
 - The email should sound human-written, not AI-generated
 
+ABSOLUTE RULES - NEVER VIOLATE:
+- NEVER use placeholders like [Name], [Your name], [Company], [Prospect's Name]
+- Use the actual values provided above directly in your text
+- If a value is marked as "use natural fallback", write naturally without specifying the name (e.g., "Hi there," instead of "Hi [Name],")
+- Start emails with the prospect's name "${context.recipientName}" if appropriate, or use a natural greeting
+- The output must be 100% send-ready with NO editing needed
+
 CRITICAL - EMAIL CLOSING:
 - NEVER use formal closings like "Best regards", "Kind regards", "Sincerely", "Met vriendelijke groet"
 - NEVER add a signature block
-- NEVER use placeholders like [Name], [Your name], [Company]
 - The email stops directly after the last sentence or question
 - Example GOOD: "Let's stay in touch. When you're ready, I'd love to hear from you."
 - Example BAD: "Let's stay in touch.\\n\\nBest regards,\\n[Your name]"
@@ -152,22 +160,29 @@ Original email from ${context.recipientName} (${context.recipientEmail}):
 ${context.originalBody}
 """
 
-Write a perfect sales reply email now.
+Write a perfect sales reply email now in ${languageName}.
 
-REMINDER: 
-- Use the prospect's name "${context.recipientName}" directly
+USE THESE EXACT VALUES IN YOUR EMAIL (NO PLACEHOLDERS):
+- Prospect's name: "${context.recipientName}"
+${context.userName ? `- Your name: "${context.userName}"` : '- If you need your name, use a natural fallback (e.g., just skip it or say "I" or "we")'}
+${context.companyName ? `- Company: "${context.companyName}"` : ''}
+${context.productService ? `- Product/Service: "${context.productService}"` : ''}
+${includeCalendlyLink && context.calendlyLink ? `- INCLUDE THIS CALENDLY LINK: ${context.calendlyLink}` : '- Do NOT include any calendar links'}
+
+CRITICAL REMINDERS:
+- Write directly to ${context.recipientName} - use this name, not [Name] or [Prospect's Name]
 - Write in ${languageName}
-- NO placeholders anywhere
-${includeCalendlyLink && context.calendlyLink ? `- Include this Calendly link: ${context.calendlyLink}` : '- Do NOT include any calendar links'}
+- The output must be send-ready with ZERO placeholders
+- If any data is missing, write naturally without that detail
 
 IMPORTANT: Return ONLY a JSON object with exactly this structure:
 {
   "subject": "Re: ${context.originalSubject}",
-  "body": "[email body text in ${languageName} - PLAIN TEXT, no placeholders, no signature]",
+  "body": "[complete email body in ${languageName} - addressed to ${context.recipientName} - NO placeholders - NO signature]",
   "tone": "[tone description in English]"
 }
 
-The "body" field must be complete, send-ready email text with NO placeholders.`
+The "body" field must be 100% ready to send - NO brackets, NO placeholders, NO [Name] anywhere.`
 
     console.log('Calling Claude API...')
 
