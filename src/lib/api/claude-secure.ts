@@ -4,7 +4,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import { rateLimiter } from './rateLimiter'
 
-export type EmailSentiment = 'not_interested' | 'doubtful' | 'positive'
+export type EmailSentiment = 'positive' | 'neutral' | 'negative'
 
 export interface SentimentAnalysis {
   sentiment: EmailSentiment
@@ -29,7 +29,7 @@ export async function analyzeSentiment(
     if (!session) {
       console.error('❌ No active session found')
       return {
-        sentiment: 'doubtful',
+        sentiment: 'neutral',
         confidence: 0,
         reasoning: 'Authentication required',
         error: 'Not logged in. Please log in again to use sentiment analysis.',
@@ -41,7 +41,7 @@ export async function analyzeSentiment(
     if (!rateCheck.allowed) {
       console.error('❌ Rate limit exceeded for AI API')
       return {
-        sentiment: 'doubtful',
+        sentiment: 'neutral',
         confidence: 0,
         reasoning: 'Rate limit exceeded',
         error: rateCheck.message || 'Too many requests. Please try again later.',
@@ -92,7 +92,7 @@ export async function analyzeSentiment(
       console.error('Technical details:', technicalDetails)
       
       return {
-        sentiment: 'doubtful',
+        sentiment: 'neutral',
         confidence: 0,
         reasoning: 'Analysis unavailable',
         error: userMessage,
@@ -102,7 +102,7 @@ export async function analyzeSentiment(
     if (!data) {
       console.error('❌ No data returned from Edge Function')
       return {
-        sentiment: 'doubtful',
+        sentiment: 'neutral',
         confidence: 0,
         reasoning: 'No result',
         error: 'Sentiment analysis returned no result. Please try again.',
@@ -120,7 +120,7 @@ export async function analyzeSentiment(
     }
     
     return {
-      sentiment: 'doubtful',
+      sentiment: 'neutral',
       confidence: 0,
       reasoning: 'Error occurred',
       error: userMessage,
@@ -129,8 +129,8 @@ export async function analyzeSentiment(
 }
 
 export interface EmailReplyContext {
-  recipientName: string
   recipientEmail: string
+  recipientName: string
   originalSubject: string
   originalBody: string
   sentiment: 'positive' | 'neutral' | 'negative'

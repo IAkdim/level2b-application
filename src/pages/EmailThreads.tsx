@@ -160,28 +160,18 @@ export function EmailThreads() {
       try {
         const sentiment = await analyzeSentiment(email.body, email.subject);
         
-        // Check if the sentiment analysis returned an error
         if (sentiment.error) {
-          console.error(`Sentiment analysis error for email ${email.id}:`, sentiment.error);
-          lastError = sentiment.error;
-          errorCount++;
-          
-          // Still update the email with the error sentiment
-          setReplies(prevReplies => 
-            prevReplies.map(r => 
-              r.id === email.id ? { ...r, sentiment } : r
-            )
-          );
-        } else {
-          // Update de email in de state
-          setReplies(prevReplies => 
-            prevReplies.map(r => 
-              r.id === email.id ? { ...r, sentiment } : r
-            )
-          );
-          
-          successCount++;
+          throw new Error(sentiment.error);
         }
+        
+        // Store in UI state only
+        setReplies(prevReplies => 
+          prevReplies.map(r => 
+            r.id === email.id ? { ...r, sentiment } : r
+          )
+        );
+        
+        successCount++;
       } catch (error) {
         console.error(`Failed to analyze sentiment for email ${email.id}:`, error);
         lastError = error instanceof Error ? error.message : String(error);
@@ -190,7 +180,7 @@ export function EmailThreads() {
     }
 
     setIsAnalyzingSentiment(false);
-    setSelectedEmailIds(new Set()); // Clear selection
+    setSelectedEmailIds(new Set());
 
     if (successCount > 0) {
       toast.success(`Sentiment analysis completed`, {
@@ -341,23 +331,39 @@ export function EmailThreads() {
       let calendlyLink: string | undefined;
 
       if (selectedOrg?.id) {
-        const { data: orgSettings } = await supabase
-          .from('organization_settings')
-          .select('company_name, product_service, calendly_scheduling_url')
-          .eq('org_id', selectedOrg.id)
-          .single();
+        try {
+          const { data: orgSettings, error: orgError } = await supabase
+            .from('organization_settings')
+            .select('company_name, product_service, calendly_scheduling_url')
+            .eq('org_id', selectedOrg.id)
+            .single();
 
-        companyName = orgSettings?.company_name;
-        productService = orgSettings?.product_service;
-        calendlyLink = orgSettings?.calendly_scheduling_url;
+          if (orgError) {
+            console.warn('organization_settings query failed:', orgError);
+            // Table might not exist - continue without these values
+          } else {
+            companyName = orgSettings?.company_name;
+            productService = orgSettings?.product_service;
+            calendlyLink = orgSettings?.calendly_scheduling_url;
+            
+            console.log('[REPLY] Organization settings fetched:', {
+              companyName,
+              productService,
+              calendlyLink,
+              sentiment: selectedEmail.sentiment?.sentiment
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to fetch organization settings:', err);
+          // Continue without these values
+        }
       }
 
-      // Map sentiment to correct types
-      let sentimentType: 'positive' | 'neutral' | 'negative' = 'neutral';
-      if (selectedEmail.sentiment?.sentiment === 'positive') {
-        sentimentType = 'positive';
-      } else if (selectedEmail.sentiment?.sentiment === 'not_interested') {
-        sentimentType = 'negative';
+      // CRITICAL: Check if sentiment is positive but no Calendly link
+      if (selectedEmail.sentiment?.sentiment === 'positive' && !calendlyLink) {
+        toast.error('Cannot generate positive reply: Calendly link not configured. Please set up organization settings first.');
+        setIsGeneratingReply(false);
+        return;
       }
 
       const context: EmailReplyContext = {
@@ -365,13 +371,19 @@ export function EmailThreads() {
         recipientEmail,
         originalSubject: selectedEmail.subject,
         originalBody: selectedEmail.body || selectedEmail.snippet,
-        sentiment: sentimentType,
+        sentiment: selectedEmail.sentiment?.sentiment || 'neutral',
         userName,
         companyName,
         productService,
         calendlyLink,
         language: replyLanguage,
       };
+
+      console.log('[REPLY] Sending context to Edge Function:', {
+        sentiment: context.sentiment,
+        calendlyLink: context.calendlyLink,
+        hasCalendlyLink: !!context.calendlyLink
+      });
 
       const generatedReply = await generateSalesReply(context);
 
@@ -793,14 +805,14 @@ export function EmailThreads() {
                               <Badge 
                                 variant={
                                   email.sentiment.sentiment === 'positive' ? 'default' :
-                                  email.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                                  email.sentiment.sentiment === 'neutral' ? 'secondary' :
                                   'destructive'
                                 }
                                 className="text-xs"
                               >
                                 {email.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                                 email.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                                 '🔴 Not Interested'}
+                                 email.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                                 '🔴 Negative'}
                               </Badge>
                             )}
                           </div>
@@ -845,7 +857,8 @@ export function EmailThreads() {
             <>
               <DialogHeader>
                 <DialogTitle className="text-xl">{selectedEmail.subject}</DialogTitle>
-                <DialogDescription className="space-y-2">
+                <DialogDescription>View and manage email thread details</DialogDescription>
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
@@ -869,14 +882,14 @@ export function EmailThreads() {
                         <Badge 
                           variant={
                             selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
-                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                            selectedEmail.sentiment.sentiment === 'neutral' ? 'secondary' :
                             'destructive'
                           }
                           className="text-sm"
                         >
                           {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                           '🔴 Not Interested'}
+                           selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                           '🔴 Negative'}
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
@@ -884,7 +897,7 @@ export function EmailThreads() {
                       </span>
                     </div>
                   </div>
-                </DialogDescription>
+                </div>
               </DialogHeader>
 
               <div className="mt-6 space-y-6">
@@ -920,8 +933,8 @@ export function EmailThreads() {
                             <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
                             <div className="text-2xl font-bold">
                               {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                               selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                               '🔴 Not Interested'}
+                               selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                               '🔴 Negative'}
                             </div>
                           </div>
                           <div className="border rounded-lg p-4 bg-muted/30">
@@ -984,30 +997,31 @@ export function EmailThreads() {
               <DialogHeader>
                 <DialogTitle>Reply to email</DialogTitle>
                 <DialogDescription>
-                  <div className="space-y-1 mt-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-foreground">To:</span>
-                      <span className="text-foreground">{selectedEmail.from}</span>
-                    </div>
-                    {selectedEmail.sentiment && (
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-foreground">Sentiment:</span>
-                        <Badge 
-                          variant={
-                            selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
-                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
-                            'destructive'
-                          }
-                          className="text-xs"
-                        >
-                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                           '🔴 Not Interested'}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
+                  Generate an AI-powered reply based on sentiment analysis
                 </DialogDescription>
+                <div className="space-y-1 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-foreground">To:</span>
+                    <span className="text-foreground">{selectedEmail.from}</span>
+                  </div>
+                  {selectedEmail.sentiment && (
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-foreground">Sentiment:</span>
+                      <Badge 
+                        variant={
+                          selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
+                          selectedEmail.sentiment.sentiment === 'neutral' ? 'secondary' :
+                          'destructive'
+                        }
+                        className="text-xs"
+                      >
+                        {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                         selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                         '🔴 Negative'}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
               </DialogHeader>
 
               <div className="space-y-4 mt-4">
@@ -1039,7 +1053,8 @@ export function EmailThreads() {
                     variant="outline"
                     size="sm"
                     onClick={handleGenerateAIReply}
-                    disabled={isGeneratingReply}
+                    disabled={isGeneratingReply || !selectedEmail.sentiment}
+                    title={!selectedEmail.sentiment ? 'Analyze sentiment first' : ''}
                   >
                     {isGeneratingReply ? (
                       <>
