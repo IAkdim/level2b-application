@@ -101,6 +101,8 @@ export async function isAdmin(): Promise<boolean> {
 
 /**
  * Get current user's role
+ * TODO: [2026-01-09] This function is exported but not currently used.
+ * Keep for potential admin UI expansion. Review and remove if confirmed unnecessary.
  */
 export async function getUserRole(): Promise<string> {
   try {
@@ -281,6 +283,8 @@ export async function updateSystemSetting(key: string, value: any): Promise<void
 
 /**
  * Get admin audit log
+ * TODO: [2026-01-09] This function is exported but not currently used in any UI.
+ * Keep for admin dashboard expansion. Review and remove if confirmed unnecessary.
  */
 export async function getAuditLog(
   limit: number = 100,
@@ -301,6 +305,8 @@ export async function getAuditLog(
 
 /**
  * Create a system log entry
+ * TODO: [2026-01-09] This function is exported but not currently used in frontend.
+ * Keep for potential error logging integration. Review and remove if confirmed unnecessary.
  */
 export async function createSystemLog(
   level: 'info' | 'warning' | 'error' | 'critical',

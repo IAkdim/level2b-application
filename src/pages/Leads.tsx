@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X, Zap, AlertCircle } from "lucide-react"
+import { ENABLE_MOCK_DATA, MOCK_LEADS } from "@/lib/mockData"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,7 +87,8 @@ export function Leads() {
   // Delete mutation
   const deleteLead = useDeleteLead()
 
-  const leads = leadsData?.data || []
+  // MOCK DATA: Use mock data when enabled
+  const leads = ENABLE_MOCK_DATA ? MOCK_LEADS : (leadsData?.data || [])
 
   const clearFilters = () => {
     setStatusFilter([])

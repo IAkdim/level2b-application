@@ -14,6 +14,7 @@ import { Calendar, Search, RefreshCw, ExternalLink, CalendarCheck, Video, Phone,
 import { toast } from "sonner"
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, isPast, isFuture, isToday, parseISO } from "date-fns"
 import { nl } from "date-fns/locale"
+import { ENABLE_MOCK_DATA, MOCK_MEETINGS } from "@/lib/mockData"
 
 function getStatusVariant(status: Meeting['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   const variants = {
@@ -57,6 +58,12 @@ export function Meetings() {
 
     try {
       setIsLoading(true)
+      // MOCK DATA: Use mock data when enabled
+      if (ENABLE_MOCK_DATA) {
+        setMeetings(MOCK_MEETINGS)
+        setIsLoading(false)
+        return
+      }
       const data = await getMeetings(selectedOrg.id)
       setMeetings(data)
     } catch (error) {

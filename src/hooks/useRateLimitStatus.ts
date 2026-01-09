@@ -1,5 +1,7 @@
 // src/hooks/useRateLimitStatus.ts
 // Hook to monitor and display rate limit status
+// TODO: [2026-01-09] These hooks are exported but only referenced in documentation (RATE_LIMITING.md).
+// Keep for potential future UI integration. Review and remove if confirmed unnecessary.
 
 import { useState, useEffect } from 'react'
 import { rateLimiter, type RateLimitCategory } from '@/lib/api/rateLimiter'

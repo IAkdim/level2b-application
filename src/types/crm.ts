@@ -6,7 +6,6 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost'
 export type Language = 'en' | 'nl' | 'de' | 'fr' | 'es' | 'it' | 'pt'
-export type Language = 'en' | 'nl' | 'de' | 'fr' | 'es' | 'it' | 'pt'
 
 // ============================================================================
 // LEAD

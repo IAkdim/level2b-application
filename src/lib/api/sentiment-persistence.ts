@@ -1,4 +1,6 @@
 // Sentiment persistence layer - Single source of truth for email sentiment
+// TODO: [2026-01-09] Functions in this file are exported but not currently imported anywhere.
+// These may be intended for future use or backend integration. Review and remove if confirmed unused.
 import { supabase } from "@/lib/supabaseClient"
 import { analyzeSentiment, type SentimentAnalysis } from "./claude-secure"
 
