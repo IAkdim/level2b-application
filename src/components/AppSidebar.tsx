@@ -37,13 +37,18 @@ interface NavItem {
   icon: any
   badge?: number
   shortcut?: string
+  description?: string
 }
 
+// Navigation grouped by workflow
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/", icon: Home, shortcut: "⌘D" },
-  { name: "Outreach", href: "/outreach/leads", icon: Users, shortcut: "⌘O" },
-  { name: "Meetings", href: "/meetings", icon: Calendar, shortcut: "⌘M" },
-  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "⌘A" },
+  { name: "Command Center", href: "/", icon: Home, shortcut: "⌘D", description: "Overview & workflow" },
+  { name: "Outreach", href: "/outreach/templates", icon: Send, shortcut: "⌘O", description: "Templates, leads & emails" },
+  { name: "Meetings", href: "/meetings", icon: Calendar, shortcut: "⌘M", description: "Calendly sync" },
+  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "⌘A", description: "Performance insights" },
+]
+
+const secondaryNavigation: NavItem[] = [
   { name: "API Monitoring", href: "/api-monitoring", icon: Activity, shortcut: "⌘I" },
   { name: "Organization", href: "/organization", icon: Building2, shortcut: "⌘G" },
   { name: "Configuration", href: "/configuration", icon: Settings, shortcut: "⌘," },
@@ -204,10 +209,23 @@ const content = (
 
         <Separator />
 
-        {/* Navigation */}
+        {/* Main Navigation */}
         <ScrollArea className="flex-1 px-3 py-2">
           <nav className="space-y-1" role="navigation" aria-label="Main navigation">
+            {!isCollapsed && (
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Workflow
+              </div>
+            )}
             {navigation.map((item) => renderNavItem(item))}
+            
+            {!isCollapsed && (
+              <div className="px-2 py-1.5 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Settings
+              </div>
+            )}
+            {isCollapsed && <Separator className="my-2" />}
+            {secondaryNavigation.map((item) => renderNavItem(item))}
           </nav>
         </ScrollArea>
 

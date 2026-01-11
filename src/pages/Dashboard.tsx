@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Mail, Users, Calendar, TrendingUp, ArrowUpRight } from "lucide-react"
+import { Mail, Users, Calendar, TrendingUp, ArrowUpRight, Sparkles, Play, ChevronRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { useNavigate } from "react-router-dom"
 import { ENABLE_MOCK_DATA, MOCK_ACTIVITIES, MOCK_LEADS, MOCK_MEETINGS } from "@/lib/mockData"
+import { WorkflowHub } from "@/components/WorkflowHub"
 
 interface DashboardStats {
   totalEmails: number
@@ -202,14 +203,20 @@ export function Dashboard() {
   return (
     <div className="space-y-8 max-w-7xl">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Overview of your AI emailer performance
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Command Center</h1>
+          <p className="text-muted-foreground">
+            Your sales automation workflow at a glance
+          </p>
+        </div>
+        <Button onClick={() => navigate('/outreach/templates')} className="gap-2">
+          <Sparkles className="h-4 w-4" />
+          Start New Campaign
+        </Button>
       </div>
 
-      {/* Stats Grid - Keep cards for metrics */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statsCards.map((stat) => (
           <Card key={stat.name} className="group hover:shadow-lg transition-all duration-300">
@@ -227,74 +234,78 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Recent Activity - Use subtle background instead of heavy card */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Recent Activity</h2>
-              <p className="text-sm text-muted-foreground">Latest updates from your leads</p>
-            </div>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => navigate('/outreach/leads')}>
-              View all
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              {activities.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="rounded-full bg-muted p-3">
-                      <Users className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm">No activities yet</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {activities.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                      <div className="flex h-2 w-2 rounded-full bg-primary mt-2 ring-4 ring-primary/10"></div>
-                      <div className="flex-1 space-y-1 min-w-0">
-                        <p className="text-sm font-medium leading-none truncate">
-                          {getActivityDescription(activity)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatTimeAgo(activity.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Workflow Hub - Main Focus */}
+        <div className="lg:col-span-2">
+          <WorkflowHub />
         </div>
 
-        {/* Quick Actions - Keep card but refined */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">Quick Actions</h2>
-            <p className="text-sm text-muted-foreground">Quick actions for your workflow</p>
+        {/* Right Column - Activity + Quick Actions */}
+        <div className="space-y-6">
+          {/* Recent Activity */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Recent Activity</h2>
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => navigate('/outreach/leads')}>
+                View all
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                {activities.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="rounded-full bg-muted p-3">
+                        <Users className="h-5 w-5" />
+                      </div>
+                      <p className="text-sm">No activities yet</p>
+                      <p className="text-xs">Activities will appear here as you work</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {activities.slice(0, 4).map((activity) => (
+                      <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <div className="flex h-2 w-2 rounded-full bg-primary mt-2 ring-4 ring-primary/10"></div>
+                        <div className="flex-1 space-y-0.5 min-w-0">
+                          <p className="text-sm font-medium leading-tight truncate">
+                            {getActivityDescription(activity)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatTimeAgo(activity.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          <Card>
-            <CardContent className="pt-6 space-y-2">
-              <Button className="w-full justify-start gap-2" onClick={() => navigate('/outreach/templates')}>
-                <Mail className="h-4 w-4" />
-                New Template
+          {/* Quick Actions */}
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/outreach/templates')}>
+                <Mail className="h-4 w-4 text-primary" />
+                <span className="text-xs">Templates</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/outreach/leads')}>
-                <Users className="h-4 w-4" />
-                Manage Leads
+              <Button variant="outline" size="sm" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/outreach/leads')}>
+                <Users className="h-4 w-4 text-primary" />
+                <span className="text-xs">Leads</span>
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/analytics')}>
-                <TrendingUp className="h-4 w-4" />
-                View Analytics
+              <Button variant="outline" size="sm" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/outreach/email-threads')}>
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-xs">Threads</span>
               </Button>
-            </CardContent>
-          </Card>
+              <Button variant="outline" size="sm" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/meetings')}>
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-xs">Meetings</span>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

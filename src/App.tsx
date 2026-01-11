@@ -109,11 +109,11 @@ function App() {
                             <Routes>
                               <Route path="/" element={<Dashboard />} />
                               <Route path="/outreach" element={<OutreachLayout />}>
-                                <Route index element={<Navigate to="leads" replace />} />
+                                <Route index element={<Navigate to="templates" replace />} />
+                                <Route path="templates" element={<Templates />} />
                                 <Route path="leads" element={<Leads />} />
                                 <Route path="leads/:leadId" element={<LeadDetail />} />
                                 <Route path="email-threads" element={<EmailThreads />} />
-                                <Route path="templates" element={<Templates />} />
                               </Route>
                               <Route path="/meetings" element={<Meetings />} />
                               <Route path="/analytics" element={<Analytics />} />

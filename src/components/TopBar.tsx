@@ -1,4 +1,4 @@
-import { Bell, Search, HelpCircle, Building2, ChevronDown, RefreshCw } from "lucide-react"
+import { Bell, Search, HelpCircle, Building2, ChevronDown, RefreshCw, Command } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -21,9 +21,10 @@ import {
 } from "@/components/ui/popover"
 import { Settings, User, LogOut, Plus, X } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { OrganizationSelector } from "@/components/OrganizationSelector"
+import { QuickActions } from "@/components/QuickActions"
 import { 
   getNotifications, 
   getUnreadCount, 
@@ -45,7 +46,21 @@ export function TopBar() {
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>('')
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   const { selectedOrg, userOrgs, setOrganization } = useOrganization()
+
+  // Global keyboard shortcut for quick actions (⌘K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setQuickActionsOpen(true)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   function getNotificationIcon(type: Notification["type"]) {
     const baseClasses = "h-2 w-2 rounded-full"
@@ -252,16 +267,40 @@ export function TopBar() {
 
           {/* Right side - Actions */}
           <div className="flex items-center gap-1">
-            {/* Search */}
+            {/* Quick Actions / Search */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Search" className="text-muted-foreground hover:text-foreground">
-                  <Search className="h-4 w-4" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setQuickActionsOpen(true)}
+                  className="hidden sm:flex items-center gap-2 h-8 px-3 text-muted-foreground hover:text-foreground"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span className="text-sm">Quick actions</span>
+                  <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
+                    <Command className="h-2.5 w-2.5" />K
+                  </kbd>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Search <kbd className="ml-2 text-xs bg-muted px-1 py-0.5 rounded">⌘K</kbd></p>
+                <p>Quick actions & search <kbd className="ml-1 text-xs bg-muted px-1 py-0.5 rounded">⌘K</kbd></p>
               </TooltipContent>
+            </Tooltip>
+            
+            {/* Mobile search button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon-sm" 
+                  onClick={() => setQuickActionsOpen(true)}
+                  className="sm:hidden text-muted-foreground hover:text-foreground"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Quick actions</TooltipContent>
             </Tooltip>
 
             {/* Help */}
@@ -420,6 +459,9 @@ export function TopBar() {
 
       {/* Organization Selector Dialog */}
       <OrganizationSelector open={orgSelectorOpen} onOpenChange={setOrgSelectorOpen} />
+      
+      {/* Quick Actions Dialog */}
+      <QuickActions open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
     </TooltipProvider>
   )
 }

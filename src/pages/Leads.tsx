@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X, Zap, AlertCircle } from "lucide-react"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X, Zap, AlertCircle, LayoutGrid, List } from "lucide-react"
+import { LeadsPipeline } from "@/components/LeadsPipeline"
 import { ENABLE_MOCK_DATA, MOCK_LEADS } from "@/lib/mockData"
 import {
   DropdownMenu,
@@ -48,6 +50,9 @@ export function Leads() {
   // Usage limits state
   const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null)
   const [isLoadingUsage, setIsLoadingUsage] = useState(true)
+  
+  // View mode state (table or pipeline)
+  const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table')
 
   // Load daily usage
   const loadDailyUsage = useCallback(async () => {
@@ -337,20 +342,38 @@ export function Leads() {
                     )}
                   </CardDescription>
                 </div>
-                {/* Search */}
-                <div className="flex-1 max-w-md relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                  <Input
-                    type="text"
-                    placeholder="Search by name, email, company, phone..."
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                <div className="flex items-center gap-3">
+                  {/* View Toggle */}
+                  <ToggleGroup 
+                    type="single" 
+                    value={viewMode} 
+                    onValueChange={(value) => value && setViewMode(value as 'table' | 'pipeline')}
+                    className="border rounded-lg p-1"
+                  >
+                    <ToggleGroupItem value="table" aria-label="Table view" className="h-8 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      <List className="h-4 w-4 mr-1.5" />
+                      <span className="text-xs">Table</span>
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="pipeline" aria-label="Pipeline view" className="h-8 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                      <LayoutGrid className="h-4 w-4 mr-1.5" />
+                      <span className="text-xs">Pipeline</span>
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  {/* Search */}
+                  <div className="flex-1 max-w-md relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name, email, company, phone..."
+                      className="pl-10"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className={viewMode === 'pipeline' ? 'p-4' : 'p-0'}>
               {leadsLoading ? (
                 <div className="flex justify-center items-center py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -369,6 +392,19 @@ export function Leads() {
                       : "Click 'Add Lead' to create your first lead"}
                   </p>
                 </div>
+              ) : viewMode === 'pipeline' ? (
+                <LeadsPipeline
+                  leads={leads}
+                  onLeadClick={(lead) => navigate(`/outreach/leads/${lead.id}`)}
+                  onEdit={(lead) => setEditingLead(lead)}
+                  onDelete={(lead) => {
+                    if (confirm(`Are you sure you want to delete ${lead.name}?`)) {
+                      deleteLead.mutateAsync(lead.id).then(() => {
+                        toast.success(`${lead.name} deleted`)
+                      })
+                    }
+                  }}
+                />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>

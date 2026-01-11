@@ -519,17 +519,66 @@ export default function Templates() {
         </Card>
       )}
 
-      {/* Empty State */}
-      {!generatedTemplate && validation.isValid && (
+      {/* Empty State - First time users */}
+      {!generatedTemplate && validation.isValid && savedTemplates.length === 0 && (
+        <Card className="border-dashed border-2">
+          <CardContent className="py-16 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="relative inline-block">
+                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center ring-1 ring-primary/20 mx-auto">
+                  <Sparkles className="h-10 w-10 text-primary" />
+                </div>
+                <div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-lg">
+                  1
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-semibold mt-6 mb-2">
+                Create Your First Email Template
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Use AI to generate personalized cold email templates that convert. 
+                This is the first step in your outreach workflow.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button 
+                  onClick={handleGenerateTemplate}
+                  disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Generate Template with AI
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-6">
+                Next step: Add leads to send your emails to
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Empty State - Has saved templates but no generated */}
+      {!generatedTemplate && validation.isValid && savedTemplates.length > 0 && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              No templates generated yet
+          <CardContent className="py-8 text-center">
+            <Sparkles className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <h3 className="font-semibold mb-1">
+              Generate a new template
             </h3>
-            <p className="text-muted-foreground mb-4">
-              Click on "Generate New Template" to get started
+            <p className="text-sm text-muted-foreground mb-4">
+              Or use one of your {savedTemplates.length} saved templates below
             </p>
+            <Button 
+              onClick={handleGenerateTemplate}
+              disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate New Template
+            </Button>
           </CardContent>
         </Card>
       )}
