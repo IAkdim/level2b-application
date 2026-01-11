@@ -164,7 +164,7 @@ export function Leads() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden -m-6 lg:-m-8">
       {/* Left Sidebar - Filters */}
       <LeadsFilterSidebar
         statusFilter={statusFilter}
@@ -178,21 +178,19 @@ export function Leads() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="p-6 lg:p-8 space-y-6">
           {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-              <p className="text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+              <p className="text-sm text-muted-foreground">
                 Manage your prospects and track the status of your outreach
               </p>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-2">
               {selectedLeads.size > 0 && (
                 <Button
-                  variant="default"
                   onClick={() => setShowBulkEmailDialog(true)}
-                  className="bg-primary"
                   disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
                 >
                   <Mail className="mr-2 h-4 w-4" />
@@ -212,35 +210,37 @@ export function Leads() {
 
           {/* Daily Email Usage Card */}
           {!isLoadingUsage && dailyUsage && (
-            <Card className="border-blue-200 bg-blue-50/50">
-              <CardContent className="pt-6">
+            <Card className="border-info/30 bg-info/5">
+              <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Zap className="h-5 w-5 text-blue-600" />
+                    <div className="rounded-lg bg-info/10 p-2">
+                      <Zap className="h-5 w-5 text-info" />
+                    </div>
                     <div>
-                      <h3 className="font-semibold text-blue-900">
+                      <h3 className="font-medium text-sm">
                         Daily Email Sending
                       </h3>
-                      <p className="text-sm text-blue-800 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {dailyUsage.emailsRemaining} of {dailyUsage.emailLimit} emails remaining today
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-xl font-bold text-info">
                       {dailyUsage.emailsRemaining}/{dailyUsage.emailLimit}
                     </div>
-                    <p className="text-xs text-blue-700 mt-1">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Resets in {getTimeUntilReset()}
                     </p>
                   </div>
                 </div>
                 
                 {/* Progress bar */}
-                <div className="mt-4">
-                  <div className="w-full bg-blue-200 rounded-full h-2">
+                <div className="mt-3">
+                  <div className="w-full bg-info/20 rounded-full h-1.5">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-info h-1.5 rounded-full transition-all duration-300"
                       style={{ 
                         width: `${Math.min(100, Math.max(0, (dailyUsage.emailsSent / dailyUsage.emailLimit) * 100))}%` 
                       }}
@@ -250,7 +250,7 @@ export function Leads() {
 
                 {/* Warning when close to limit */}
                 {dailyUsage.emailsRemaining <= 10 && dailyUsage.emailsRemaining > 0 && (
-                  <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
+                  <p className="text-xs text-warning mt-2 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     Only {dailyUsage.emailsRemaining} email{dailyUsage.emailsRemaining === 1 ? '' : 's'} left today
                   </p>
@@ -258,7 +258,7 @@ export function Leads() {
 
                 {/* Limit reached */}
                 {dailyUsage.emailsRemaining === 0 && (
-                  <p className="text-sm text-blue-900 mt-3 font-medium flex items-center gap-2">
+                  <p className="text-sm text-destructive mt-3 font-medium flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Daily email limit reached. Sending will reset in {getTimeUntilReset()}
                   </p>
@@ -268,11 +268,11 @@ export function Leads() {
           )}
 
           {/* Leads Table */}
-          <Card className="border-border/30">
+          <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <CardTitle className="text-lg">Leads</CardTitle>
+                  <CardTitle>Leads</CardTitle>
                   <CardDescription className="mt-1">
                     {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
                     {searchTerm && ' matching your search'}
@@ -283,10 +283,10 @@ export function Leads() {
                           variant="ghost"
                           size="sm"
                           onClick={clearSelection}
-                          className="ml-2 h-6 px-2 text-xs"
+                          className="ml-2 h-6 px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
                         >
                           <X className="h-3 w-3 mr-1" />
-                          Clear selection
+                          Clear
                         </Button>
                       </span>
                     )}

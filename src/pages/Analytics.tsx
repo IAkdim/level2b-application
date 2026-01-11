@@ -1,8 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays, Loader2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useOrganization } from "@/contexts/OrganizationContext"
@@ -181,17 +179,23 @@ export function Analytics() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative">
+            <div className="h-10 w-10 rounded-full border-2 border-primary/20"></div>
+            <div className="absolute inset-0 h-10 w-10 rounded-full border-2 border-transparent border-t-primary animate-spin"></div>
+          </div>
+          <span className="text-sm text-muted-foreground">Loading analytics...</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="space-y-8 max-w-7xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
             Detailed insights into your email campaign performance
           </p>
         </div>

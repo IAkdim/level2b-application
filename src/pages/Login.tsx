@@ -108,11 +108,11 @@ export function Login() {
       </div>
 
       {/* Right side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-8">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-terracotta-600 to-terracotta-800 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-terracotta-600 to-terracotta-800 rounded-xl flex items-center justify-center shadow-lg">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-terracotta-600 to-terracotta-800 bg-clip-text text-transparent">
@@ -120,12 +120,12 @@ export function Login() {
             </span>
           </div>
 
-          <div className="bg-card rounded-2xl shadow-xl border border-border p-8">
+          <div className="bg-card rounded-2xl shadow-xl border border-border/60 p-8">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
+              <h2 className="text-2xl font-semibold text-foreground mb-2">
                 Welcome back
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Log in to continue with Level2b
               </p>
             </div>
@@ -144,20 +144,25 @@ export function Login() {
               variant="outline"
               onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 h-12 text-base font-medium border-2 hover:bg-muted transition-all"
+              size="lg"
+              className="w-full flex items-center justify-center gap-3 h-12 text-base font-medium border-2 hover:bg-muted hover:border-muted-foreground/20 transition-all"
             >
-              <FcGoogle className="w-6 h-6" />
+              {isLoading ? (
+                <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin" />
+              ) : (
+                <FcGoogle className="w-5 h-5" />
+              )}
               {isLoading ? "Logging in..." : "Log in with Google"}
             </Button>
 
-            <div className="mt-8 pt-6 border-t border-border">
+            <div className="mt-8 pt-6 border-t border-border/60">
               <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                Door in te loggen ga je akkoord met onze{" "}
-                <a href="#" className="text-primary hover:underline">
-                  Algemene Voorwaarden
+                By logging in, you agree to our{" "}
+                <a href="#" className="text-primary hover:underline font-medium">
+                  Terms of Service
                 </a>{" "}
-                en{" "}
-                <a href="#" className="text-primary hover:underline">
+                and{" "}
+                <a href="#" className="text-primary hover:underline font-medium">
                   Privacy Policy
                 </a>
               </p>

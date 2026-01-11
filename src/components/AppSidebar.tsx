@@ -120,19 +120,19 @@ const content = (
   <Link
     to={item.href}
     className={cn(
-      "group flex items-center rounded-lg transition-colors",
+      "group flex items-center rounded-lg transition-all duration-200",
       isCollapsed
-        ? "justify-center p-2" // centered layout when collapsed
-        : "px-3 py-2 text-sm font-medium", // standard layout when expanded
+        ? "justify-center p-2.5" // centered layout when collapsed
+        : "px-3 py-2.5 text-sm font-medium", // standard layout when expanded
       isActive
-        ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        ? "bg-primary text-primary-foreground shadow-sm"
+        : "text-muted-foreground hover:bg-muted hover:text-foreground"
     )}
     aria-current={isActive ? "page" : undefined}
   >
     <item.icon
       className={cn(
-        "h-4 w-4 flex-shrink-0", // slightly smaller icons globally
+        "h-4 w-4 flex-shrink-0 transition-colors", // slightly smaller icons globally
         !isCollapsed && "mr-3" // spacing for expanded layout
       )}
       aria-hidden="true"
@@ -141,7 +141,7 @@ const content = (
       <>
         <span className="flex-1">{item.name}</span>
         {item.badge && (
-          <Badge variant="destructive" className="ml-auto">
+          <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0">
             {item.badge}
           </Badge>
         )}
@@ -174,22 +174,22 @@ const content = (
     <TooltipProvider>
       <div
         className={cn(
-          "flex h-full flex-col border-r bg-background transition-all duration-300",
+          "flex h-full flex-col border-r border-border/60 bg-background transition-all duration-300 ease-in-out",
           isCollapsed ? "w-16" : "w-64"
         )}
       >
         {/* Header */}
-        <div className="flex h-16 items-center justify-between px-4 border-b">
+        <div className="flex h-14 items-center justify-between px-4 border-b border-border/60">
           {!isCollapsed && (
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Level2B
             </h1>
           )}
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             onClick={toggleCollapsed}
-            className={cn("ml-auto", isCollapsed && "mx-auto")}
+            className={cn("ml-auto hover:bg-muted", isCollapsed && "mx-auto")}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
