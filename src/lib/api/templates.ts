@@ -2,7 +2,7 @@
 // Email template generation and storage API
 
 import { supabase } from '@/lib/supabaseClient'
-import type { EmailTemplate, CreateEmailTemplateInput, UpdateEmailTemplateInput } from '@/types/crm'
+import type { EmailTemplate, CreateEmailTemplateInput, UpdateEmailTemplateInput, Language } from '@/types/crm'
 
 export interface GeneratedTemplate {
   templateName: string
@@ -25,6 +25,7 @@ export async function generateColdEmailTemplate(companyInfo: {
   industry?: string
   calendlyLink?: string
   additionalContext?: string
+  language?: Language
 }): Promise<GeneratedTemplate> {
   try {
     console.log('Generating cold email template via Edge Function:', companyInfo)
@@ -215,10 +216,23 @@ export async function deleteEmailTemplate(id: string): Promise<void> {
  * Increment usage count for a template
  */
 export async function incrementTemplateUsage(id: string): Promise<void> {
+  // First, get the current value
+  const { data: template, error: fetchError } = await supabase
+    .from('email_templates')
+    .select('times_used')
+    .eq('id', id)
+    .single()
+
+  if (fetchError) {
+    console.error('Error fetching template for usage increment:', fetchError)
+    throw new Error(fetchError.message)
+  }
+
+  // Then update with incremented value
   const { error } = await supabase
     .from('email_templates')
     .update({
-      times_used: supabase.raw('times_used + 1'),
+      times_used: (template.times_used || 0) + 1,
       last_used_at: new Date().toISOString(),
     })
     .eq('id', id)

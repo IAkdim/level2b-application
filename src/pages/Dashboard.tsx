@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { useNavigate } from "react-router-dom"
+import { ENABLE_MOCK_DATA, MOCK_ACTIVITIES, MOCK_LEADS, MOCK_MEETINGS } from "@/lib/mockData"
 
 interface DashboardStats {
   totalEmails: number
@@ -44,6 +45,25 @@ export function Dashboard() {
 
     try {
       setIsLoading(true)
+
+      // MOCK DATA: Use mock data when enabled
+      if (ENABLE_MOCK_DATA) {
+        const emailActivities = MOCK_ACTIVITIES.filter(a => a.type === 'email')
+        const activeLeadsCount = MOCK_LEADS.filter(l => l.status !== 'lost' && l.status !== 'closed').length
+        const meetingsCount = MOCK_MEETINGS.filter(m => m.status === 'active').length
+        const totalEmails = emailActivities.length
+        
+        setStats({
+          totalEmails: totalEmails,
+          activeLeads: activeLeadsCount,
+          meetingsBooked: meetingsCount,
+          replyRate: 24
+        })
+        
+        setActivities(MOCK_ACTIVITIES)
+        setIsLoading(false)
+        return
+      }
 
       // Get total emails sent (activities with type='email')
       const { count: emailCount } = await supabase

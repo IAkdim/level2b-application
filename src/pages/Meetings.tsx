@@ -8,10 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Search, RefreshCw, ExternalLink, CalendarCheck, Video, Phone, MapPin } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar, Search, RefreshCw, ExternalLink, CalendarCheck, Video, Phone, MapPin, List, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
-import { format } from "date-fns"
+import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, isPast, isFuture, isToday, parseISO } from "date-fns"
 import { nl } from "date-fns/locale"
+import { ENABLE_MOCK_DATA, MOCK_MEETINGS } from "@/lib/mockData"
 
 function getStatusVariant(status: Meeting['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   const variants = {
@@ -36,6 +39,9 @@ export function Meetings() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [timeFilter, setTimeFilter] = useState<string>("all")
+  const [viewMode, setViewMode] = useState<"list" | "agenda">("list")
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [calendlyConnected, setCalendlyConnected] = useState(false)
 
   useEffect(() => {
@@ -46,18 +52,19 @@ export function Meetings() {
   }, [selectedOrg])
 
   const loadMeetings = async () => {
-    console.log('[Meetings] loadMeetings called')
     if (!selectedOrg) {
-      console.log('[Meetings] No selectedOrg, returning')
       return
     }
 
     try {
       setIsLoading(true)
-      console.log('[Meetings] Fetching meetings for org:', selectedOrg.id)
+      // MOCK DATA: Use mock data when enabled
+      if (ENABLE_MOCK_DATA) {
+        setMeetings(MOCK_MEETINGS)
+        setIsLoading(false)
+        return
+      }
       const data = await getMeetings(selectedOrg.id)
-      console.log('[Meetings] Meetings loaded:', data.length, 'meetings')
-      console.log('[Meetings] First meeting:', data[0])
       setMeetings(data)
     } catch (error) {
       console.error('[Meetings] Error loading meetings:', error)
@@ -79,17 +86,11 @@ export function Meetings() {
   }
 
   const handleSyncMeetings = async () => {
-    console.log('[Meetings] handleSyncMeetings called')
-    console.log('[Meetings] selectedOrg:', selectedOrg)
-    
     if (!selectedOrg) return
 
     setIsSyncing(true)
     try {
-      console.log('[Meetings] Calling syncCalendlyMeetings...')
       const result = await syncCalendlyMeetings(selectedOrg.id)
-      console.log('[Meetings] Sync result:', JSON.stringify(result))
-      console.log('[Meetings] Synced:', result.synced, 'Skipped:', result.skipped, 'Total:', result.total)
       
       // Always refresh the meetings list after sync
       await loadMeetings()
@@ -107,7 +108,6 @@ export function Meetings() {
       console.error('[Meetings] Error syncing meetings:', error)
       toast.error('Error synchronising meetings')
     } finally {
-      console.log('[Meetings] Setting isSyncing to false')
       setIsSyncing(false)
     }
   }
@@ -121,8 +121,52 @@ export function Meetings() {
     
     const matchesStatus = statusFilter === "all" || meeting.status === statusFilter
     
-    return matchesSearch && matchesStatus
+    const meetingDate = new Date(meeting.start_time)
+    const matchesTime = timeFilter === "all" || 
+      (timeFilter === "upcoming" && (isFuture(meetingDate) || isToday(meetingDate))) ||
+      (timeFilter === "past" && isPast(meetingDate) && !isToday(meetingDate))
+    
+    return matchesSearch && matchesStatus && matchesTime
   })
+
+  // Group meetings by day for agenda view
+  const getWeekDays = () => {
+    const start = startOfWeek(selectedDate, { locale: nl })
+    const days = []
+    for (let i = 0; i < 7; i++) {
+      days.push(addDays(start, i))
+    }
+    return days
+  }
+
+  const groupMeetingsByDay = (meetings: Meeting[]) => {
+    const grouped: { [key: string]: Meeting[] } = {}
+    
+    meetings.forEach(meeting => {
+      const dateKey = format(new Date(meeting.start_time), 'yyyy-MM-dd')
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = []
+      }
+      grouped[dateKey].push(meeting)
+    })
+    
+    return grouped
+  }
+
+  const handlePreviousWeek = () => {
+    setSelectedDate(prev => subWeeks(prev, 1))
+  }
+
+  const handleNextWeek = () => {
+    setSelectedDate(prev => addWeeks(prev, 1))
+  }
+
+  const handleToday = () => {
+    setSelectedDate(new Date())
+  }
+
+  const weekDays = getWeekDays()
+  const groupedMeetings = groupMeetingsByDay(filteredMeetings)
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -199,14 +243,17 @@ export function Meetings() {
         </Card>
         <Card className="group hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming</CardTitle>
             <div className="rounded-lg bg-muted p-2 group-hover:bg-info/10 transition-colors">
               <Calendar className="h-4 w-4 text-info" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => m.status === 'scheduled' || m.status === 'confirmed').length}
+              {meetings.filter(m => {
+                const date = new Date(m.start_time)
+                return (isFuture(date) || isToday(date)) && m.status !== 'canceled'
+              }).length}
             </div>
           </CardContent>
         </Card>
@@ -217,7 +264,10 @@ export function Meetings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => m.status === 'completed').length}
+              {meetings.filter(m => {
+                const date = new Date(m.start_time)
+                return isPast(date) && !isToday(date) && m.status !== 'canceled'
+              }).length}
             </div>
           </CardContent>
         </Card>
@@ -237,7 +287,27 @@ export function Meetings() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Filters & View</CardTitle>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List
+              </Button>
+              <Button
+                variant={viewMode === "agenda" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("agenda")}
+              >
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Week Agenda
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex space-x-4">
@@ -250,17 +320,29 @@ export function Meetings() {
                 <Input
                   id="search-meetings"
                   type="text"
-                  placeholder="Search meetings..."
+                  placeholder="Search by name, email, or company..."
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
-            <div className="w-48">
-              <Label htmlFor="status-filter" className="sr-only">
-                Filter by status
+            <div className="w-40">
+              <Label htmlFor="time-filter" className="sr-only">
+                Filter by time
               </Label>
+              <Select value={timeFilter} onValueChange={setTimeFilter}>
+                <SelectTrigger id="time-filter">
+                  <SelectValue placeholder="All time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All time</SelectItem>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="past">Past</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-40">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
 <SelectTrigger id="status-filter">
                   <SelectValue placeholder="All statuses" />
@@ -279,82 +361,237 @@ export function Meetings() {
       </Card>
 
       {/* Content based on view mode */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Meetings</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${filteredMeetings.length} of ${meetings.length} meetings`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      {viewMode === "list" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Meetings List</CardTitle>
+            <CardDescription>
+              {isLoading ? 'Loading...' : `${filteredMeetings.length} of ${meetings.length} meetings`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredMeetings.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No meetings found
+                  </p>
+                ) : (
+                  filteredMeetings
+                    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+                    .map((meeting) => {
+                      const meetingDate = new Date(meeting.start_time)
+                      const endDate = meeting.end_time ? new Date(meeting.end_time) : null
+                      const duration = endDate 
+                        ? Math.round((endDate.getTime() - meetingDate.getTime()) / 60000)
+                        : 30
+                      
+                      const TypeIcon = meeting.location?.includes('zoom') || meeting.location?.includes('meet') 
+                        ? Video 
+                        : meeting.location?.includes('phone') 
+                          ? Phone 
+                          : MapPin
+
+                      const isPastMeeting = isPast(meetingDate) && !isToday(meetingDate)
+
+                      return (
+                        <div 
+                          key={meeting.id} 
+                          className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors ${
+                            isPastMeeting ? 'opacity-50 bg-muted/20' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <h3 className={`font-medium ${isPastMeeting ? 'text-muted-foreground' : ''}`}>
+                                  {meeting.name}
+                                </h3>
+                                <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                                <Badge variant={getStatusVariant(meeting.status as any)}>
+                                  {getStatusLabel(meeting.status as any)}
+                                </Badge>
+                                {isPastMeeting && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Completed
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-2">
+                                <span>
+                                  {meeting.invitee_name || meeting.invitee_email}
+                                  {meeting.lead?.company && ` - ${meeting.lead.company}`}
+                                </span>
+                                <span>{format(meetingDate, 'PPP', { locale: nl })} at {format(meetingDate, 'HH:mm')}</span>
+                                <span>{duration} min</span>
+                              </div>
+                              {meeting.location && meeting.location.startsWith('http') && (
+                                <a 
+                                  href={meeting.location} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                                >
+                                  Join Meeting <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                              {meeting.location && !meeting.location.startsWith('http') && (
+                                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" /> {meeting.location}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Week Agenda</CardTitle>
+                <CardDescription>
+                  {format(weekDays[0], 'PPP', { locale: nl })} - {format(weekDays[6], 'PPP', { locale: nl })}
+                </CardDescription>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousWeek}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToday}
+                >
+                  Today
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {format(selectedDate, 'PPP', { locale: nl })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <div className="p-3">
+                      <Input
+                        type="date"
+                        value={format(selectedDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setSelectedDate(parseISO(e.target.value))
+                          }
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextWeek}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredMeetings.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No meetings found
-                </p>
-              ) : (
-                filteredMeetings.map((meeting) => {
-                  const meetingDate = new Date(meeting.start_time)
-                  const endDate = meeting.end_time ? new Date(meeting.end_time) : null
-                  const duration = endDate 
-                    ? Math.round((endDate.getTime() - meetingDate.getTime()) / 60000)
-                    : 30
-                  
-                  const TypeIcon = meeting.location?.includes('zoom') || meeting.location?.includes('meet') 
-                    ? Video 
-                    : meeting.location?.includes('phone') 
-                      ? Phone 
-                      : MapPin
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map((day, idx) => {
+                  const dateKey = format(day, 'yyyy-MM-dd')
+                  const dayMeetings = groupedMeetings[dateKey] || []
+                  const isCurrentDay = isToday(day)
+                  const isPastDay = isPast(day) && !isToday(day)
 
                   return (
-                    <div key={meeting.id} className="border rounded-lg p-4 hover:bg-muted/50">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-medium">{meeting.name}</h3>
-                            <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                            <Badge variant={getStatusVariant(meeting.status as any)}>
-                              {getStatusLabel(meeting.status as any)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-2">
-                            <span>
-                              {meeting.invitee_name || meeting.invitee_email}
-                              {meeting.lead?.company && ` - ${meeting.lead.company}`}
-                            </span>
-                            <span>{format(meetingDate, 'PPP', { locale: nl })} om {format(meetingDate, 'HH:mm')}</span>
-                            <span>{duration} min</span>
-                          </div>
-                          {meeting.location && meeting.location.startsWith('http') && (
-                            <a 
-                              href={meeting.location} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1"
-                            >
-                              Join Meeting <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {meeting.location && !meeting.location.startsWith('http') && (
-                            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                              <MapPin className="h-3 w-3" /> {meeting.location}
-                            </p>
-                          )}
+                    <div 
+                      key={idx} 
+                      className={`border rounded-lg p-3 min-h-[200px] ${
+                        isCurrentDay ? 'bg-primary/5 border-primary' : ''
+                      } ${isPastDay ? 'bg-muted/30' : ''}`}
+                    >
+                      <div className="text-center mb-3">
+                        <div className={`text-xs font-medium text-muted-foreground uppercase ${
+                          isCurrentDay ? 'text-primary' : ''
+                        }`}>
+                          {format(day, 'EEE', { locale: nl })}
                         </div>
+                        <div className={`text-lg font-bold ${
+                          isCurrentDay ? 'text-primary' : isPastDay ? 'text-muted-foreground' : ''
+                        }`}>
+                          {format(day, 'd')}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {dayMeetings.length === 0 ? (
+                          <p className="text-xs text-center text-muted-foreground py-4">
+                            No meetings
+                          </p>
+                        ) : (
+                          dayMeetings
+                            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                            .map((meeting) => {
+                              const meetingDate = new Date(meeting.start_time)
+                              const TypeIcon = meeting.location?.includes('zoom') || meeting.location?.includes('meet') 
+                                ? Video 
+                                : meeting.location?.includes('phone') 
+                                  ? Phone 
+                                  : MapPin
+
+                              return (
+                                <div 
+                                  key={meeting.id}
+                                  className={`text-xs p-2 rounded border bg-background hover:bg-muted/50 cursor-pointer ${
+                                    meeting.status === 'canceled' ? 'opacity-50' : ''
+                                  }`}
+                                  title={`${meeting.name} - ${meeting.invitee_name || meeting.invitee_email}`}
+                                >
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <TypeIcon className="h-3 w-3 flex-shrink-0" />
+                                    <span className="font-medium truncate">
+                                      {format(meetingDate, 'HH:mm')}
+                                    </span>
+                                  </div>
+                                  <p className="truncate text-muted-foreground">
+                                    {meeting.invitee_name || meeting.invitee_email?.split('@')[0]}
+                                  </p>
+                                  <p className="truncate font-medium">
+                                    {meeting.name}
+                                  </p>
+                                </div>
+                              )
+                            })
+                        )}
                       </div>
                     </div>
                   )
-                })
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

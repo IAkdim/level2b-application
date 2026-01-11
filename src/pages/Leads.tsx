@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Upload, Search, Plus, User, Loader2, Edit2, Trash2, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Mail, X, Zap, AlertCircle } from "lucide-react"
+import { ENABLE_MOCK_DATA, MOCK_LEADS } from "@/lib/mockData"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +20,9 @@ import { useOrganization } from "@/contexts/OrganizationContext"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
-import { ImportCSVDialog } from "@/components/ImportCSVDialog"
+import { ImportLeadsDialog } from "@/components/ImportLeadsDialog"
 import { BulkEmailDialog } from "@/components/BulkEmailDialog"
+import { GenerateLeadsDialog } from "@/components/GenerateLeadsDialog"
 import { getDailyUsage, getTimeUntilReset, type DailyUsage } from "@/lib/api/usageLimits"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
@@ -73,7 +75,7 @@ export function Leads() {
   const debouncedSearch = useDebounce(searchTerm, 300)
 
   // Fetch leads with server-side filters and sorting
-  const { data: leadsData, isLoading: leadsLoading } = useLeads({
+  const { data: leadsData, isLoading: leadsLoading, refetch } = useLeads({
     status: statusFilter.length > 0 ? statusFilter : undefined,
     sentiment: sentimentFilter.length > 0 ? sentimentFilter : undefined,
     source: sourceFilter.length > 0 ? sourceFilter : undefined,
@@ -85,7 +87,8 @@ export function Leads() {
   // Delete mutation
   const deleteLead = useDeleteLead()
 
-  const leads = leadsData?.data || []
+  // MOCK DATA: Use mock data when enabled
+  const leads = ENABLE_MOCK_DATA ? MOCK_LEADS : (leadsData?.data || [])
 
   const clearFilters = () => {
     setStatusFilter([])
@@ -124,9 +127,36 @@ export function Leads() {
 
     try {
       await deleteLead.mutateAsync(lead.id)
+      toast.success(`${lead.name} deleted successfully`)
     } catch (error) {
       console.error("Failed to delete lead:", error)
-      alert("Failed to delete lead")
+      toast.error("Failed to delete lead")
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedLeads.size === 0) {
+      toast.error("No leads selected")
+      return
+    }
+
+    const count = selectedLeads.size
+    if (!confirm(`Are you sure you want to delete ${count} lead${count !== 1 ? 's' : ''}? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const deletePromises = Array.from(selectedLeads).map(leadId => 
+        deleteLead.mutateAsync(leadId)
+      )
+      
+      await Promise.all(deletePromises)
+      
+      toast.success(`${count} lead${count !== 1 ? 's' : ''} deleted successfully`)
+      setSelectedLeads(new Set())
+    } catch (error) {
+      console.error("Failed to delete leads:", error)
+      toast.error("Failed to delete some leads")
     }
   }
 
@@ -189,17 +219,32 @@ export function Leads() {
             </div>
             <div className="flex flex-wrap gap-2">
               {selectedLeads.size > 0 && (
-                <Button
-                  onClick={() => setShowBulkEmailDialog(true)}
-                  disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
-                </Button>
+                <>
+                  <Button
+                    onClick={() => setShowBulkEmailDialog(true)}
+                    disabled={dailyUsage ? dailyUsage.emailsRemaining < selectedLeads.size : false}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Email {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleBulkDelete}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
+                  </Button>
+                </>
+              )}
+              {selectedOrg && (
+                <GenerateLeadsDialog
+                  organizationId={selectedOrg.id}
+                  onLeadsGenerated={refetch}
+                />
               )}
               <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                Import Leads
               </Button>
               <Button onClick={() => setShowAddDialog(true)}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -475,8 +520,8 @@ export function Leads() {
           {/* Add Lead Dialog */}
           <AddLeadDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
 
-          {/* Import CSV Dialog */}
-          <ImportCSVDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
+          {/* Import Leads Dialog */}
+          <ImportLeadsDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
 
           {/* Edit Lead Dialog */}
           <EditLeadDialog

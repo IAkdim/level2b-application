@@ -18,14 +18,16 @@ import {
   getTimeUntilReset,
   type DailyUsage
 } from '@/lib/api/usageLimits'
-import type { EmailTemplate } from '@/types/crm'
+import type { EmailTemplate, Language } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { eventBus } from '@/lib/eventBus'
 import {
-  getCompanySettings,
-  saveCompanySettings,
+  getOrganizationSettings,
+  updateOrganizationSettings,
+  type OrganizationSettings
+} from '@/lib/api/calendly'
+import {
   validateSettingsForTemplateGeneration,
-  getFieldLabel,
-  type CompanySettings
 } from '@/lib/api/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,12 +36,12 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Sparkles, 
   Copy, 
   Mail,
   AlertCircle,
-  Settings,
   Plus,
   X,
   Trash2,
@@ -48,16 +50,13 @@ import {
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
 
 
 export default function Templates() {
-  const navigate = useNavigate()
   const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
@@ -75,9 +74,10 @@ export default function Templates() {
 
   // Extra context for template generation
   const [additionalContext, setAdditionalContext] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>('en')
 
   // Quick settings form state
-  const [quickSettings, setQuickSettings] = useState<CompanySettings>({
+  const [quickSettings, setQuickSettings] = useState<Partial<OrganizationSettings>>({
     company_name: '',
     product_service: '',
     target_audience: '',
@@ -111,8 +111,9 @@ export default function Templates() {
 
   // Check validation on mount and update
   useEffect(() => {
-    const checkValidation = () => {
-      const settings = getCompanySettings()
+    const checkValidation = async () => {
+      if (!selectedOrg?.id) return
+      const settings = await getOrganizationSettings(selectedOrg.id)
       const result = validateSettingsForTemplateGeneration(settings)
       setValidation(result)
     }
@@ -122,20 +123,17 @@ export default function Templates() {
     const handleFocus = () => checkValidation()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+  }, [selectedOrg?.id])
 
   const loadTemplates = useCallback(async () => {
     if (!selectedOrg?.id) return
     
     try {
-      setIsLoadingTemplates(true)
       const templates = await getEmailTemplates(selectedOrg.id)
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
       toast.error('Could not load templates')
-    } finally {
-      setIsLoadingTemplates(false)
     }
   }, [selectedOrg?.id])
 
@@ -144,9 +142,19 @@ export default function Templates() {
     loadTemplates()
   }, [loadTemplates])
 
+  // Listen for template saved events from other components (e.g., BulkEmailDialog)
+  useEffect(() => {
+    const unsubscribe = eventBus.on('templateSaved', loadTemplates)
+    return unsubscribe
+  }, [loadTemplates])
+
   const handleGenerateTemplate = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
     // Always show quick settings dialog so user can add extra context
-    const existing = getCompanySettings()
+    const existing = await getOrganizationSettings(selectedOrg.id)
     if (existing) {
       setQuickSettings(existing)
     }
@@ -155,6 +163,11 @@ export default function Templates() {
   }
 
   const handleQuickSettingsSave = async () => {
+    if (!selectedOrg?.id) {
+      toast.error('No organisation selected')
+      return
+    }
+    
     // Validate required fields
     if (!quickSettings.company_name?.trim()) {
       toast.error('Company name is required')
@@ -169,8 +182,16 @@ export default function Templates() {
       return
     }
 
-    // Save settings
-    saveCompanySettings(quickSettings)
+    // Save settings to database
+    try {
+      await updateOrganizationSettings(selectedOrg.id, quickSettings)
+      // Emit event to notify other components
+      eventBus.emit('companySettingsUpdated')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+      return
+    }
     
     // Update validation
     const result = validateSettingsForTemplateGeneration(quickSettings)
@@ -185,7 +206,7 @@ export default function Templates() {
     }
   }
 
-  const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
+  const generateTemplate = async (settings: Partial<OrganizationSettings>): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null) // Clear previous errors
     
@@ -217,8 +238,9 @@ export default function Templates() {
         uniqueSellingPoints: settings.unique_selling_points,
         targetAudience: settings.target_audience!,
         industry: settings.industry,
-        calendlyLink: settings.calendly_link,
+        calendlyLink: settings.calendly_scheduling_url,
         additionalContext: additionalContext.trim() || undefined,
+        language: selectedLanguage,
       })
 
       // Increment usage counter after successful generation (only if usage limits are set up)
@@ -290,9 +312,7 @@ export default function Templates() {
   }
 
   const handleSaveTemplate = async () => {
-    console.log('handleSaveTemplate called')
     if (!generatedTemplate) {
-      console.log('No generated template to save')
       return
     }
 
@@ -302,18 +322,19 @@ export default function Templates() {
     }
 
     try {
-      console.log('Saving template to database...')
-      const settings = getCompanySettings()
+      const settings = await getOrganizationSettings(selectedOrg.id)
       const result = await saveEmailTemplate(selectedOrg.id, {
         name: templateName,
         subject: templateSubject,
         body: templateBody,
-        company_info: settings,
+        language: selectedLanguage,
+        company_info: settings || undefined,
         additional_context: additionalContext || undefined,
       })
-      console.log('Template saved successfully:', result)
       toast.success('Template saved!')
       await loadTemplates() // Reload templates
+      setShowGenerateDialog(false) // Close the GENERATE dialog (not preview)
+      setGeneratedTemplate(null) // Reset generated template
     } catch (error) {
       console.error('Error saving template:', error)
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -359,12 +380,12 @@ export default function Templates() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cold Email Templates</h1>
           <p className="text-muted-foreground mt-1">
-            Generate persuasive cold emails with AI
+            Generate Persuasive Cold Emails with AI
           </p>
         </div>
         <Button 
           onClick={handleGenerateTemplate}
-          disabled={isGenerating || (dailyUsage && dailyUsage.templatesRemaining === 0)}
+          disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
           size="lg"
         >
           <Sparkles className="mr-2 h-4 w-4" />
@@ -642,9 +663,9 @@ export default function Templates() {
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Fill in Company Information</DialogTitle>
+            <DialogTitle>Company Information</DialogTitle>
             <DialogDescription>
-              Fill in the fields below to generate a template
+              Complete the fields below to generate a template
             </DialogDescription>
           </DialogHeader>
           
@@ -668,7 +689,7 @@ export default function Templates() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="quick_company_name">
-                Company name <span className="text-red-500">*</span>
+                Company Name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_company_name"
@@ -693,7 +714,7 @@ export default function Templates() {
 
             <div className="space-y-2">
               <Label htmlFor="quick_target_audience">
-                Target audience <span className="text-red-500">*</span>
+                Target Audience <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_target_audience"
@@ -701,6 +722,26 @@ export default function Templates() {
                 onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
                 placeholder="e.g. B2B SaaS companies with 10-50 employees"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="language">
+                Template Language <span className="text-red-500">*</span>
+              </Label>
+              <Select value={selectedLanguage} onValueChange={(value) => setSelectedLanguage(value as Language)}>
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">🇬🇧 English</SelectItem>
+                  <SelectItem value="nl">🇳🇱 Nederlands</SelectItem>
+                  <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                  <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                  <SelectItem value="es">🇪🇸 Español</SelectItem>
+                  <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                  <SelectItem value="pt">🇵🇹 Português</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -726,13 +767,13 @@ export default function Templates() {
                   {quickSettings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                       >
                         <X className="h-3 w-3" />
                       </button>

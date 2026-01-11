@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Save, Plus, X, Building2, Calendar, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { eventBus } from '@/lib/eventBus'
 
 interface CompanySettingsFormProps {
   showOnlyCalendly?: boolean
@@ -62,11 +63,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   }
 
   const loadSettings = async (organizationId: string) => {
-    console.log('[CompanySettingsForm] Loading settings for org:', organizationId)
     try {
       setIsLoading(true)
       const data = await getOrganizationSettings(organizationId)
-      console.log('[CompanySettingsForm] Settings loaded:', data)
       
       // Always set settings, even if data is null
       setSettings({
@@ -84,11 +83,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
       // If connected, load event types
       if (connected && data) {
-        console.log('[CompanySettingsForm] Loading event types...')
         await loadEventTypes(organizationId)
         setSelectedEventTypeUri(data.calendly_event_type_uri || '')
       }
-      console.log('[CompanySettingsForm] Settings load complete')
     } catch (error) {
       console.error('[CompanySettingsForm] Error loading settings:', error)
       toast.error('Error loading settings')
@@ -102,7 +99,6 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
         industry: '',
       })
     } finally {
-      console.log('[CompanySettingsForm] Setting isLoading to false')
       setIsLoading(false)
     }
   }
@@ -113,6 +109,18 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     } else {
       setIsLoading(false)
     }
+  }, [selectedOrg?.id])
+
+  // Listen for settings updates from other components (e.g., TemplateSelector)
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      if (selectedOrg?.id) {
+        loadSettings(selectedOrg.id)
+      }
+    }
+
+    eventBus.on('companySettingsUpdated', handleSettingsUpdate)
+    return () => eventBus.off('companySettingsUpdated', handleSettingsUpdate)
   }, [selectedOrg?.id])
 
   // Check for Calendly OAuth callback - only once on mount
@@ -181,6 +189,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       
       console.log('[CompanySettingsForm] Settings saved successfully')
       toast.success('Settings saved!')
+      
+      // Notify other components (like TemplateSelector) that settings were updated
+      eventBus.emit('companySettingsUpdated')
     } catch (error) {
       console.error('[CompanySettingsForm] CAUGHT ERROR:', error)
       toast.error('Error saving settings')
@@ -463,13 +474,13 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
                   {settings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-red-500"
+                        className="text-gray-500 dark:text-gray-400 hover:text-red-500"
                       >
                         <X className="h-3 w-3" />
                       </button>

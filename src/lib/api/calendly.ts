@@ -1,5 +1,6 @@
 // API functions for Calendly integration
 import { supabase } from '../supabaseClient'
+import { rateLimiter } from './rateLimiter'
 
 export interface CalendlyEventType {
   uri: string
@@ -34,13 +35,9 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
     .from('organization_settings')
     .select('*')
     .eq('org_id', orgId)
-    .single()
+    .maybeSingle()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // No settings found, return null
-      return null
-    }
     console.error('Error fetching organization settings:', error)
     throw error
   }
@@ -55,30 +52,33 @@ export async function updateOrganizationSettings(
   orgId: string,
   updates: Partial<OrganizationSettings>
 ): Promise<void> {
-  // Check if settings exist
-  const existing = await getOrganizationSettings(orgId)
+  // First, try to update existing row
+  const { data: updateData, error: updateError } = await supabase
+    .from('organization_settings')
+    .update(updates)
+    .eq('org_id', orgId)
+    .select()
 
-  if (existing) {
-    // Update existing
-    const { error } = await supabase
-      .from('organization_settings')
-      .update(updates)
-      .eq('org_id', orgId)
+  // If update succeeded and returned data, we're done
+  if (updateData && updateData.length > 0) {
+    return
+  }
 
-    if (error) {
-      console.error('Error updating organization settings:', error)
-      throw error
-    }
-  } else {
-    // Insert new
-    const { error } = await supabase
-      .from('organization_settings')
-      .insert({ org_id: orgId, ...updates })
+  // If update failed with real error (not just no rows), throw it
+  if (updateError) {
+    console.error('[updateOrganizationSettings] Update error:', updateError)
+    throw updateError
+  }
 
-    if (error) {
-      console.error('Error inserting organization settings:', error)
-      throw error
-    }
+  // If update succeeded but no rows affected, insert new row
+  const { data: insertData, error: insertError } = await supabase
+    .from('organization_settings')
+    .insert({ org_id: orgId, ...updates })
+    .select()
+
+  if (insertError) {
+    console.error('[updateOrganizationSettings] Insert error:', insertError)
+    throw insertError
   }
 }
 
@@ -87,13 +87,9 @@ export async function updateOrganizationSettings(
  * Returns the authorization URL to redirect the user to
  */
 export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
-  console.log('[calendly.ts] initiateCalendlyOAuth called with orgId:', orgId)
-  
   const { data, error } = await supabase.functions.invoke('calendly-oauth-init', {
     body: { orgId },
   })
-
-  console.log('[calendly.ts] Edge function response:', { data, error })
 
   if (error) {
     console.error('[calendly.ts] Error initiating Calendly OAuth:', error)
@@ -105,7 +101,6 @@ export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
     throw new Error(data.error)
   }
 
-  console.log('[calendly.ts] Returning authUrl:', data.authUrl)
   return data.authUrl
 }
 
@@ -113,6 +108,15 @@ export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
  * Get available Calendly event types (scheduling links)
  */
 export async function getCalendlyEventTypes(orgId: string): Promise<CalendlyEventType[]> {
+  // Rate limit check
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    const rateCheck = await rateLimiter.checkLimit('calendly', session.user.id)
+    if (!rateCheck.allowed) {
+      throw new Error(rateCheck.message || 'Too many Calendly API requests. Please try again later.')
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('calendly-get-event-types', {
     body: { orgId },
   })

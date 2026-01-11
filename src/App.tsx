@@ -4,9 +4,12 @@ import { lazy, Suspense } from "react"
 import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
+import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
+import { Toaster } from "@/components/ui/sonner"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -16,6 +19,7 @@ const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ defa
 const Templates = lazy(() => import("@/pages/Templates"))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
+const ApiMonitoring = lazy(() => import("@/pages/ApiMonitoring"))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
 const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
@@ -23,6 +27,15 @@ const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
 const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
+
+// Dev Dashboard pages
+const DevDashboardLayout = lazy(() => import("@/components/DevDashboardLayout"))
+const DevOverview = lazy(() => import("@/pages/dev/DevOverview"))
+const DevUsers = lazy(() => import("@/pages/dev/DevUsers"))
+const DevUserDetail = lazy(() => import("@/pages/dev/DevUserDetail"))
+const DevLogs = lazy(() => import("@/pages/dev/DevLogs"))
+const DevFeatureFlags = lazy(() => import("@/pages/dev/DevFeatureFlags"))
+const DevSettings = lazy(() => import("@/pages/dev/DevSettings"))
 
 const queryClient = new QueryClient()
 
@@ -63,6 +76,24 @@ function App() {
                 }
               />
 
+              {/* Developer Dashboard - admin only */}
+              <Route
+                path="/dev/*"
+                element={
+                  <AdminRoute>
+                    <DevDashboardLayout />
+                  </AdminRoute>
+                }
+              >
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<DevOverview />} />
+                <Route path="users" element={<DevUsers />} />
+                <Route path="users/:userId" element={<DevUserDetail />} />
+                <Route path="logs" element={<DevLogs />} />
+                <Route path="flags" element={<DevFeatureFlags />} />
+                <Route path="settings" element={<DevSettings />} />
+              </Route>
+
             {/* Protected app routes */}
             <Route
               path="/*"
@@ -86,6 +117,7 @@ function App() {
                               </Route>
                               <Route path="/meetings" element={<Meetings />} />
                               <Route path="/analytics" element={<Analytics />} />
+                              <Route path="/api-monitoring" element={<ApiMonitoring />} />
                               <Route path="/configuration" element={<Configuration />} />
                               <Route path="/organization" element={<OrganizationManagement />} />
                               <Route path="/profile" element={<Profile />} />
@@ -96,12 +128,15 @@ function App() {
                     </div>
                     {/* Guide Dialog - globally available */}
                     <GuideDialog />
+                    {/* First visit onboarding modal */}
+                    <FirstVisitModal />
                   </div>
                 </ProtectedRoute>
               }
             />
               </Routes>
             </Suspense>
+            <Toaster />
           </OrganizationProvider>
         </Router>
       </ThemeProvider>
