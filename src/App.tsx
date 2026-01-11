@@ -29,8 +29,14 @@ const queryClient = new QueryClient()
 // Loading fallback component
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-muted-foreground">Loading...</div>
+    <div className="flex items-center justify-center h-full min-h-[200px]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative">
+          <div className="h-10 w-10 rounded-full border-2 border-primary/20"></div>
+          <div className="absolute inset-0 h-10 w-10 rounded-full border-2 border-transparent border-t-primary animate-spin"></div>
+        </div>
+        <span className="text-sm text-muted-foreground">Loading...</span>
+      </div>
     </div>
   )
 }
@@ -62,28 +68,30 @@ function App() {
               path="/*"
               element={
                 <ProtectedRoute>
-                  <div>
+                  <div className="min-h-screen bg-background">
                     <TopBar />
                     <div className="flex h-[calc(100vh-56px)]">
                       <AppSidebar />
-                      <main className="flex-1 overflow-auto p-8 bg-muted/30">
-                        <Suspense fallback={<PageLoader />}>
-                          <Routes>
-                            <Route path="/" element={<Dashboard />} />
-                            <Route path="/outreach" element={<OutreachLayout />}>
-                              <Route index element={<Navigate to="leads" replace />} />
-                              <Route path="leads" element={<Leads />} />
-                              <Route path="leads/:leadId" element={<LeadDetail />} />
-                              <Route path="email-threads" element={<EmailThreads />} />
-                              <Route path="templates" element={<Templates />} />
-                            </Route>
-                            <Route path="/meetings" element={<Meetings />} />
-                            <Route path="/analytics" element={<Analytics />} />
-                            <Route path="/configuration" element={<Configuration />} />
-                            <Route path="/organization" element={<OrganizationManagement />} />
-                            <Route path="/profile" element={<Profile />} />
-                          </Routes>
-                        </Suspense>
+                      <main className="flex-1 overflow-auto bg-muted/30">
+                        <div className="p-6 lg:p-8">
+                          <Suspense fallback={<PageLoader />}>
+                            <Routes>
+                              <Route path="/" element={<Dashboard />} />
+                              <Route path="/outreach" element={<OutreachLayout />}>
+                                <Route index element={<Navigate to="leads" replace />} />
+                                <Route path="leads" element={<Leads />} />
+                                <Route path="leads/:leadId" element={<LeadDetail />} />
+                                <Route path="email-threads" element={<EmailThreads />} />
+                                <Route path="templates" element={<Templates />} />
+                              </Route>
+                              <Route path="/meetings" element={<Meetings />} />
+                              <Route path="/analytics" element={<Analytics />} />
+                              <Route path="/configuration" element={<Configuration />} />
+                              <Route path="/organization" element={<OrganizationManagement />} />
+                              <Route path="/profile" element={<Profile />} />
+                            </Routes>
+                          </Suspense>
+                        </div>
                       </main>
                     </div>
                     {/* Guide Dialog - globally available */}

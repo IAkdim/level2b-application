@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { supabase } from "@/lib/supabaseClient"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -191,37 +192,39 @@ export function TopBar() {
 
   return (
     <TooltipProvider>
-      <div className="h-14 border-b bg-background">
-        <div className="flex h-full items-center justify-between px-6">
+      <div className="h-14 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+        <div className="flex h-full items-center justify-between px-4 lg:px-6">
           {/* Left side - Organization Selector */}
           <div className="flex items-center gap-4">
             {selectedOrg && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 h-8 px-3">
-                    <Building2 className="h-4 w-4" />
+                  <Button variant="ghost" className="flex items-center gap-2 h-9 px-3 hover:bg-muted">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
+                    </div>
                     <span className="text-sm font-medium">{selectedOrg.name}</span>
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Switch Organization</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {userOrgs.map((userOrg) => (
                     <DropdownMenuItem
                       key={userOrg.org_id}
                       onClick={() => setOrganization(userOrg.organization)}
-                      className={selectedOrg.id === userOrg.org_id ? "bg-accent" : ""}
+                      className={cn("cursor-pointer", selectedOrg.id === userOrg.org_id && "bg-muted")}
                     >
-                      <Building2 className="mr-2 h-4 w-4" />
+                      <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
                       <div className="flex flex-col">
-                        <span>{userOrg.organization.name}</span>
-                        <span className="text-xs text-muted-foreground">{userOrg.role}</span>
+                        <span className="text-sm">{userOrg.organization.name}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{userOrg.role}</span>
                       </div>
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)}>
+                  <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)} className="cursor-pointer">
                     <Plus className="mr-2 h-4 w-4" />
                     Manage Organizations
                   </DropdownMenuItem>
@@ -231,23 +234,23 @@ export function TopBar() {
           </div>
 
           {/* Right side - Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
             {/* Search */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Search">
+                <Button variant="ghost" size="icon-sm" aria-label="Search" className="text-muted-foreground hover:text-foreground">
                   <Search className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Search <kbd className="ml-2 text-xs">⌘K</kbd></p>
+                <p>Search <kbd className="ml-2 text-xs bg-muted px-1 py-0.5 rounded">⌘K</kbd></p>
               </TooltipContent>
             </Tooltip>
 
             {/* Help */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Help">
+                <Button variant="ghost" size="icon-sm" aria-label="Help" className="text-muted-foreground hover:text-foreground">
                   <HelpCircle className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Mail, Users, Calendar, TrendingUp, ArrowUpRight, Loader2 } from "lucide-react"
+import { Mail, Users, Calendar, TrendingUp, ArrowUpRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useOrganization } from "@/contexts/OrganizationContext"
@@ -168,89 +168,109 @@ export function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative">
+            <div className="h-10 w-10 rounded-full border-2 border-primary/20"></div>
+            <div className="absolute inset-0 h-10 w-10 rounded-full border-2 border-transparent border-t-primary animate-spin"></div>
+          </div>
+          <span className="text-sm text-muted-foreground">Loading dashboard...</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 max-w-7xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
           Overview of your AI emailer performance
         </p>
       </div>
 
       {/* Stats Grid - Keep cards for metrics */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statsCards.map((stat) => (
-          <Card key={stat.name} className="border-border/30">
+          <Card key={stat.name} className="group hover:shadow-lg transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{stat.name}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground/50" />
+              <div className="rounded-lg bg-muted p-2 group-hover:bg-primary/10 transition-colors">
+                <stat.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stat.value}</div>
+              <div className="text-2xl font-bold tracking-tight">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Recent Activity - Use subtle background instead of heavy card */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold">Recent Activity</h2>
               <p className="text-sm text-muted-foreground">Latest updates from your leads</p>
             </div>
-            <Button variant="ghost" size="sm" className="gap-1" onClick={() => navigate('/leads')}>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => navigate('/outreach/leads')}>
               View all
-              <ArrowUpRight className="h-3 w-3" />
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          <div className="space-y-2 bg-muted/30 rounded-lg p-6 border border-border/30">
-            {activities.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No activities yet
-              </div>
-            ) : (
-              activities.map((activity) => (
-                <div key={activity.id} className="flex items-start gap-4 p-4 bg-background rounded-md hover:bg-accent/50 transition-colors">
-                  <div className="flex h-2 w-2 rounded-full bg-muted-foreground/40 mt-2"></div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {getActivityDescription(activity)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTimeAgo(activity.created_at)}
-                    </p>
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {activities.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="rounded-full bg-muted p-3">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm">No activities yet</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {activities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex h-2 w-2 rounded-full bg-primary mt-2 ring-4 ring-primary/10"></div>
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <p className="text-sm font-medium leading-none truncate">
+                          {getActivityDescription(activity)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatTimeAgo(activity.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Actions - Keep card but refined */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div>
             <h2 className="text-base font-semibold">Quick Actions</h2>
             <p className="text-sm text-muted-foreground">Quick actions for your workflow</p>
           </div>
 
-          <Card className="border-border/30">
+          <Card>
             <CardContent className="pt-6 space-y-2">
-              <Button size="sm" className="w-full" onClick={() => navigate('/outreach/templates')}>
+              <Button className="w-full justify-start gap-2" onClick={() => navigate('/outreach/templates')}>
+                <Mail className="h-4 w-4" />
                 New Template
               </Button>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/outreach/leads')}>
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/outreach/leads')}>
+                <Users className="h-4 w-4" />
                 Manage Leads
               </Button>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/analytics')}>
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/analytics')}>
+                <TrendingUp className="h-4 w-4" />
                 View Analytics
               </Button>
             </CardContent>

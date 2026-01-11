@@ -125,15 +125,15 @@ export function Meetings() {
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Meetings</h1>
-          <p className="text-muted-foreground">
+    <div className="space-y-6 max-w-7xl">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Meetings</h1>
+          <p className="text-sm text-muted-foreground">
             Automatic synchronisation of Calendly meetings with your CRM
           </p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex gap-2">
           {calendlyConnected && (
             <Button 
               onClick={handleSyncMeetings} 
@@ -143,7 +143,7 @@ export function Meetings() {
             >
               {isSyncing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin"></div>
                   Synchronising...
                 </>
               ) : (
@@ -159,13 +159,15 @@ export function Meetings() {
 
       {/* Calendly Connection Warning */}
       {!calendlyConnected && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="pt-6">
+        <Card className="border-warning/30 bg-warning/5">
+          <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <CalendarCheck className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="rounded-lg bg-warning/10 p-2">
+                <CalendarCheck className="h-5 w-5 text-warning" />
+              </div>
               <div className="flex-1">
-                <p className="font-semibold text-amber-900">Calendly not connected</p>
-                <p className="text-sm text-amber-800 mt-1">
+                <p className="font-medium text-sm">Calendly not connected</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
                   Connect your Calendly account in configuration to automatically synchronise meetings.
                 </p>
                 <Button
@@ -184,19 +186,23 @@ export function Meetings() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <Card>
+        <Card className="group hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+            <div className="rounded-lg bg-muted p-2 group-hover:bg-primary/10 transition-colors">
+              <Calendar className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{meetings.length}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="group hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
+            <div className="rounded-lg bg-muted p-2 group-hover:bg-info/10 transition-colors">
+              <Calendar className="h-4 w-4 text-info" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
