@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { X, Mail, Users, FileText, Calendar, Check, Minimize2, Maximize2, ChevronRight, LucideIcon } from "lucide-react"
+import { X, Mail, Users, FileText, Calendar, Check, Minimize2, Maximize2, ChevronRight, LucideIcon, Sparkles, ArrowRight, Rocket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -20,6 +20,7 @@ interface OnboardingTask {
   checkType: 'manual' | 'leads' | 'templates' | 'emails' | 'meetings'
   actionUrl?: string
   actionType?: 'navigate' | 'external'
+  stepNumber: number
 }
 
 const DEFAULT_TASKS: OnboardingTask[] = [
@@ -31,17 +32,8 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     completed: false,
     checkType: 'manual',
     actionUrl: '/configuration',
-    actionType: 'navigate'
-  },
-  {
-    id: 'add-leads',
-    title: 'Add your first leads',
-    description: 'Import or manually add leads to your CRM',
-    icon: Users,
-    completed: false,
-    checkType: 'leads',
-    actionUrl: '/outreach/leads',
-    actionType: 'navigate'
+    actionType: 'navigate',
+    stepNumber: 0
   },
   {
     id: 'create-template',
@@ -51,7 +43,19 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     completed: false,
     checkType: 'templates',
     actionUrl: '/outreach/templates',
-    actionType: 'navigate'
+    actionType: 'navigate',
+    stepNumber: 1
+  },
+  {
+    id: 'add-leads',
+    title: 'Add your first leads',
+    description: 'Import or manually add leads to your CRM',
+    icon: Users,
+    completed: false,
+    checkType: 'leads',
+    actionUrl: '/outreach/leads',
+    actionType: 'navigate',
+    stepNumber: 2
   },
   {
     id: 'send-email',
@@ -61,7 +65,8 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     completed: false,
     checkType: 'emails',
     actionUrl: '/outreach/email-threads',
-    actionType: 'navigate'
+    actionType: 'navigate',
+    stepNumber: 3
   },
   {
     id: 'connect-calendly',
@@ -71,7 +76,8 @@ const DEFAULT_TASKS: OnboardingTask[] = [
     completed: false,
     checkType: 'meetings',
     actionUrl: '/configuration',
-    actionType: 'navigate'
+    actionType: 'navigate',
+    stepNumber: 4
   }
 ]
 
@@ -145,30 +151,8 @@ export function FirstVisitModal() {
           hasChanges = true
         }
 
-        // Check for leads
-        if (tasks[1].checkType === 'leads' && !tasks[1].completed) {
-          const { data: orgs } = await supabase
-            .from('user_organizations')
-            .select('org_id')
-            .eq('user_id', session.user.id)
-            .limit(1)
-            .single()
-
-          if (orgs?.org_id) {
-            const { count } = await supabase
-              .from('leads')
-              .select('*', { count: 'exact', head: true })
-              .eq('org_id', orgs.org_id)
-
-            if (count && count > 0) {
-              updatedTasks[1].completed = true
-              hasChanges = true
-            }
-          }
-        }
-
-        // Check for templates
-        if (tasks[2].checkType === 'templates' && !tasks[2].completed) {
+        // Check for templates (now index 1)
+        if (tasks[1].checkType === 'templates' && !tasks[1].completed) {
           const { data: orgs } = await supabase
             .from('user_organizations')
             .select('org_id')
@@ -181,6 +165,28 @@ export function FirstVisitModal() {
               .from('templates')
               .select('*', { count: 'exact', head: true })
               .eq('organization_id', orgs.org_id)
+
+            if (count && count > 0) {
+              updatedTasks[1].completed = true
+              hasChanges = true
+            }
+          }
+        }
+
+        // Check for leads (now index 2)
+        if (tasks[2].checkType === 'leads' && !tasks[2].completed) {
+          const { data: orgs } = await supabase
+            .from('user_organizations')
+            .select('org_id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .single()
+
+          if (orgs?.org_id) {
+            const { count } = await supabase
+              .from('leads')
+              .select('*', { count: 'exact', head: true })
+              .eq('org_id', orgs.org_id)
 
             if (count && count > 0) {
               updatedTasks[2].completed = true
@@ -303,20 +309,27 @@ export function FirstVisitModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <CardTitle>Welcome to Level2B! 👋</CardTitle>
-              {allCompleted && (
-                <Badge variant="default" className="bg-green-500">
-                  <Check className="h-3 w-3 mr-1" />
-                  Complete!
-                </Badge>
-              )}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Rocket className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Welcome to Level2B!
+                  {allCompleted && (
+                    <Badge variant="default" className="bg-green-500">
+                      <Check className="h-3 w-3 mr-1" />
+                      Complete!
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Let's get you set up in 5 easy steps
+                </CardDescription>
+              </div>
             </div>
-            <CardDescription>
-              Complete these tasks to get started with your sales outreach
-            </CardDescription>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -338,54 +351,95 @@ export function FirstVisitModal() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Progress bar */}
-          <div className="space-y-2">
+          {/* Progress bar with label */}
+          <div className="space-y-2 bg-muted/30 rounded-lg p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="font-medium">Your Progress</span>
+              </div>
+              <span className="text-muted-foreground">
                 {completedCount} of {tasks.length} completed
               </span>
             </div>
-            <Progress value={progress} className="h-3" />
+            <Progress value={progress} className="h-2" />
+            {!allCompleted && completedCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Great start! Keep going to unlock your full potential.
+              </p>
+            )}
           </div>
 
-          {/* Tasks list */}
-          <div className="space-y-3">
-            {tasks.map((task) => {
+          {/* Tasks list with step numbers */}
+          <div className="space-y-2">
+            {tasks.map((task, index) => {
               const Icon = task.icon
+              const isNextStep = !task.completed && tasks.slice(0, index).every(t => t.completed)
               return (
                 <div
                   key={task.id}
                   onClick={() => handleTaskClick(task)}
-                  className={`flex items-start gap-4 rounded-lg border p-4 transition-all ${
+                  className={`flex items-center gap-4 rounded-lg border p-4 transition-all ${
                     task.completed
-                      ? 'bg-muted/50 border-green-500/50'
-                      : 'hover:bg-muted/50 hover:border-primary/50 cursor-pointer'
+                      ? 'bg-green-50/50 dark:bg-green-950/20 border-green-500/30'
+                      : isNextStep
+                      ? 'bg-primary/5 border-primary/30 hover:border-primary/50 cursor-pointer ring-2 ring-primary/20'
+                      : 'hover:bg-muted/50 hover:border-muted-foreground/30 cursor-pointer'
                   }`}
                 >
+                  {/* Step number or checkmark */}
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 font-semibold text-sm transition-all ${
                       task.completed
-                        ? 'bg-green-500 border-green-500'
-                        : 'border-muted-foreground/30'
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : isNextStep
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-muted-foreground/30 text-muted-foreground'
                     }`}
                   >
                     {task.completed ? (
-                      <Check className="h-4 w-4 text-white" />
+                      <Check className="h-4 w-4" />
                     ) : (
-                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      task.stepNumber + 1
                     )}
                   </div>
-                  <div className="flex-1 space-y-1">
+                  
+                  {/* Icon */}
+                  <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center ${
+                    task.completed 
+                      ? 'bg-green-100 dark:bg-green-900/30' 
+                      : isNextStep
+                      ? 'bg-primary/10'
+                      : 'bg-muted'
+                  }`}>
+                    <Icon className={`h-4 w-4 ${
+                      task.completed 
+                        ? 'text-green-600' 
+                        : isNextStep
+                        ? 'text-primary'
+                        : 'text-muted-foreground'
+                    }`} />
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
                     <h3 className={`font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
                       {task.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {task.description}
                     </p>
                   </div>
+                  
+                  {/* Arrow for next step */}
                   {!task.completed && (
-                    <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                    <div className={`shrink-0 ${isNextStep ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {isNextStep ? (
+                        <ArrowRight className="h-5 w-5" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 opacity-50" />
+                      )}
+                    </div>
                   )}
                 </div>
               )
@@ -394,16 +448,18 @@ export function FirstVisitModal() {
 
           {/* Actions */}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between pt-4 border-t">
-            <Button variant="ghost" onClick={skipAll} className="sm:w-auto">
-              Skip tutorial
+            <Button variant="ghost" onClick={skipAll} className="sm:w-auto text-muted-foreground">
+              Skip for now
             </Button>
             {allCompleted ? (
               <Button onClick={() => setOpen(false)} className="sm:w-auto">
+                <Rocket className="h-4 w-4 mr-2" />
                 Start using Level2B
               </Button>
             ) : (
               <Button variant="outline" onClick={() => setMinimized(true)} className="sm:w-auto">
-                Minimize
+                <Minimize2 className="h-4 w-4 mr-2" />
+                Continue later
               </Button>
             )}
           </div>
