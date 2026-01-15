@@ -2,10 +2,10 @@
 // Cold email template generator (no database storage)
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
+import {
   generateColdEmailTemplate,
   type GeneratedTemplate,
-  getEmailTemplates,
+  getUserEmailTemplates,
   saveEmailTemplate,
   deleteEmailTemplate,
   incrementTemplateUsage,
@@ -20,11 +20,11 @@ import {
 } from '@/lib/api/usageLimits'
 import type { EmailTemplate } from '@/types/crm'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   getCompanySettings,
   saveCompanySettings,
   validateSettingsForTemplateGeneration,
-  getFieldLabel,
   type CompanySettings
 } from '@/lib/api/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,12 +34,11 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { 
-  Sparkles, 
-  Copy, 
+import {
+  Sparkles,
+  Copy,
   Mail,
   AlertCircle,
-  Settings,
   Plus,
   X,
   Trash2,
@@ -48,16 +47,15 @@ import {
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
 
 
 export default function Templates() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
+  const [, setIsLoadingTemplates] = useState(true)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
@@ -86,11 +84,11 @@ export default function Templates() {
   const [newUsp, setNewUsp] = useState('')
 
   const loadDailyUsage = useCallback(async () => {
-    if (!selectedOrg?.id) return
-    
+    if (!user) return
+
     try {
       setIsLoadingUsage(true)
-      const usage = await getDailyUsage(selectedOrg.id)
+      const usage = await getDailyUsage({ orgId: selectedOrg?.id })
       setDailyUsage(usage)
     } catch (error) {
       console.error('Error loading daily usage:', error)
@@ -100,14 +98,14 @@ export default function Templates() {
     } finally {
       setIsLoadingUsage(false)
     }
-  }, [selectedOrg?.id])
+  }, [user, selectedOrg?.id])
 
-  // Load daily usage on mount and when org changes
+  // Load daily usage on mount and when user/org changes
   useEffect(() => {
-    if (selectedOrg?.id) {
+    if (user) {
       loadDailyUsage()
     }
-  }, [selectedOrg?.id, loadDailyUsage])
+  }, [user, loadDailyUsage])
 
   // Check validation on mount and update
   useEffect(() => {
@@ -125,11 +123,14 @@ export default function Templates() {
   }, [])
 
   const loadTemplates = useCallback(async () => {
-    if (!selectedOrg?.id) return
-    
+    if (!user) return
+
     try {
       setIsLoadingTemplates(true)
-      const templates = await getEmailTemplates(selectedOrg.id)
+      const templates = await getUserEmailTemplates(user.id, {
+        includeShared: !!selectedOrg?.id,
+        orgId: selectedOrg?.id
+      })
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
@@ -137,7 +138,7 @@ export default function Templates() {
     } finally {
       setIsLoadingTemplates(false)
     }
-  }, [selectedOrg?.id])
+  }, [user, selectedOrg?.id])
 
   // Load saved templates on mount
   useEffect(() => {
@@ -188,18 +189,12 @@ export default function Templates() {
   const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null) // Clear previous errors
-    
-    if (!selectedOrg?.id) {
-      setGenerationError('No organisation selected')
-      setIsGenerating(false)
-      return false
-    }
 
     try {
-      // Check usage limit before generating (only if usage limits are set up)
+      // Check usage limit before generating (user-centric)
       if (dailyUsage) {
-        const limitCheck = await checkUsageLimit(selectedOrg.id, 'template')
-        
+        const limitCheck = await checkUsageLimit('template', { orgId: selectedOrg?.id })
+
         if (!limitCheck.allowed) {
           const errorMsg = formatUsageLimitError(limitCheck.error!)
           const resetTime = getTimeUntilReset()
@@ -221,10 +216,10 @@ export default function Templates() {
         additionalContext: additionalContext.trim() || undefined,
       })
 
-      // Increment usage counter after successful generation (only if usage limits are set up)
+      // Increment usage counter after successful generation (user-centric)
       if (dailyUsage) {
         try {
-          const incrementResult = await incrementUsage(selectedOrg.id, 'template')
+          const incrementResult = await incrementUsage('template', 1, { orgId: selectedOrg?.id })
           if (incrementResult.success) {
             // Reload usage to update UI
             await loadDailyUsage()
@@ -296,20 +291,16 @@ export default function Templates() {
       return
     }
 
-    if (!selectedOrg?.id) {
-      toast.error('No organisation selected')
-      return
-    }
-
     try {
       console.log('Saving template to database...')
       const settings = getCompanySettings()
-      const result = await saveEmailTemplate(selectedOrg.id, {
+      const result = await saveEmailTemplate({
         name: templateName,
         subject: templateSubject,
         body: templateBody,
-        company_info: settings,
+        company_info: settings || undefined,
         additional_context: additionalContext || undefined,
+        orgId: selectedOrg?.id,
       })
       console.log('Template saved successfully:', result)
       toast.success('Template saved!')
@@ -362,9 +353,9 @@ export default function Templates() {
             Generate persuasive cold emails with AI
           </p>
         </div>
-        <Button 
+        <Button
           onClick={handleGenerateTemplate}
-          disabled={isGenerating || (dailyUsage && dailyUsage.templatesRemaining === 0)}
+          disabled={isGenerating || !!(dailyUsage && dailyUsage.templatesRemaining === 0)}
           size="lg"
         >
           <Sparkles className="mr-2 h-4 w-4" />

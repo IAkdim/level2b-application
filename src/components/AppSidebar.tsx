@@ -85,18 +85,14 @@ export function AppSidebar() {
       return
     }
 
-    if (!selectedOrg?.id) {
-      toast.error('No organisation selected')
-      return
-    }
-
     setIsSubmittingFeedback(true)
     try {
-      await submitFeedback(selectedOrg.id, {
+      await submitFeedback({
         type: feedbackType,
         message: feedbackMessage.trim(),
         rating: feedbackRating > 0 ? feedbackRating : undefined,
         page_url: window.location.href,
+        orgId: selectedOrg?.id,
       })
       
       toast.success('Thank you for your feedback!')

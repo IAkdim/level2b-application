@@ -206,7 +206,7 @@ export function Meetings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => m.status === 'scheduled' || m.status === 'confirmed').length}
+              {meetings.filter(m => m.status === 'active').length}
             </div>
           </CardContent>
         </Card>
@@ -217,7 +217,7 @@ export function Meetings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => m.status === 'completed').length}
+              {meetings.filter(m => new Date(m.end_time) < new Date()).length}
             </div>
           </CardContent>
         </Card>

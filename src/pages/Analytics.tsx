@@ -46,7 +46,7 @@ export function Analytics() {
         .eq('type', 'email')
 
       // Get total calls made
-      const { count: callCount } = await supabase
+      const { count: _callCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
         .eq('org_id', selectedOrg.id)

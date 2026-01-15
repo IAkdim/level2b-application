@@ -1,12 +1,18 @@
 import { supabase } from '../supabaseClient'
 import type { Task, CreateTaskInput, UpdateTaskInput, TaskFilters } from '@/types/crm'
 
+interface UserCentricOptions {
+  includeShared?: boolean
+  orgId?: string
+}
+
 /**
- * Fetch tasks with optional filters
+ * Fetch tasks with optional filters (USER-CENTRIC)
  */
-export async function getTasks(
-  orgId: string,
-  filters?: TaskFilters
+export async function getUserTasks(
+  userId: string,
+  filters?: TaskFilters,
+  options?: UserCentricOptions
 ): Promise<Task[]> {
   let query = supabase
     .from('tasks')
@@ -24,7 +30,13 @@ export async function getTasks(
         email
       )
     `)
-    .eq('org_id', orgId)
+
+  // User-centric filtering: user's own OR shared via org
+  if (options?.includeShared && options?.orgId) {
+    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
 
   // Apply filters
   if (filters?.status) {
@@ -96,22 +108,25 @@ export async function getTask(taskId: string): Promise<Task> {
 }
 
 /**
- * Create a new task
+ * Create a new task (USER-CENTRIC)
  */
 export async function createTask(
-  orgId: string,
-  input: CreateTaskInput
+  input: CreateTaskInput & { orgId?: string }
 ): Promise<Task> {
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { orgId, ...taskInput } = input
 
   const { data, error } = await supabase
     .from('tasks')
     .insert({
-      org_id: orgId,
-      ...input,
-      status: input.status || 'pending',
-      priority: input.priority || 'medium',
-      created_by: user?.id
+      user_id: user.id,
+      org_id: orgId || null,
+      ...taskInput,
+      status: taskInput.status || 'pending',
+      priority: taskInput.priority || 'medium',
+      created_by: user.id
     })
     .select(`
       *,
@@ -187,10 +202,13 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 /**
- * Get overdue tasks for an organization
+ * Get overdue tasks (USER-CENTRIC)
  */
-export async function getOverdueTasks(orgId: string): Promise<Task[]> {
-  const { data, error } = await supabase
+export async function getOverdueTasks(
+  userId: string,
+  options?: UserCentricOptions
+): Promise<Task[]> {
+  let query = supabase
     .from('tasks')
     .select(`
       *,
@@ -206,7 +224,15 @@ export async function getOverdueTasks(orgId: string): Promise<Task[]> {
         email
       )
     `)
-    .eq('org_id', orgId)
+
+  // User-centric filtering
+  if (options?.includeShared && options?.orgId) {
+    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
     .in('status', ['pending', 'in_progress'])
     .lt('due_date', new Date().toISOString())
     .order('due_date', { ascending: true })
@@ -217,15 +243,18 @@ export async function getOverdueTasks(orgId: string): Promise<Task[]> {
 }
 
 /**
- * Get tasks due today for an organization
+ * Get tasks due today (USER-CENTRIC)
  */
-export async function getTasksDueToday(orgId: string): Promise<Task[]> {
+export async function getTasksDueToday(
+  userId: string,
+  options?: UserCentricOptions
+): Promise<Task[]> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('tasks')
     .select(`
       *,
@@ -241,7 +270,15 @@ export async function getTasksDueToday(orgId: string): Promise<Task[]> {
         email
       )
     `)
-    .eq('org_id', orgId)
+
+  // User-centric filtering
+  if (options?.includeShared && options?.orgId) {
+    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
     .in('status', ['pending', 'in_progress'])
     .gte('due_date', today.toISOString())
     .lt('due_date', tomorrow.toISOString())

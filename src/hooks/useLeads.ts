@@ -1,21 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { useAuth } from '@/contexts/AuthContext'
 import * as leadsApi from '@/lib/api/leads'
 import type { Lead, CreateLeadInput, UpdateLeadInput, LeadFilters, PaginationParams } from '@/types/crm'
 
+interface UseLeadsOptions {
+  includeShared?: boolean
+}
+
 /**
- * Hook to fetch paginated leads with filters
+ * Hook to fetch paginated leads with filters (USER-CENTRIC)
  */
-export function useLeads(filters?: LeadFilters, pagination?: PaginationParams) {
+export function useLeads(
+  filters?: LeadFilters,
+  pagination?: PaginationParams,
+  options?: UseLeadsOptions
+) {
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['leads', selectedOrg?.id, filters, pagination],
+    queryKey: ['leads', user?.id, selectedOrg?.id, filters, pagination, options?.includeShared],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return leadsApi.getLeads(selectedOrg.id, filters, pagination)
+      if (!user) throw new Error('Not authenticated')
+      return leadsApi.getUserLeads(user.id, filters, pagination, {
+        includeShared: options?.includeShared,
+        orgId: selectedOrg?.id
+      })
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
   })
 }
 
@@ -34,39 +47,47 @@ export function useLead(leadId: string | undefined) {
 }
 
 /**
- * Hook to fetch lead statistics
+ * Hook to fetch lead statistics (USER-CENTRIC)
  */
-export function useLeadStats() {
+export function useLeadStats(options?: UseLeadsOptions) {
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['lead-stats', selectedOrg?.id],
+    queryKey: ['lead-stats', user?.id, selectedOrg?.id, options?.includeShared],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return leadsApi.getLeadStats(selectedOrg.id)
+      if (!user) throw new Error('Not authenticated')
+      return leadsApi.getUserLeadStats(user.id, {
+        includeShared: options?.includeShared,
+        orgId: selectedOrg?.id
+      })
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
   })
 }
 
 /**
- * Hook to fetch unique source tags
+ * Hook to fetch unique source tags (USER-CENTRIC)
  */
-export function useUniqueSources() {
+export function useUniqueSources(options?: UseLeadsOptions) {
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['unique-sources', selectedOrg?.id],
+    queryKey: ['unique-sources', user?.id, selectedOrg?.id, options?.includeShared],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return leadsApi.getUniqueSources(selectedOrg.id)
+      if (!user) throw new Error('Not authenticated')
+      return leadsApi.getUserUniqueSources(user.id, {
+        includeShared: options?.includeShared,
+        orgId: selectedOrg?.id
+      })
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
   })
 }
 
 /**
- * Hook to create a new lead
+ * Hook to create a new lead (USER-CENTRIC)
  */
 export function useCreateLead() {
   const { selectedOrg } = useOrganization()
@@ -74,74 +95,72 @@ export function useCreateLead() {
 
   return useMutation({
     mutationFn: (input: CreateLeadInput) => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return leadsApi.createLead(selectedOrg.id, input)
+      // org_id is optional - only set if user has an org selected
+      return leadsApi.createLead({ ...input, orgId: selectedOrg?.id })
     },
     onSuccess: () => {
       // Invalidate leads queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['leads', selectedOrg?.id] })
-      queryClient.invalidateQueries({ queryKey: ['lead-stats', selectedOrg?.id] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
   })
 }
 
 /**
- * Hook to update a lead
+ * Hook to update a lead (USER-CENTRIC)
  */
 export function useUpdateLead() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({ leadId, input }: { leadId: string; input: UpdateLeadInput }) =>
       leadsApi.updateLead(leadId, input),
     onSuccess: (data) => {
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['leads', selectedOrg?.id] })
+      // Invalidate all leads queries (user-centric invalidation)
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['lead', data.id] })
-      queryClient.invalidateQueries({ queryKey: ['lead-stats', selectedOrg?.id] })
+      queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
   })
 }
 
 /**
- * Hook to delete a lead
+ * Hook to delete a lead (USER-CENTRIC)
  */
 export function useDeleteLead() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (leadId: string) => leadsApi.deleteLead(leadId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads', selectedOrg?.id] })
-      queryClient.invalidateQueries({ queryKey: ['lead-stats', selectedOrg?.id] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
   })
 }
 
 /**
- * Hook to update lead status
+ * Hook to update lead status (USER-CENTRIC)
  */
 export function useUpdateLeadStatus() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({ leadId, status }: { leadId: string; status: Lead['status'] }) =>
       leadsApi.updateLeadStatus(leadId, status),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['leads', selectedOrg?.id] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['lead', data.id] })
-      queryClient.invalidateQueries({ queryKey: ['lead-stats', selectedOrg?.id] })
+      queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
   })
 }
 
 /**
- * Hook to import leads from CSV with progress tracking
+ * Hook to import leads from CSV with progress tracking (USER-CENTRIC)
  */
 export function useImportLeads() {
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
@@ -153,11 +172,14 @@ export function useImportLeads() {
       leads: CreateLeadInput[]
       onProgress?: (processed: number, total: number) => void
     }) => {
-      if (!selectedOrg) throw new Error('No organization selected')
+      if (!user) throw new Error('Not authenticated')
 
-      // Check for existing emails
+      // Check for existing emails (user-centric)
       const emails = leads.map(lead => lead.email.toLowerCase())
-      const existingEmails = await leadsApi.checkExistingEmails(selectedOrg.id, emails)
+      const existingEmails = await leadsApi.checkUserExistingEmails(user.id, emails, {
+        includeShared: !!selectedOrg?.id,
+        orgId: selectedOrg?.id
+      })
 
       // Helper to check if lead data actually changed
       const hasChanges = (oldLead: Lead, newData: CreateLeadInput): boolean => {
@@ -197,7 +219,8 @@ export function useImportLeads() {
         const batchResults = await Promise.allSettled(
           batch.map(async (input) => {
             const existingLeadId = existingEmails.get(input.email.toLowerCase())
-            const result = await leadsApi.upsertLead(selectedOrg.id, input, existingLeadId)
+            // User-centric upsert - org_id is optional
+            const result = await leadsApi.upsertLead({ ...input, orgId: selectedOrg?.id }, existingLeadId)
             return result
           })
         )
@@ -263,9 +286,9 @@ export function useImportLeads() {
       }
     },
     onSuccess: () => {
-      // Invalidate all leads queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['leads', selectedOrg?.id] })
-      queryClient.invalidateQueries({ queryKey: ['lead-stats', selectedOrg?.id] })
+      // Invalidate all leads queries to refetch (user-centric)
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
   })
 }

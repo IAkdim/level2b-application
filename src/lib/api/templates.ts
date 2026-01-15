@@ -111,19 +111,23 @@ export async function generateColdEmailTemplate(companyInfo: {
 }
 
 /**
- * Save generated template to database
+ * Save generated template to database (USER-CENTRIC)
  */
 export async function saveEmailTemplate(
-  orgId: string,
-  input: CreateEmailTemplateInput
+  input: CreateEmailTemplateInput & { orgId?: string }
 ): Promise<EmailTemplate> {
-  console.log('saveEmailTemplate called with orgId:', orgId, 'input:', input)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { orgId, ...templateInput } = input
+  console.log('saveEmailTemplate called for user:', user.id, 'orgId:', orgId)
 
   const { data, error } = await supabase
     .from('email_templates')
     .insert({
-      org_id: orgId,
-      ...input,
+      user_id: user.id,
+      org_id: orgId || null,
+      ...templateInput,
     })
     .select()
     .single()
@@ -138,15 +142,30 @@ export async function saveEmailTemplate(
   return data
 }
 
+interface UserCentricOptions {
+  includeShared?: boolean
+  orgId?: string
+}
+
 /**
- * Get all email templates for current organization
+ * Get all email templates (USER-CENTRIC)
  */
-export async function getEmailTemplates(orgId: string): Promise<EmailTemplate[]> {
-  const { data, error } = await supabase
+export async function getUserEmailTemplates(
+  userId: string,
+  options?: UserCentricOptions
+): Promise<EmailTemplate[]> {
+  let query = supabase
     .from('email_templates')
     .select('*')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  // User-centric filtering: user's own OR shared via org
+  if (options?.includeShared && options?.orgId) {
+    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching templates:', error)
@@ -215,10 +234,17 @@ export async function deleteEmailTemplate(id: string): Promise<void> {
  * Increment usage count for a template
  */
 export async function incrementTemplateUsage(id: string): Promise<void> {
+  // First get current value
+  const { data: template } = await supabase
+    .from('email_templates')
+    .select('times_used')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('email_templates')
     .update({
-      times_used: supabase.raw('times_used + 1'),
+      times_used: (template?.times_used || 0) + 1,
       last_used_at: new Date().toISOString(),
     })
     .eq('id', id)

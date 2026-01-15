@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar"
 import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { GuideDialog } from "@/components/GuideDialog"
+import { AuthProvider } from "@/contexts/AuthContext"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
 
@@ -46,8 +47,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Router>
-          <OrganizationProvider>
-            <Suspense fallback={<PageLoader />}>
+          <AuthProvider>
+            <OrganizationProvider>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -101,8 +103,9 @@ function App() {
               }
             />
               </Routes>
-            </Suspense>
-          </OrganizationProvider>
+              </Suspense>
+            </OrganizationProvider>
+          </AuthProvider>
         </Router>
       </ThemeProvider>
     </QueryClientProvider>

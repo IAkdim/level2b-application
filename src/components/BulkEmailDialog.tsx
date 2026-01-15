@@ -40,17 +40,12 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       return
     }
 
-    if (!selectedOrg?.id) {
-      alert("Geen organisatie geselecteerd")
-      return
-    }
-
     setIsSending(true)
     setSendResult(null)
 
     try {
-      // Check daily email limit
-      const limitCheck = await checkUsageLimit(selectedOrg.id, 'email')
+      // Check daily email limit (user-centric)
+      const limitCheck = await checkUsageLimit('email', { orgId: selectedOrg?.id })
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -109,10 +104,10 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       const messageIds = await sendBatchEmails(emails, labelName || undefined)
       console.log("Batch send completed. Message IDs:", messageIds);
 
-      // Increment email usage counter for successful sends
+      // Increment email usage counter for successful sends (user-centric)
       if (messageIds.length > 0) {
         try {
-          await incrementUsage(selectedOrg.id, 'email', messageIds.length)
+          await incrementUsage('email', messageIds.length, { orgId: selectedOrg?.id })
         } catch (error) {
           console.error('Error incrementing email usage:', error)
           // Don't fail the send if usage tracking fails
