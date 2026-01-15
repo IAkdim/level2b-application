@@ -1,5 +1,6 @@
 // Create Checkout Session - Supabase Edge Function
 // Generates a Stripe Checkout session for subscription signup
+// Subscriptions are per-user (account), not per-organization
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -26,6 +27,8 @@ interface CheckoutRequest {
 }
 
 serve(async (req) => {
+  console.log("=== create-checkout-session called ===")
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders })
@@ -35,6 +38,7 @@ serve(async (req) => {
     // Get the authorization header
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
+      console.log("ERROR: Missing authorization header")
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -49,68 +53,67 @@ serve(async (req) => {
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
+      console.log("ERROR: Unauthorized -", userError?.message)
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
+    console.log("User authenticated:", user.id, user.email)
 
     // Get request body
     const { priceId, successUrl, cancelUrl }: CheckoutRequest = await req.json()
+    console.log("Request priceId:", priceId)
 
     if (!priceId) {
+      console.log("ERROR: Missing priceId")
       return new Response(
         JSON.stringify({ error: "Missing priceId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
-    // Get the user's current organization
-    const { data: userOrg, error: orgError } = await supabase
-      .from("user_orgs")
-      .select("org_id, organization:organizations(id, name)")
-      .eq("user_id", user.id)
-      .single()
-
-    if (orgError || !userOrg) {
-      return new Response(
-        JSON.stringify({ error: "User must belong to an organization" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
+    // Check if user already has an active subscription
+    let existingSub = null
+    try {
+      const { data, error: subError } = await supabase
+        .from("subscriptions")
+        .select("id, subscription_status, stripe_subscription_id")
+        .eq("user_id", user.id)
+        .in("subscription_status", ["active", "trialing"])
+        .single()
+      
+      if (!subError) {
+        existingSub = data
+      }
+      console.log("Subscription check result:", existingSub ? "found" : "none", subError?.message || "")
+    } catch (e) {
+      console.log("Subscription check skipped (table may not exist)")
     }
 
-    const orgId = userOrg.org_id
-    const orgName = (userOrg.organization as any)?.name || "Organization"
-
-    // Check if org already has an active subscription
-    const { data: existingSub } = await supabase
-      .from("subscriptions")
-      .select("id, subscription_status, stripe_subscription_id")
-      .eq("org_id", orgId)
-      .in("subscription_status", ["active", "trialing"])
-      .single()
-
     if (existingSub) {
+      console.log("ERROR: User already has an active subscription")
       return new Response(
         JSON.stringify({ 
-          error: "Organization already has an active subscription",
+          error: "You already have an active subscription",
           subscription_id: existingSub.stripe_subscription_id
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
-    // Check if org already has a Stripe customer
+    // Check if user already has a Stripe customer
     const { data: existingCustomer } = await supabase
       .from("stripe_customers")
       .select("stripe_customer_id")
-      .eq("org_id", orgId)
+      .eq("user_id", user.id)
       .single()
 
     let customerId: string | undefined
 
     if (existingCustomer) {
       customerId = existingCustomer.stripe_customer_id
+      console.log("Existing Stripe customer found:", customerId)
     }
 
     // Create checkout session
@@ -125,32 +128,31 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
-      // IMPORTANT: client_reference_id links the checkout to the organization
-      client_reference_id: orgId,
+      // IMPORTANT: client_reference_id links the checkout to the user
+      client_reference_id: user.id,
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       // Allow promotion codes for discounts
       allow_promotion_codes: true,
       // Billing address collection
       billing_address_collection: "required",
-      // Tax collection (enable if using Stripe Tax)
-      // automatic_tax: { enabled: true },
       // Success and cancel URLs
       success_url: successUrl || `${appUrl}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${appUrl}/subscribe?canceled=true`,
       // Subscription metadata
       subscription_data: {
         metadata: {
-          org_id: orgId,
-          org_name: orgName,
-          created_by_user_id: user.id,
+          user_id: user.id,
+          user_email: user.email || "",
         },
       },
       // Customer creation behavior
       customer_creation: customerId ? undefined : "always",
     }
 
+    console.log("Creating Stripe checkout session...")
     const session = await stripe.checkout.sessions.create(sessionParams)
+    console.log("Checkout session created:", session.id)
 
     return new Response(
       JSON.stringify({ 
@@ -161,7 +163,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error("Error creating checkout session:", error)
+    console.error("ERROR creating checkout session:", error.message, error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

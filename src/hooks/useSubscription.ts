@@ -1,9 +1,10 @@
 // useSubscription hook - Manages subscription state and Stripe interactions
+// Subscriptions are per-user (account), not per-organization
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import type { Subscription, BillingHistory } from '@/types/subscription'
+import type { User } from '@supabase/supabase-js'
 
 interface UseSubscriptionReturn {
   subscription: Subscription | null
@@ -18,15 +19,33 @@ interface UseSubscriptionReturn {
 }
 
 export function useSubscription(): UseSubscriptionReturn {
-  const { selectedOrg } = useOrganization()
+  const [user, setUser] = useState<User | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [billingHistory, setBillingHistory] = useState<BillingHistory[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Get the current user on mount
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+
+    // Listen for auth changes
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
+
+    return () => {
+      authSub.unsubscribe()
+    }
+  }, [])
+
   // Fetch subscription data
   const fetchSubscription = useCallback(async () => {
-    if (!selectedOrg?.id) {
+    if (!user?.id) {
       setSubscription(null)
       setBillingHistory([])
       setLoading(false)
@@ -37,25 +56,25 @@ export function useSubscription(): UseSubscriptionReturn {
       setLoading(true)
       setError(null)
 
-      // Fetch subscription
+      // Fetch subscription for the current user
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('org_id', selectedOrg.id)
+        .eq('user_id', user.id)
         .single()
 
       if (subError && subError.code !== 'PGRST116') {
-        // PGRST116 = no rows returned (which is fine for new orgs)
+        // PGRST116 = no rows returned (which is fine for new users)
         throw subError
       }
 
       setSubscription(subData || null)
 
-      // Fetch billing history
+      // Fetch billing history for the current user
       const { data: historyData, error: historyError } = await supabase
         .from('billing_history')
         .select('*')
-        .eq('org_id', selectedOrg.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(12)
 
@@ -71,26 +90,26 @@ export function useSubscription(): UseSubscriptionReturn {
     } finally {
       setLoading(false)
     }
-  }, [selectedOrg?.id])
+  }, [user?.id])
 
-  // Initial fetch
+  // Initial fetch when user changes
   useEffect(() => {
     fetchSubscription()
   }, [fetchSubscription])
 
   // Subscribe to realtime updates
   useEffect(() => {
-    if (!selectedOrg?.id) return
+    if (!user?.id) return
 
     const channel = supabase
-      .channel(`subscription-${selectedOrg.id}`)
+      .channel(`subscription-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'subscriptions',
-          filter: `org_id=eq.${selectedOrg.id}`,
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           console.log('Subscription updated:', payload)
@@ -106,13 +125,13 @@ export function useSubscription(): UseSubscriptionReturn {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedOrg?.id])
+  }, [user?.id])
 
   // Calculate access
   const hasAccess = calculateHasAccess(subscription)
   const isGracePeriod = subscription?.subscription_status === 'past_due' && hasAccess
 
-  // Create checkout session
+  // Create checkout session - no organization needed, uses authenticated user
   const createCheckoutSession = useCallback(async (priceId: string): Promise<string | null> => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -125,7 +144,13 @@ export function useSubscription(): UseSubscriptionReturn {
       })
 
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to create checkout session')
+        // Try to get detailed error from response data
+        const errorMessage = response.data?.error || response.error.message || 'Failed to create checkout session'
+        throw new Error(errorMessage)
+      }
+
+      if (!response.data?.url) {
+        throw new Error(response.data?.error || 'No checkout URL returned')
       }
 
       return response.data.url

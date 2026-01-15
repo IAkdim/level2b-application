@@ -1,5 +1,6 @@
 // Stripe Webhook Handler for Supabase Edge Functions
 // This handles all Stripe webhook events and syncs data to Supabase
+// Subscriptions are per-user (account), not per-organization
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -87,12 +88,12 @@ serve(async (req) => {
           break
         }
 
-        const orgId = session.client_reference_id
+        const userId = session.client_reference_id
         const customerId = session.customer as string
         const subscriptionId = session.subscription as string
 
-        if (!orgId) {
-          console.error("No client_reference_id (org_id) in session")
+        if (!userId) {
+          console.error("No client_reference_id (user_id) in session")
           break
         }
 
@@ -103,14 +104,14 @@ serve(async (req) => {
 
         // Create or update customer record
         await supabase.from("stripe_customers").upsert({
-          org_id: orgId,
+          user_id: userId,
           stripe_customer_id: customerId,
           email: session.customer_email,
-        }, { onConflict: "org_id" })
+        }, { onConflict: "user_id" })
 
         // Create subscription record
         await supabase.from("subscriptions").upsert({
-          org_id: orgId,
+          user_id: userId,
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
           subscription_status: subscription.status,
@@ -122,9 +123,9 @@ serve(async (req) => {
           leads_per_week_limit: planConfig.leadsLimit,
           email_domains_limit: planConfig.emailDomainsLimit,
           is_enterprise: false,
-        }, { onConflict: "org_id" })
+        }, { onConflict: "user_id" })
 
-        console.log(`Created subscription for org ${orgId}: ${planConfig.tier}`)
+        console.log(`Created subscription for user ${userId}: ${planConfig.tier}`)
         break
       }
 
@@ -156,7 +157,7 @@ serve(async (req) => {
         // Find the subscription by Stripe subscription ID
         const { data: existingSub } = await supabase
           .from("subscriptions")
-          .select("id, org_id")
+          .select("id, user_id")
           .eq("stripe_subscription_id", subscription.id)
           .single()
 
@@ -169,7 +170,7 @@ serve(async (req) => {
             })
             .eq("id", existingSub.id)
 
-          console.log(`Subscription canceled for org ${existingSub.org_id}`)
+          console.log(`Subscription canceled for user ${existingSub.user_id}`)
         }
         break
       }
@@ -180,17 +181,17 @@ serve(async (req) => {
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice
 
-        // Find the org by customer ID
+        // Find the user by customer ID
         const { data: customer } = await supabase
           .from("stripe_customers")
-          .select("org_id")
+          .select("user_id")
           .eq("stripe_customer_id", invoice.customer as string)
           .single()
 
         if (customer) {
           // Store billing history
           await supabase.from("billing_history").upsert({
-            org_id: customer.org_id,
+            user_id: customer.user_id,
             stripe_invoice_id: invoice.id,
             stripe_subscription_id: invoice.subscription as string,
             amount_paid: invoice.amount_paid,
@@ -203,7 +204,7 @@ serve(async (req) => {
             paid_at: new Date().toISOString(),
           }, { onConflict: "stripe_invoice_id" })
 
-          console.log(`Invoice paid for org ${customer.org_id}: €${invoice.amount_paid / 100}`)
+          console.log(`Invoice paid for user ${customer.user_id}: €${invoice.amount_paid / 100}`)
         }
         break
       }
@@ -214,21 +215,21 @@ serve(async (req) => {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice
 
-        // Find the subscription by customer ID
+        // Find the user by customer ID
         const { data: customer } = await supabase
           .from("stripe_customers")
-          .select("org_id")
+          .select("user_id")
           .eq("stripe_customer_id", invoice.customer as string)
           .single()
 
         if (customer) {
           // The subscription status will be updated by customer.subscription.updated
           // But we can log this for monitoring
-          console.log(`Payment failed for org ${customer.org_id}`)
+          console.log(`Payment failed for user ${customer.user_id}`)
 
           // Update billing history
           await supabase.from("billing_history").upsert({
-            org_id: customer.org_id,
+            user_id: customer.user_id,
             stripe_invoice_id: invoice.id,
             stripe_subscription_id: invoice.subscription as string,
             amount_paid: 0,
@@ -297,10 +298,10 @@ async function handleSubscriptionChange(
   const priceId = subscription.items.data[0]?.price.id
   const planConfig = PRICE_TO_TIER[priceId] || { tier: "starter", leadsLimit: 1000, emailDomainsLimit: 1 }
 
-  // Find the org by customer ID
+  // Find the user by customer ID
   const { data: customer } = await supabase
     .from("stripe_customers")
-    .select("org_id")
+    .select("user_id")
     .eq("stripe_customer_id", customerId)
     .single()
 
@@ -311,7 +312,7 @@ async function handleSubscriptionChange(
 
   // Update the subscription
   await supabase.from("subscriptions").upsert({
-    org_id: customer.org_id,
+    user_id: customer.user_id,
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
     subscription_status: subscription.status,
@@ -323,7 +324,7 @@ async function handleSubscriptionChange(
     canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
     leads_per_week_limit: planConfig.leadsLimit,
     email_domains_limit: planConfig.emailDomainsLimit,
-  }, { onConflict: "org_id" })
+  }, { onConflict: "user_id" })
 
-  console.log(`Updated subscription for org ${customer.org_id}: ${subscription.status} - ${planConfig.tier}`)
+  console.log(`Updated subscription for user ${customer.user_id}: ${subscription.status} - ${planConfig.tier}`)
 }

@@ -14,7 +14,7 @@ export type SubscriptionStatus =
 
 export interface Subscription {
   id: string
-  org_id: string
+  user_id: string  // Subscriptions are per-user (account)
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   subscription_status: SubscriptionStatus
@@ -36,7 +36,7 @@ export interface Subscription {
 
 export interface BillingHistory {
   id: string
-  org_id: string
+  user_id: string  // Billing history is per-user
   stripe_invoice_id: string
   stripe_subscription_id: string | null
   amount_paid: number

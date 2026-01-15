@@ -10,33 +10,52 @@ import { PLANS, formatPrice, type PlanConfig } from '@/types/subscription'
 import { cn } from '@/lib/utils'
 
 export function Subscribe() {
-  const { createCheckoutSession, loading: subscriptionLoading } = useSubscriptionContext()
+  const { createCheckoutSession, loading: subscriptionLoading, error } = useSubscriptionContext()
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   const handleSelectPlan = async (plan: PlanConfig) => {
-    if (!plan.priceId) {
-      // Enterprise - redirect to contact
+    // Enterprise plan - no Stripe checkout
+    if (plan.id === 'enterprise') {
       window.location.href = 'mailto:sales@level2b.com?subject=Enterprise%20Inquiry'
       return
     }
 
+    // Check if price ID is configured
+    if (!plan.priceId) {
+      console.error(`Price ID not configured for ${plan.name}. Set VITE_STRIPE_PRICE_${plan.id.toUpperCase()} in .env.local`)
+      setCheckoutError(`Stripe is not configured yet. Please set up your Stripe Price IDs in .env.local`)
+      return
+    }
+
     setLoadingPlan(plan.id)
+    setCheckoutError(null)
 
     try {
       const checkoutUrl = await createCheckoutSession(plan.priceId)
       if (checkoutUrl) {
         window.location.href = checkoutUrl
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting checkout:', error)
+      setCheckoutError(error.message || 'Failed to start checkout')
     } finally {
       setLoadingPlan(null)
     }
   }
 
+  const displayError = checkoutError || error
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container max-w-6xl py-16 px-4">
+        {/* Error Banner */}
+        {displayError && (
+          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-center">
+            <p className="text-destructive font-medium">{displayError}</p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">

@@ -1,5 +1,6 @@
 // Create Customer Portal Session - Supabase Edge Function
 // Generates a Stripe Customer Portal session for billing management
+// Subscriptions are per-user (account), not per-organization
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -44,25 +45,11 @@ serve(async (req) => {
       )
     }
 
-    // Get the user's current organization
-    const { data: userOrg } = await supabase
-      .from("user_orgs")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .single()
-
-    if (!userOrg) {
-      return new Response(
-        JSON.stringify({ error: "User must belong to an organization" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
-    }
-
-    // Get the Stripe customer ID for this org
+    // Get the Stripe customer ID for this user
     const { data: stripeCustomer } = await supabase
       .from("stripe_customers")
       .select("stripe_customer_id")
-      .eq("org_id", userOrg.org_id)
+      .eq("user_id", user.id)
       .single()
 
     if (!stripeCustomer) {
