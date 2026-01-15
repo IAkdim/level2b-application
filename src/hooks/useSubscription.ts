@@ -139,8 +139,15 @@ export function useSubscription(): UseSubscriptionReturn {
         throw new Error('Not authenticated')
       }
 
+      // Use current origin for success/cancel URLs (works for localhost and production)
+      const origin = window.location.origin
+
       const response = await supabase.functions.invoke('create-checkout-session', {
-        body: { priceId },
+        body: { 
+          priceId,
+          successUrl: `${origin}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${origin}/subscribe?canceled=true`,
+        },
       })
 
       if (response.error) {

@@ -146,8 +146,8 @@ serve(async (req) => {
           user_email: user.email || "",
         },
       },
-      // Customer creation behavior
-      customer_creation: customerId ? undefined : "always",
+      // Note: customer_creation is not allowed in subscription mode
+      // Stripe automatically creates a customer for subscriptions
     }
 
     console.log("Creating Stripe checkout session...")

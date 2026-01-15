@@ -41,7 +41,8 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    // Use constructEventAsync for Deno/Edge runtime (async crypto)
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
   } catch (err) {
     console.error("Webhook signature verification failed:", err)
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
