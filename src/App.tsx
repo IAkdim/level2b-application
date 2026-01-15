@@ -8,8 +8,10 @@ import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
 import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
 import { Toaster } from "@/components/ui/sonner"
+import { SubscriptionGate } from "@/components/SubscriptionGate"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -27,6 +29,9 @@ const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
 const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
+const Subscribe = lazy(() => import("@/pages/Subscribe"))
+const SubscribeSuccess = lazy(() => import("@/pages/SubscribeSuccess"))
+const BillingSettings = lazy(() => import("@/pages/BillingSettings"))
 
 // Dev Dashboard pages
 const DevDashboardLayout = lazy(() => import("@/components/DevDashboardLayout"))
@@ -60,6 +65,7 @@ function App() {
       <ThemeProvider>
         <Router>
           <OrganizationProvider>
+            <SubscriptionProvider>
             <Suspense fallback={<PageLoader />}>
               <Routes>
               {/* Public routes */}
@@ -72,6 +78,24 @@ function App() {
                 element={
                   <ProtectedRoute requireOrganization={false}>
                     <SelectOrganization />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Subscription pages - requires auth and org but not subscription */}
+              <Route
+                path="/subscribe"
+                element={
+                  <ProtectedRoute>
+                    <Subscribe />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/subscribe/success"
+                element={
+                  <ProtectedRoute>
+                    <SubscribeSuccess />
                   </ProtectedRoute>
                 }
               />
@@ -94,11 +118,12 @@ function App() {
                 <Route path="settings" element={<DevSettings />} />
               </Route>
 
-            {/* Protected app routes */}
+            {/* Protected app routes - requires subscription */}
             <Route
               path="/*"
               element={
                 <ProtectedRoute>
+                  <SubscriptionGate redirectToPaywall>
                   <div className="min-h-screen bg-background">
                     <TopBar />
                     <div className="flex h-[calc(100vh-56px)]">
@@ -121,6 +146,7 @@ function App() {
                               <Route path="/configuration" element={<Configuration />} />
                               <Route path="/organization" element={<OrganizationManagement />} />
                               <Route path="/profile" element={<Profile />} />
+                              <Route path="/settings/billing" element={<BillingSettings />} />
                             </Routes>
                           </Suspense>
                         </div>
@@ -131,12 +157,14 @@ function App() {
                     {/* First visit onboarding modal */}
                     <FirstVisitModal />
                   </div>
+                  </SubscriptionGate>
                 </ProtectedRoute>
               }
             />
               </Routes>
             </Suspense>
             <Toaster />
+            </SubscriptionProvider>
           </OrganizationProvider>
         </Router>
       </ThemeProvider>
