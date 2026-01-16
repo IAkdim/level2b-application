@@ -1,14 +1,16 @@
 // GuidedWalkthrough - Interactive step-by-step tour for demo users
-// Highlights UI elements and guides users to generate leads and send first email
+// Highlights UI elements and requires task completion before advancing
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { 
   X, 
   Sparkles, 
   Target,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,8 +18,21 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useOnboardingContext } from '@/contexts/OnboardingContext'
 import { cn } from '@/lib/utils'
-// Types are defined inline
 import { WALKTHROUGH_STEPS, getWalkthroughStep, getNextWalkthroughStep } from '@/types/onboarding'
+import type { WalkthroughStepId } from '@/types/onboarding'
+
+// Event names for walkthrough task completion
+export const WALKTHROUGH_EVENTS = {
+  LEAD_GENERATED: 'walkthrough:lead_generated',
+  LEAD_VIEWED: 'walkthrough:lead_viewed',
+  TEMPLATE_CREATED: 'walkthrough:template_created',
+  EMAIL_SENT: 'walkthrough:email_sent',
+} as const
+
+// Export for other components to trigger when tasks are completed
+export function emitWalkthroughEvent(event: keyof typeof WALKTHROUGH_EVENTS) {
+  window.dispatchEvent(new CustomEvent(WALKTHROUGH_EVENTS[event]))
+}
 
 interface GuidedWalkthroughProps {
   className?: string
@@ -25,7 +40,6 @@ interface GuidedWalkthroughProps {
 
 export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { 
     state, 
     isDemo, 
@@ -37,7 +51,10 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 })
+  const [waitingForTask, setWaitingForTask] = useState(false)
+  const [taskCompleted, setTaskCompleted] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const targetElementRef = useRef<Element | null>(null)
 
   const currentStepId = state.currentWalkthroughStep
   const currentStep = getWalkthroughStep(currentStepId)
@@ -48,22 +65,29 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
   // Should show walkthrough?
   const shouldShow = isDemo && state.walkthroughActive && !state.walkthroughCompleted && currentStep
 
+  // Steps that require task completion (user must DO something, not just click Next)
+  const taskSteps: WalkthroughStepId[] = ['generate_lead', 'view_lead', 'create_template', 'send_email']
+  const requiresTaskCompletion = taskSteps.includes(currentStepId)
+
   // Find and highlight target element
   const updateTargetPosition = useCallback(() => {
     if (!currentStep?.targetSelector) {
       setTargetRect(null)
+      targetElementRef.current = null
       return
     }
 
     const target = document.querySelector(currentStep.targetSelector)
+    targetElementRef.current = target
+    
     if (target) {
       const rect = target.getBoundingClientRect()
       setTargetRect(rect)
       
       // Calculate tooltip position
-      const tooltipWidth = 320
-      const tooltipHeight = 200
-      const padding = 16
+      const tooltipWidth = 340
+      const tooltipHeight = 260
+      const padding = 20
       
       let top = 0
       let left = 0
@@ -110,7 +134,7 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
     window.addEventListener('scroll', updateTargetPosition, true)
     
     // Re-check periodically (for dynamic content)
-    const interval = setInterval(updateTargetPosition, 500)
+    const interval = setInterval(updateTargetPosition, 300)
     
     return () => {
       window.removeEventListener('resize', updateTargetPosition)
@@ -129,23 +153,82 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
     }
   }, [shouldShow])
 
-  // Handle navigation for steps that require route change
+  // Reset task state when step changes
   useEffect(() => {
-    if (!shouldShow || !currentStep?.nextRoute) return
-    
-    // Check if we need to navigate
-    if (currentStep.action === 'navigate' && !location.pathname.includes(currentStep.nextRoute)) {
-      // Don't auto-navigate, wait for user click
-    }
-  }, [shouldShow, currentStep, location.pathname])
+    setWaitingForTask(false)
+    setTaskCompleted(false)
+  }, [currentStepId])
 
-  const handleNext = async () => {
+  // Listen for task completion events
+  useEffect(() => {
+    if (!shouldShow || !requiresTaskCompletion) return
+
+    const handleLeadGenerated = () => {
+      if (currentStepId === 'generate_lead') {
+        setTaskCompleted(true)
+        setWaitingForTask(false)
+      }
+    }
+
+    const handleLeadViewed = () => {
+      if (currentStepId === 'view_lead') {
+        setTaskCompleted(true)
+        setWaitingForTask(false)
+      }
+    }
+
+    const handleTemplateCreated = () => {
+      if (currentStepId === 'create_template') {
+        setTaskCompleted(true)
+        setWaitingForTask(false)
+      }
+    }
+
+    const handleEmailSent = () => {
+      if (currentStepId === 'send_email') {
+        setTaskCompleted(true)
+        setWaitingForTask(false)
+      }
+    }
+
+    window.addEventListener(WALKTHROUGH_EVENTS.LEAD_GENERATED, handleLeadGenerated)
+    window.addEventListener(WALKTHROUGH_EVENTS.LEAD_VIEWED, handleLeadViewed)
+    window.addEventListener(WALKTHROUGH_EVENTS.TEMPLATE_CREATED, handleTemplateCreated)
+    window.addEventListener(WALKTHROUGH_EVENTS.EMAIL_SENT, handleEmailSent)
+
+    return () => {
+      window.removeEventListener(WALKTHROUGH_EVENTS.LEAD_GENERATED, handleLeadGenerated)
+      window.removeEventListener(WALKTHROUGH_EVENTS.LEAD_VIEWED, handleLeadViewed)
+      window.removeEventListener(WALKTHROUGH_EVENTS.TEMPLATE_CREATED, handleTemplateCreated)
+      window.removeEventListener(WALKTHROUGH_EVENTS.EMAIL_SENT, handleEmailSent)
+    }
+  }, [shouldShow, requiresTaskCompletion, currentStepId])
+
+  // Handle clicking the highlighted element
+  const handleTargetClick = useCallback(() => {
     if (!currentStep) return
-
-    // If this step requires navigation
-    if (currentStep.nextRoute && !location.pathname.includes(currentStep.nextRoute)) {
+    
+    if (requiresTaskCompletion) {
+      // Start waiting for the task to complete
+      setWaitingForTask(true)
+      
+      // Click the actual element to trigger the action
+      if (targetElementRef.current && targetElementRef.current instanceof HTMLElement) {
+        targetElementRef.current.click()
+      }
+    } else if (currentStep.action === 'navigate' && currentStep.nextRoute) {
+      // Navigation step - navigate and advance
       navigate(currentStep.nextRoute)
+      handleAdvance()
+    } else {
+      // Simple click - just advance
+      handleAdvance()
     }
+  }, [currentStep, requiresTaskCompletion, navigate])
+
+  // Advance to next step
+  const handleAdvance = async () => {
+    if (!currentStep) return
 
     const nextStep = getNextWalkthroughStep(currentStepId)
     if (nextStep) {
@@ -153,6 +236,8 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
     } else {
       await completeWalkthrough()
     }
+    setTaskCompleted(false)
+    setWaitingForTask(false)
   }
 
   const handleDismiss = async () => {
@@ -166,21 +251,60 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
 
   if (!shouldShow || !isVisible) return null
 
+  // Determine button state and text
+  const getButtonState = () => {
+    if (currentStep?.isTerminal) {
+      return { text: 'Get Full Access', icon: Target, disabled: false, onClick: handleComplete }
+    }
+    
+    if (requiresTaskCompletion) {
+      if (taskCompleted) {
+        return { text: 'Continue', icon: CheckCircle2, disabled: false, onClick: handleAdvance }
+      }
+      if (waitingForTask) {
+        return { text: 'Complete the task...', icon: Loader2, disabled: true, onClick: () => {} }
+      }
+      // Has target - tell user to click it
+      if (targetRect) {
+        return { text: 'Click the highlighted element', icon: Target, disabled: true, onClick: () => {} }
+      }
+    }
+    
+    // Navigation step
+    if (currentStep?.action === 'navigate') {
+      return { text: 'Go there', icon: ChevronRight, disabled: false, onClick: handleTargetClick }
+    }
+    
+    // Welcome/intro step without target
+    return { text: 'Next', icon: ChevronRight, disabled: false, onClick: handleAdvance }
+  }
+
+  const buttonState = getButtonState()
+
   // Render spotlight overlay and tooltip
   return createPortal(
     <div className={cn("fixed inset-0 z-[100]", className)}>
-      {/* Dark overlay with spotlight cutout */}
+      {/* Full screen dark overlay - blocks all clicks */}
+      <div 
+        className="absolute inset-0 bg-black/70 transition-opacity duration-300"
+        onClick={(e) => e.stopPropagation()}
+      />
+      
+      {/* SVG with spotlight cutout */}
       {targetRect && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        <svg 
+          className="absolute inset-0 w-full h-full"
+          style={{ pointerEvents: 'none', zIndex: 1 }}
+        >
           <defs>
             <mask id="spotlight-mask">
               <rect x="0" y="0" width="100%" height="100%" fill="white" />
               <rect
-                x={targetRect.left - 8}
-                y={targetRect.top - 8}
-                width={targetRect.width + 16}
-                height={targetRect.height + 16}
-                rx="8"
+                x={targetRect.left - 10}
+                y={targetRect.top - 10}
+                width={targetRect.width + 20}
+                height={targetRect.height + 20}
+                rx="12"
                 fill="black"
               />
             </mask>
@@ -190,49 +314,72 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
             y="0"
             width="100%"
             height="100%"
-            fill="rgba(0, 0, 0, 0.5)"
+            fill="rgba(0, 0, 0, 0.75)"
             mask="url(#spotlight-mask)"
           />
         </svg>
       )}
 
-      {/* Highlight ring around target */}
+      {/* Pulsing highlight border around target */}
       {targetRect && (
         <div
-          className="absolute border-2 border-primary rounded-lg pointer-events-none animate-pulse"
+          className="absolute rounded-xl pointer-events-none"
           style={{
-            top: targetRect.top - 8,
-            left: targetRect.left - 8,
-            width: targetRect.width + 16,
-            height: targetRect.height + 16,
+            top: targetRect.top - 10,
+            left: targetRect.left - 10,
+            width: targetRect.width + 20,
+            height: targetRect.height + 20,
+            zIndex: 2,
+            border: '3px solid hsl(var(--primary))',
+            boxShadow: '0 0 0 4px hsl(var(--primary) / 0.3), 0 0 30px hsl(var(--primary) / 0.4)',
+            animation: 'spotlight-pulse 2s ease-in-out infinite',
           }}
         />
       )}
 
-      {/* Tooltip */}
+      {/* Invisible clickable area over spotlight - passes clicks to element */}
+      {targetRect && (
+        <div
+          className="absolute cursor-pointer"
+          style={{
+            top: targetRect.top - 10,
+            left: targetRect.left - 10,
+            width: targetRect.width + 20,
+            height: targetRect.height + 20,
+            zIndex: 3,
+          }}
+          onClick={handleTargetClick}
+        />
+      )}
+
+      {/* Tooltip card */}
       <Card
         ref={tooltipRef}
         className={cn(
-          "absolute w-80 shadow-2xl border-primary/20 transition-all duration-300",
+          "absolute w-[340px] shadow-2xl border-2 border-primary/40 bg-background/98 backdrop-blur-sm transition-all duration-300",
           !targetRect && "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         )}
-        style={targetRect ? { top: tooltipPosition.top, left: tooltipPosition.left } : {}}
+        style={targetRect ? { 
+          top: tooltipPosition.top, 
+          left: tooltipPosition.left,
+          zIndex: 10,
+        } : { zIndex: 10 }}
       >
-        <CardContent className="p-4">
+        <CardContent className="p-5">
           {/* Header */}
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
+              <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
               </div>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="outline" className="text-xs font-semibold border-primary/40 text-primary">
                 Step {completedSteps + 1} of {totalSteps}
               </Badge>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 -mt-1 -mr-1"
+              className="h-8 w-8 -mt-1 -mr-1 text-muted-foreground hover:text-foreground"
               onClick={handleDismiss}
             >
               <X className="h-4 w-4" />
@@ -240,17 +387,46 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
           </div>
 
           {/* Progress bar */}
-          <Progress value={progress} className="h-1.5 mb-4" />
+          <Progress value={progress} className="h-2 mb-5" />
 
           {/* Content */}
-          <div className="mb-4">
-            <h3 className="font-semibold text-base mb-1">
+          <div className="mb-5">
+            <h3 className="font-semibold text-lg mb-2">
               {currentStep?.title}
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               {currentStep?.description}
             </p>
           </div>
+
+          {/* Task status indicator for task steps */}
+          {requiresTaskCompletion && (
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2.5 rounded-lg mb-4 text-sm font-medium",
+              taskCompleted 
+                ? "bg-green-500/15 text-green-600 dark:text-green-400 border border-green-500/30" 
+                : waitingForTask
+                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  : "bg-muted text-muted-foreground border border-border"
+            )}>
+              {taskCompleted ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                  <span>Task completed! Click Continue below.</span>
+                </>
+              ) : waitingForTask ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                  <span>Complete the action to continue...</span>
+                </>
+              ) : (
+                <>
+                  <Target className="h-4 w-4 flex-shrink-0" />
+                  <span>Click the highlighted button above</span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-between">
@@ -258,25 +434,42 @@ export function GuidedWalkthrough({ className }: GuidedWalkthroughProps) {
               variant="ghost"
               size="sm"
               onClick={handleDismiss}
-              className="text-muted-foreground"
+              className="text-muted-foreground hover:text-foreground"
             >
               Skip tour
             </Button>
 
-            {currentStep?.isTerminal ? (
-              <Button size="sm" onClick={handleComplete}>
-                <Target className="mr-2 h-4 w-4" />
-                Get Full Access
-              </Button>
-            ) : (
-              <Button size="sm" onClick={handleNext}>
-                {currentStep?.action === 'navigate' ? 'Go there' : 'Next'}
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            )}
+            <Button 
+              size="sm" 
+              onClick={buttonState.onClick}
+              disabled={buttonState.disabled}
+              className={cn(
+                "min-w-[140px]",
+                taskCompleted && "bg-green-600 hover:bg-green-700 text-white"
+              )}
+            >
+              {waitingForTask ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <buttonState.icon className="mr-2 h-4 w-4" />
+              )}
+              {buttonState.text}
+            </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* CSS for spotlight pulse animation */}
+      <style>{`
+        @keyframes spotlight-pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 4px hsl(var(--primary) / 0.3), 0 0 30px hsl(var(--primary) / 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 8px hsl(var(--primary) / 0.15), 0 0 50px hsl(var(--primary) / 0.5);
+          }
+        }
+      `}</style>
     </div>,
     document.body
   )
@@ -298,7 +491,6 @@ export function WalkthroughIndicator() {
   return (
     <button
       onClick={() => {
-        // Could navigate to the step's route
         if (currentStep?.nextRoute) {
           navigate(currentStep.nextRoute)
         }
@@ -306,7 +498,7 @@ export function WalkthroughIndicator() {
       className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
     >
       <Sparkles className="h-4 w-4" />
-      <span>Setup: {completedSteps}/{totalSteps}</span>
+      <span>Tour: {completedSteps}/{totalSteps}</span>
       <ChevronRight className="h-4 w-4" />
     </button>
   )

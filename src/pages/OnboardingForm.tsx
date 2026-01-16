@@ -77,29 +77,39 @@ export function OnboardingForm() {
     setAnswers(prev => ({ ...prev, [field]: value }))
   }
 
-  // Save current step
-  const saveCurrentStep = async () => {
+  // Save step answers
+  const saveStepAnswers = async (stepNum: number) => {
+    const step = ONBOARDING_STEPS[stepNum - 1]
     const stepAnswers: Partial<OnboardingFormAnswers> = {}
-    stepConfig.fields.forEach(field => {
+    step.fields.forEach(field => {
       stepAnswers[field] = answers[field]
     })
-    await updateOnboardingStep(currentStep, stepAnswers)
+    return stepAnswers
   }
 
   // Go to next step
   const handleNext = async () => {
+    if (isSubmitting) return // Prevent double-clicks
+    
     setIsSubmitting(true)
     try {
-      await saveCurrentStep()
+      // Get answers for current step
+      const stepAnswers = await saveStepAnswers(currentStep)
       
       if (currentStep < totalSteps) {
+        // Save with NEXT step number so we resume at the right place
+        const nextStep = currentStep + 1
+        await updateOnboardingStep(nextStep, stepAnswers)
         setDirection('forward')
-        setCurrentStep(prev => prev + 1)
+        setCurrentStep(nextStep)
       } else {
-        // Complete onboarding
+        // Final step - save answers and complete
+        await updateOnboardingStep(currentStep, stepAnswers)
         await completeOnboarding()
         navigate('/subscribe')
       }
+    } catch (err) {
+      console.error('Error advancing step:', err)
     } finally {
       setIsSubmitting(false)
     }
@@ -108,9 +118,11 @@ export function OnboardingForm() {
   // Go to previous step
   const handleBack = async () => {
     if (currentStep > 1) {
-      await saveCurrentStep()
+      const stepAnswers = await saveStepAnswers(currentStep)
+      const prevStep = currentStep - 1
+      await updateOnboardingStep(prevStep, stepAnswers)
       setDirection('back')
-      setCurrentStep(prev => prev - 1)
+      setCurrentStep(prevStep)
     }
   }
 
