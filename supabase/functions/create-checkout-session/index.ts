@@ -112,8 +112,24 @@ serve(async (req) => {
     let customerId: string | undefined
 
     if (existingCustomer) {
-      customerId = existingCustomer.stripe_customer_id
-      console.log("Existing Stripe customer found:", customerId)
+      // Verify the customer still exists in Stripe
+      try {
+        await stripe.customers.retrieve(existingCustomer.stripe_customer_id)
+        customerId = existingCustomer.stripe_customer_id
+        console.log("Existing Stripe customer verified:", customerId)
+      } catch (stripeErr: any) {
+        // Customer doesn't exist in Stripe anymore - delete the stale record
+        if (stripeErr.code === "resource_missing") {
+          console.log("Stale Stripe customer detected, removing from database:", existingCustomer.stripe_customer_id)
+          await supabase
+            .from("stripe_customers")
+            .delete()
+            .eq("user_id", user.id)
+          customerId = undefined // Will let Stripe create a new customer
+        } else {
+          throw stripeErr // Re-throw other errors
+        }
+      }
     }
 
     // Create checkout session

@@ -15,7 +15,11 @@ export function SubscribeSuccess() {
   // Poll for subscription update (webhook might take a moment)
   useEffect(() => {
     if (subscription?.subscription_status === 'active') {
-      return // Already have active subscription
+      // Subscription confirmed - redirect to thank you page
+      const timer = setTimeout(() => {
+        navigate('/thank-you', { replace: true })
+      }, 1500) // Brief delay to show success state
+      return () => clearTimeout(timer)
     }
 
     if (pollingCount >= 10) {
@@ -28,7 +32,7 @@ export function SubscribeSuccess() {
     }, 2000)
 
     return () => clearTimeout(timer)
-  }, [subscription, pollingCount, refresh])
+  }, [subscription, pollingCount, refresh, navigate])
 
   const isConfirmed = subscription?.subscription_status === 'active'
 
@@ -42,11 +46,11 @@ export function SubscribeSuccess() {
             <Loader2 className="h-16 w-16 text-primary mx-auto mb-4 animate-spin" />
           )}
           <CardTitle className="text-2xl">
-            {isConfirmed ? 'Welcome to Level2B!' : 'Confirming your subscription...'}
+            {isConfirmed ? 'Payment Successful!' : 'Confirming your subscription...'}
           </CardTitle>
           <CardDescription>
             {isConfirmed 
-              ? 'Your subscription is now active. You have full access to all features.'
+              ? 'Redirecting you to your welcome page...'
               : 'Please wait while we confirm your payment. This usually takes just a few seconds.'
             }
           </CardDescription>
@@ -77,10 +81,10 @@ export function SubscribeSuccess() {
           <Button 
             className="w-full" 
             size="lg"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/thank-you')}
             disabled={!isConfirmed}
           >
-            {isConfirmed ? 'Go to Dashboard' : 'Please wait...'}
+            {isConfirmed ? 'Continue' : 'Please wait...'}
           </Button>
 
           {!isConfirmed && pollingCount >= 10 && (

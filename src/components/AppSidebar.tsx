@@ -15,6 +15,7 @@ import {
   Send,
   Star,
   Activity,
+  CreditCard,
 } from "lucide-react"
 import { eventBus } from "@/lib/eventBus"
 import { Button } from "@/components/ui/button"
@@ -51,6 +52,7 @@ const navigation: NavItem[] = [
 const secondaryNavigation: NavItem[] = [
   { name: "API Monitoring", href: "/api-monitoring", icon: Activity, shortcut: "⌘I" },
   { name: "Organization", href: "/organization", icon: Building2, shortcut: "⌘G" },
+  { name: "Billing", href: "/settings/billing", icon: CreditCard, shortcut: "⌘B", description: "Subscription & invoices" },
   { name: "Configuration", href: "/configuration", icon: Settings, shortcut: "⌘," },
 ]
 
