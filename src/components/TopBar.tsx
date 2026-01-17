@@ -42,7 +42,7 @@ export function TopBar() {
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
-  const { selectedOrg, userOrgs, setOrganization } = useOrganization()
+  const { selectedOrg, userOrgs, setOrganization, clearOrganization } = useOrganization()
 
   function getNotificationIcon(type: Notification["type"]) {
     const baseClasses = "h-2 w-2 rounded-full"
@@ -194,43 +194,64 @@ export function TopBar() {
     <TooltipProvider>
       <div className="h-14 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="flex h-full items-center justify-between px-4 lg:px-6">
-          {/* Left side - Organization Selector */}
+          {/* Left side - Workspace/Organization Selector */}
           <div className="flex items-center gap-4">
-            {selectedOrg && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 h-9 px-3 hover:bg-muted">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 h-9 px-3 hover:bg-muted">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
+                    {selectedOrg ? (
                       <Building2 className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium">{selectedOrg.name}</span>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Switch Organization</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {userOrgs.map((userOrg) => (
-                    <DropdownMenuItem
-                      key={userOrg.org_id}
-                      onClick={() => setOrganization(userOrg.organization)}
-                      className={cn("cursor-pointer", selectedOrg.id === userOrg.org_id && "bg-muted")}
-                    >
-                      <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <div className="flex flex-col">
-                        <span className="text-sm">{userOrg.organization.name}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{userOrg.role}</span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)} className="cursor-pointer">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Manage Organizations
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    ) : (
+                      <User className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium">
+                    {selectedOrg ? selectedOrg.name : "Personal Workspace"}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {/* Personal Workspace option */}
+                <DropdownMenuItem
+                  onClick={() => clearOrganization()}
+                  className={cn("cursor-pointer", !selectedOrg && "bg-muted")}
+                >
+                  <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-col">
+                    <span className="text-sm">Personal Workspace</span>
+                    <span className="text-xs text-muted-foreground">Your private data</span>
+                  </div>
+                </DropdownMenuItem>
+
+                {userOrgs.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Organizations</DropdownMenuLabel>
+                    {userOrgs.map((userOrg) => (
+                      <DropdownMenuItem
+                        key={userOrg.org_id}
+                        onClick={() => setOrganization(userOrg.organization)}
+                        className={cn("cursor-pointer", selectedOrg?.id === userOrg.org_id && "bg-muted")}
+                      >
+                        <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <div className="flex flex-col">
+                          <span className="text-sm">{userOrg.organization.name}</span>
+                          <span className="text-xs text-muted-foreground capitalize">{userOrg.role}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)} className="cursor-pointer">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {userOrgs.length > 0 ? "Manage Organizations" : "Create or Join Organization"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Right side - Actions */}

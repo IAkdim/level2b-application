@@ -18,7 +18,7 @@ export function useNotes(leadId: string | undefined) {
 }
 
 /**
- * Hook to create a new note
+ * Hook to create a new note (user-centric)
  */
 export function useCreateNote() {
   const { selectedOrg } = useOrganization()
@@ -26,8 +26,10 @@ export function useCreateNote() {
 
   return useMutation({
     mutationFn: (input: CreateNoteInput) => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return notesApi.createNote(selectedOrg.id, input)
+      return notesApi.createNote({
+        ...input,
+        orgId: selectedOrg?.id,
+      })
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notes', data.lead_id] })
