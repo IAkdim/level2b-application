@@ -11,7 +11,6 @@ import {
   ChevronRight,
   BookOpen,
   MessageSquare,
-  Building2,
   Send,
   Star,
 } from "lucide-react"

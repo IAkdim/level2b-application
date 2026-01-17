@@ -511,7 +511,7 @@ export function Configuration() {
                   <CardTitle className="text-lg">Calendly Integration</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CompanySettingsForm showOnlyCalendly />
+                  <CompanySettingsForm />
                 </CardContent>
               </Card>
 

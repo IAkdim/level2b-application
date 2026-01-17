@@ -68,7 +68,7 @@ export function useTogglePinNote() {
 
   return useMutation({
     mutationFn: ({ noteId, isPinned }: { noteId: string; isPinned: boolean }) =>
-      notesApi.togglePinNote(noteId, isPinned),
+      notesApi.toggleNotePin(noteId, isPinned),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notes', data.lead_id] })
     },
