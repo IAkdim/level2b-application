@@ -1,6 +1,7 @@
 // API functions for Calendly integration
 import { supabase } from '../supabaseClient'
 import { rateLimiter } from './rateLimiter'
+import { getUserSettings, type UserSettings } from './userSettings'
 
 export interface CalendlyEventType {
   uri: string
@@ -11,84 +12,20 @@ export interface CalendlyEventType {
   description_plain?: string
 }
 
-export interface OrganizationSettings {
-  id: string
-  org_id: string
-  calendly_access_token?: string
-  calendly_user_uri?: string
-  calendly_scheduling_url?: string
-  calendly_event_type_uri?: string
-  calendly_event_type_name?: string
-  company_name?: string
-  company_description?: string
-  product_service?: string
-  target_audience?: string
-  industry?: string
-  unique_selling_points?: string[]
-}
-
-/**
- * Get organization settings including Calendly connection status
- */
-export async function getOrganizationSettings(orgId: string): Promise<OrganizationSettings | null> {
-  const { data, error } = await supabase
-    .from('organization_settings')
-    .select('*')
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Error fetching organization settings:', error)
-    throw error
-  }
-
-  return data
-}
-
-/**
- * Update organization settings
- */
-export async function updateOrganizationSettings(
-  orgId: string,
-  updates: Partial<OrganizationSettings>
-): Promise<void> {
-  // First, try to update existing row
-  const { data: updateData, error: updateError } = await supabase
-    .from('organization_settings')
-    .update(updates)
-    .eq('org_id', orgId)
-    .select()
-
-  // If update succeeded and returned data, we're done
-  if (updateData && updateData.length > 0) {
-    return
-  }
-
-  // If update failed with real error (not just no rows), throw it
-  if (updateError) {
-    console.error('[updateOrganizationSettings] Update error:', updateError)
-    throw updateError
-  }
-
-  // If update succeeded but no rows affected, insert new row
-  const { data: insertData, error: insertError } = await supabase
-    .from('organization_settings')
-    .insert({ org_id: orgId, ...updates })
-    .select()
-
-  if (insertError) {
-    console.error('[updateOrganizationSettings] Insert error:', insertError)
-    throw insertError
-  }
-}
 
 /**
  * Initiate Calendly OAuth flow
  * Returns the authorization URL to redirect the user to
  */
-export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
+export async function initiateCalendlyOAuth(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Not authenticated')
+  }
+
   const { data, error } = await supabase.functions.invoke('calendly-oauth-init', {
-    body: { orgId },
+    body: { userId: user.id },
   })
 
   if (error) {
@@ -107,18 +44,20 @@ export async function initiateCalendlyOAuth(orgId: string): Promise<string> {
 /**
  * Get available Calendly event types (scheduling links)
  */
-export async function getCalendlyEventTypes(orgId: string): Promise<CalendlyEventType[]> {
+export async function getCalendlyEventTypes(): Promise<CalendlyEventType[]> {
   // Rate limit check
   const { data: { session } } = await supabase.auth.getSession()
-  if (session) {
-    const rateCheck = await rateLimiter.checkLimit('calendly', session.user.id)
-    if (!rateCheck.allowed) {
-      throw new Error(rateCheck.message || 'Too many Calendly API requests. Please try again later.')
-    }
+  if (!session) {
+    throw new Error('Not authenticated')
+  }
+
+  const rateCheck = await rateLimiter.checkLimit('calendly', session.user.id)
+  if (!rateCheck.allowed) {
+    throw new Error(rateCheck.message || 'Too many Calendly API requests. Please try again later.')
   }
 
   const { data, error } = await supabase.functions.invoke('calendly-get-event-types', {
-    body: { orgId },
+    body: { userId: session.user.id },
   })
 
   if (error) {
@@ -136,19 +75,23 @@ export async function getCalendlyEventTypes(orgId: string): Promise<CalendlyEven
 /**
  * Disconnect Calendly by removing tokens
  */
-export async function disconnectCalendly(orgId: string): Promise<void> {
+export async function disconnectCalendly(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Not authenticated')
+  }
+
   const { error } = await supabase
-    .from('organization_settings')
+    .from('user_settings')
     .update({
       calendly_access_token: null,
       calendly_refresh_token: null,
-      calendly_token_expires_at: null,
-      calendly_user_uri: null,
-      calendly_scheduling_url: null,
       calendly_event_type_uri: null,
+      calendly_scheduling_url: null,
       calendly_event_type_name: null,
     })
-    .eq('org_id', orgId)
+    .eq('user_id', user.id)
 
   if (error) {
     console.error('Error disconnecting Calendly:', error)
@@ -157,9 +100,9 @@ export async function disconnectCalendly(orgId: string): Promise<void> {
 }
 
 /**
- * Check if Calendly is connected for an organization
+ * Check if Calendly is connected for current user
  */
-export async function isCalendlyConnected(orgId: string): Promise<boolean> {
-  const settings = await getOrganizationSettings(orgId)
+export async function isCalendlyConnected(): Promise<boolean> {
+  const settings = await getUserSettings()
   return !!(settings?.calendly_access_token)
 }

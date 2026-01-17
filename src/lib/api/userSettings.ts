@@ -3,26 +3,40 @@ import { supabase } from "@/lib/supabaseClient"
 export interface UserSettings {
   id?: string
   user_id?: string
-  organization_id: string
-  
+
+  // Company/Business settings
+  company_name?: string
+  company_description?: string
+  product_service?: string
+  unique_selling_points?: string[]
+  target_audience?: string
+  industry?: string
+
+  // Calendly settings
+  calendly_access_token?: string
+  calendly_refresh_token?: string
+  calendly_event_type_uri?: string
+  calendly_scheduling_url?: string
+  calendly_event_type_name?: string
+
   // Profile settings
   full_name?: string
   timezone?: string
-  
+
   // Email settings
   email_signature?: string
   default_from_name?: string
   reply_to_email?: string
   track_opens?: boolean
   track_clicks?: boolean
-  
+
   // Notification settings
   notif_email_replies?: boolean
   notif_meeting_bookings?: boolean
   notif_campaign_updates?: boolean
   notif_weekly_reports?: boolean
   notif_daily_digest?: boolean
-  
+
   // Campaign settings
   campaign_daily_send_limit?: number
   campaign_followup_delay?: number
@@ -30,17 +44,17 @@ export interface UserSettings {
   campaign_sending_time_start?: string
   campaign_sending_time_end?: string
   campaign_exclude_weekends?: boolean
-  
+
   created_at?: string
   updated_at?: string
 }
 
 /**
- * Get user settings for current user and organization
+ * Get user settings for current user
  */
-export async function getUserSettings(organizationId: string): Promise<UserSettings | null> {
+export async function getUserSettings(): Promise<UserSettings | null> {
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     throw new Error('Not authenticated')
   }
@@ -49,7 +63,6 @@ export async function getUserSettings(organizationId: string): Promise<UserSetti
     .from('user_settings')
     .select('*')
     .eq('user_id', user.id)
-    .eq('organization_id', organizationId)
     .single()
 
   if (error) {
@@ -68,25 +81,23 @@ export async function getUserSettings(organizationId: string): Promise<UserSetti
  * Create or update user settings
  */
 export async function upsertUserSettings(
-  organizationId: string,
   settings: Partial<UserSettings>
 ): Promise<UserSettings> {
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     throw new Error('Not authenticated')
   }
 
   const settingsData = {
     user_id: user.id,
-    organization_id: organizationId,
     ...settings
   }
 
   const { data, error } = await supabase
     .from('user_settings')
     .upsert(settingsData, {
-      onConflict: 'user_id,organization_id'
+      onConflict: 'user_id'
     })
     .select()
     .single()
@@ -98,6 +109,11 @@ export async function upsertUserSettings(
 
   return data
 }
+
+/**
+ * Update user settings (alias for upsertUserSettings for compatibility)
+ */
+export const updateUserSettings = upsertUserSettings
 
 /**
  * Get default settings (when no settings exist yet)

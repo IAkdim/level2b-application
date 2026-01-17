@@ -115,6 +115,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
         const resetTime = getTimeUntilReset()
+        const dailyLimit = limitCheck.usage?.emailLimit || 50
         toast.error(`Dagelijkse email limiet bereikt (${dailyLimit}). Reset over ${resetTime}`, {
           description: errorMsg,
           duration: 5000
@@ -125,6 +126,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
 
       // Check if we can send the requested number of emails
       const emailsRemaining = limitCheck.usage?.emailsRemaining || 0
+      const dailyLimit = limitCheck.usage?.emailLimit || 50
       if (selectedLeads.length > emailsRemaining) {
         toast.error(`Kan niet ${selectedLeads.length} emails versturen`, {
           description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag (limiet: ${dailyLimit}). Reset over ${getTimeUntilReset()}`,

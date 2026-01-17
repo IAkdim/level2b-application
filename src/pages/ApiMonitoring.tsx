@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useOrganization } from '@/contexts/OrganizationContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
 export default function ApiMonitoring() {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   const [stats, setStats] = useState<ApiUsageStats | null>(null)
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null)
   const [logs, setLogs] = useState<ApiUsageLog[]>([])
@@ -26,14 +26,14 @@ export default function ApiMonitoring() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!selectedOrg?.id || !userId) return
+      if (!user?.id || !userId) return
 
       try {
         setIsLoading(true)
         const [statsData, rateLimitData, logsData] = await Promise.all([
-          getApiUsageStats(selectedOrg.id, 7),
-          getRateLimitInfo(userId, selectedOrg.id),
-          getApiUsageLogs(selectedOrg.id, 50)
+          getApiUsageStats(user.id, 7),
+          getRateLimitInfo(userId, user.id),
+          getApiUsageLogs(user.id, 50)
         ])
 
         setStats(statsData)
@@ -48,12 +48,12 @@ export default function ApiMonitoring() {
     }
 
     loadData()
-  }, [selectedOrg?.id, userId])
+  }, [user?.id, userId])
 
-  if (!selectedOrg) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Please select an organisation</p>
+        <p className="text-muted-foreground">Please log in to view API monitoring</p>
       </div>
     )
   }

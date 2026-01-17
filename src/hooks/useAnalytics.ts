@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useOrganization } from '@/contexts/OrganizationContext'
+import { useAuth } from '@/contexts/AuthContext'
 import * as analyticsApi from '@/lib/api/analytics'
 import type {
   DateRange,
@@ -20,15 +20,15 @@ export type { DateRange, TimeInterval }
  * Hook to get analytics summary
  */
 export function useAnalyticsSummary(dateRange?: DateRange) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<AnalyticsSummary>({
-    queryKey: ['analytics-summary', selectedOrg?.id, dateRange],
+    queryKey: ['analytics-summary', user?.id, dateRange],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getAnalyticsSummary(selectedOrg.id, dateRange)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getAnalyticsSummary(user.id, dateRange)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
@@ -37,15 +37,15 @@ export function useAnalyticsSummary(dateRange?: DateRange) {
  * Hook to get lead funnel metrics
  */
 export function useLeadFunnelMetrics(dateRange?: DateRange) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<LeadFunnelMetric[]>({
-    queryKey: ['lead-funnel-metrics', selectedOrg?.id, dateRange],
+    queryKey: ['lead-funnel-metrics', user?.id, dateRange],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getLeadFunnelMetrics(selectedOrg.id, dateRange)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getLeadFunnelMetrics(user.id, dateRange)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -57,15 +57,15 @@ export function useLeadsOverTime(
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<LeadsOverTimeData[]>({
-    queryKey: ['leads-over-time', selectedOrg?.id, dateRange, interval],
+    queryKey: ['leads-over-time', user?.id, dateRange, interval],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getLeadsOverTime(selectedOrg.id, dateRange, interval)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getLeadsOverTime(user.id, dateRange, interval)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -77,15 +77,15 @@ export function useEmailMetricsOverTime(
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<EmailMetricsData[]>({
-    queryKey: ['email-metrics-over-time', selectedOrg?.id, dateRange, interval],
+    queryKey: ['email-metrics-over-time', user?.id, dateRange, interval],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getEmailMetricsOverTime(selectedOrg.id, dateRange, interval)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getEmailMetricsOverTime(user.id, dateRange, interval)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -97,15 +97,15 @@ export function useTaskMetricsOverTime(
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<TaskMetricsData[]>({
-    queryKey: ['task-metrics-over-time', selectedOrg?.id, dateRange, interval],
+    queryKey: ['task-metrics-over-time', user?.id, dateRange, interval],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getTaskMetricsOverTime(selectedOrg.id, dateRange, interval)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getTaskMetricsOverTime(user.id, dateRange, interval)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -114,15 +114,15 @@ export function useTaskMetricsOverTime(
  * Hook to get activity metrics
  */
 export function useActivityMetrics(dateRange?: DateRange) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<ActivityMetrics>({
-    queryKey: ['activity-metrics', selectedOrg?.id, dateRange],
+    queryKey: ['activity-metrics', user?.id, dateRange],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getActivityMetrics(selectedOrg.id, dateRange)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getActivityMetrics(user.id, dateRange)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -131,15 +131,15 @@ export function useActivityMetrics(dateRange?: DateRange) {
  * Hook to get lead source distribution
  */
 export function useLeadSourceDistribution(dateRange?: DateRange) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<LeadSourceData[]>({
-    queryKey: ['lead-source-distribution', selectedOrg?.id, dateRange],
+    queryKey: ['lead-source-distribution', user?.id, dateRange],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getLeadSourceDistribution(selectedOrg.id, dateRange)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getLeadSourceDistribution(user.id, dateRange)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -148,15 +148,15 @@ export function useLeadSourceDistribution(dateRange?: DateRange) {
  * Hook to get conversion funnel data
  */
 export function useConversionFunnel(dateRange?: DateRange) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   
   return useQuery<ConversionFunnelData[]>({
-    queryKey: ['conversion-funnel', selectedOrg?.id, dateRange],
+    queryKey: ['conversion-funnel', user?.id, dateRange],
     queryFn: () => {
-      if (!selectedOrg) throw new Error('No organization selected')
-      return analyticsApi.getConversionFunnel(selectedOrg.id, dateRange)
+      if (!user) throw new Error('User not authenticated')
+      return analyticsApi.getConversionFunnel(user.id, dateRange)
     },
-    enabled: !!selectedOrg,
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
   })
 }

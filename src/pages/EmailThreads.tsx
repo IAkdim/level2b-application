@@ -17,10 +17,10 @@ import { formatRelativeTime } from "@/lib/utils/formatters";
 import { toast } from "sonner";
 import type { Language } from "@/types/crm";
 import { supabase } from "@/lib/supabaseClient";
-import { useOrganization } from "@/contexts/OrganizationContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function EmailThreads() {
-  const { selectedOrg } = useOrganization();
+  const { user } = useAuth();
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [replies, setReplies] = useState<Email[]>([]);
@@ -325,43 +325,41 @@ export function EmailThreads() {
 
       const userName = profile?.full_name || profile?.email?.split('@')[0] || 'there';
 
-      // Get organization settings for company info and Calendly link
+      // Get user settings for company info and Calendly link
       let companyName: string | undefined;
       let productService: string | undefined;
       let calendlyLink: string | undefined;
 
-      if (selectedOrg?.id) {
-        try {
-          const { data: orgSettings, error: orgError } = await supabase
-            .from('organization_settings')
-            .select('company_name, product_service, calendly_scheduling_url')
-            .eq('org_id', selectedOrg.id)
-            .single();
+      try {
+        const { data: userSettings, error: settingsError } = await supabase
+          .from('user_settings')
+          .select('company_name, product_service, calendly_scheduling_url')
+          .eq('user_id', session.user.id)
+          .single();
 
-          if (orgError) {
-            console.warn('organization_settings query failed:', orgError);
-            // Table might not exist - continue without these values
-          } else {
-            companyName = orgSettings?.company_name;
-            productService = orgSettings?.product_service;
-            calendlyLink = orgSettings?.calendly_scheduling_url;
-            
-            console.log('[REPLY] Organization settings fetched:', {
-              companyName,
-              productService,
-              calendlyLink,
-              sentiment: selectedEmail.sentiment?.sentiment
-            });
-          }
-        } catch (err) {
-          console.warn('Failed to fetch organization settings:', err);
+        if (settingsError) {
+          console.warn('user_settings query failed:', settingsError);
           // Continue without these values
+        } else {
+          companyName = userSettings?.company_name;
+          productService = userSettings?.product_service;
+          calendlyLink = userSettings?.calendly_scheduling_url;
+
+          console.log('[REPLY] User settings fetched:', {
+            companyName,
+            productService,
+            calendlyLink,
+            sentiment: selectedEmail.sentiment?.sentiment
+          });
         }
+      } catch (err) {
+        console.warn('Failed to fetch user settings:', err);
+        // Continue without these values
       }
 
       // CRITICAL: Check if sentiment is positive but no Calendly link
       if (selectedEmail.sentiment?.sentiment === 'positive' && !calendlyLink) {
-        toast.error('Cannot generate positive reply: Calendly link not configured. Please set up organization settings first.');
+        toast.error('Cannot generate positive reply: Calendly link not configured. Please set up your user settings first.');
         setIsGeneratingReply(false);
         return;
       }

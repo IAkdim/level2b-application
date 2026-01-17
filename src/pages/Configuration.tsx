@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, Bell, Mail, Shield, User, Building2, Link2, Loader2 } from "lucide-react"
 import { useTheme } from "@/contexts/ThemeContext"
 import { CompanySettingsForm } from "@/components/CompanySettingsForm"
-import { useOrganization } from "@/contexts/OrganizationContext"
+import { useAuth } from "@/contexts/AuthContext"
 import { getUserSettings, upsertUserSettings, getDefaultSettings, type UserSettings } from "@/lib/api/userSettings"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
@@ -63,7 +63,7 @@ const configSections: ConfigSection[] = [
 export function Configuration() {
   const [selectedSection, setSelectedSection] = useState("company")
   const { theme, setTheme } = useTheme()
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [userEmail, setUserEmail] = useState("")
@@ -72,27 +72,23 @@ export function Configuration() {
   // Load user data and settings
   useEffect(() => {
     async function loadData() {
-      if (!selectedOrg?.id) return
-      
+      if (!user?.id) return
+
       setIsLoading(true)
       try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser()
+        // Set current user email
         if (user?.email) {
           setUserEmail(user.email)
         }
 
         // Load user settings
-        const userSettings = await getUserSettings(selectedOrg.id)
+        const userSettings = await getUserSettings()
         if (userSettings) {
           setSettings(userSettings)
         } else {
           // Use defaults for new users
           const defaults = getDefaultSettings()
-          setSettings({
-            organization_id: selectedOrg.id,
-            ...defaults
-          } as UserSettings)
+          setSettings(defaults as UserSettings)
         }
       } catch (error) {
         console.error('Error loading settings:', error)
@@ -103,15 +99,15 @@ export function Configuration() {
     }
 
     loadData()
-  }, [selectedOrg?.id])
+  }, [user?.id])
 
   // Save settings to database
   const handleSaveSettings = async () => {
-    if (!selectedOrg?.id) return
-    
+    if (!user?.id) return
+
     setIsSaving(true)
     try {
-      await upsertUserSettings(selectedOrg.id, settings)
+      await upsertUserSettings(settings)
       toast.success('Settings saved successfully')
     } catch (error) {
       console.error('Error saving settings:', error)
