@@ -36,7 +36,6 @@ const BillingSettings = lazy(() => import("@/pages/BillingSettings"))
 
 // Onboarding pages
 const OnboardingForm = lazy(() => import("@/pages/OnboardingForm"))
-const DemoGate = lazy(() => import("@/components/DemoGate"))
 const DemoPaywall = lazy(() => import("@/components/DemoPaywall"))
 const ThankYou = lazy(() => import("@/pages/ThankYou"))
 
