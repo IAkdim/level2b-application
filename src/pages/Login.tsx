@@ -101,7 +101,7 @@ export function Login() {
             </div>
             <div>
               <h3 className="font-semibold mb-1">Team Collaboration</h3>
-              <p className="text-sm text-terracotta-100">Werk samen aan je sales doelen</p>
+              <p className="text-sm text-terracotta-100">Work together on your sales goals</p>
             </div>
           </div>
         </div>

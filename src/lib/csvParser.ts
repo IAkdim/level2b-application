@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
 import type { CreateLeadInput, LeadStatus, Sentiment } from '@/types/crm'
 
 export interface ParsedCSV {
@@ -68,6 +69,99 @@ export async function parseCSVFile(file: File): Promise<ParsedCSV> {
       },
     })
   })
+}
+
+/**
+ * Parse Excel file (.xlsx, .xls) into structured data
+ */
+export async function parseExcelFile(file: File): Promise<ParsedCSV> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result
+        if (!data) {
+          reject(new Error('Failed to read Excel file'))
+          return
+        }
+
+        // Read the workbook
+        const workbook = XLSX.read(data, { type: 'binary' })
+        
+        // Get the first sheet
+        const firstSheetName = workbook.SheetNames[0]
+        if (!firstSheetName) {
+          reject(new Error('Excel file has no sheets'))
+          return
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName]
+        
+        // Convert to JSON with header row
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+          header: 1,
+          defval: '',
+          blankrows: false
+        }) as string[][]
+
+        if (jsonData.length === 0) {
+          reject(new Error('Excel file is empty'))
+          return
+        }
+
+        // First row is headers
+        const headers = jsonData[0].map(h => String(h || '').trim()).filter(h => h.length > 0)
+        
+        if (headers.length === 0) {
+          reject(new Error('Excel file has no valid headers'))
+          return
+        }
+
+        // Remaining rows are data
+        const rows = jsonData.slice(1).map(row => {
+          const obj: Record<string, string> = {}
+          headers.forEach((header, index) => {
+            const value = row[index]
+            obj[header] = value !== undefined && value !== null ? String(value).trim() : ''
+          })
+          return obj
+        }).filter(row => {
+          // Filter out completely empty rows
+          return Object.values(row).some(v => v.length > 0)
+        })
+
+        resolve({
+          headers,
+          rows,
+          errors: []
+        })
+      } catch (error) {
+        reject(new Error(`Excel parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`))
+      }
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read Excel file'))
+    }
+
+    reader.readAsBinaryString(file)
+  })
+}
+
+/**
+ * Parse file (CSV or Excel) into structured data
+ */
+export async function parseFile(file: File): Promise<ParsedCSV> {
+  const fileName = file.name.toLowerCase()
+  
+  if (fileName.endsWith('.csv')) {
+    return parseCSVFile(file)
+  } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+    return parseExcelFile(file)
+  } else {
+    throw new Error('Unsupported file type. Please upload a CSV or Excel file.')
+  }
 }
 
 /**

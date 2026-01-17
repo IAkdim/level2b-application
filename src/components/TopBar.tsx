@@ -1,10 +1,11 @@
-import { Bell, Search, HelpCircle, Building2, ChevronDown } from "lucide-react"
+import { Bell, Search, HelpCircle, Building2, ChevronDown, RefreshCw, Command } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { supabase } from "@/lib/supabaseClient"
 import { cn } from "@/lib/utils"
+import { reAuthenticateWithGoogle } from "@/lib/api/reauth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,9 +21,10 @@ import {
 } from "@/components/ui/popover"
 import { Settings, User, LogOut, Plus, X } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { OrganizationSelector } from "@/components/OrganizationSelector"
+import { QuickActions } from "@/components/QuickActions"
 import { 
   getNotifications, 
   getUnreadCount, 
@@ -34,6 +36,7 @@ import {
 } from "@/lib/api/notifications"
 import { toast } from "sonner"
 import { useNavigate } from "react-router-dom"
+import { getUserSettings } from "@/lib/api/userSettings"
 
 export function TopBar() {
   const navigate = useNavigate()
@@ -41,8 +44,22 @@ export function TopBar() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [userName, setUserName] = useState<string>('')
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
   const { selectedOrg, userOrgs, setOrganization, clearOrganization } = useOrganization()
+
+  // Global keyboard shortcut for quick actions (⌘K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setQuickActionsOpen(true)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   function getNotificationIcon(type: Notification["type"]) {
     const baseClasses = "h-2 w-2 rounded-full"
@@ -64,11 +81,9 @@ export function TopBar() {
 
   async function loadNotifications() {
     try {
-      console.log('Loading notifications...')
       setIsLoadingNotifications(true)
       const notifs = await getNotifications(20)
       const count = await getUnreadCount()
-      console.log('Notifications loaded:', notifs.length, 'notifications, unread:', count)
       setNotifications(notifs)
       setUnreadCount(count)
     } catch (error) {
@@ -158,6 +173,23 @@ export function TopBar() {
           if (!userResponse.error && userResponse.data) {
             setUser(userResponse.data)
           }
+          
+          // Load user settings to get display name
+          if (selectedOrg?.id) {
+            try {
+              const settings = await getUserSettings(selectedOrg.id)
+              if (settings?.full_name) {
+                setUserName(settings.full_name)
+              } else if (userResponse.data?.full_name) {
+                setUserName(userResponse.data.full_name)
+              } else {
+                setUserName(session.user.email?.split('@')[0] || 'User')
+              }
+            } catch (error) {
+              console.error('Error loading user settings:', error)
+              setUserName(userResponse.data?.full_name || session.user.email?.split('@')[0] || 'User')
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching user:', error)
@@ -171,7 +203,6 @@ export function TopBar() {
     
     try {
       subscription = subscribeToNotifications((newNotification) => {
-        console.log('New notification received:', newNotification)
         setNotifications(prev => [newNotification, ...prev])
         setUnreadCount(prev => prev + 1)
         
@@ -188,7 +219,7 @@ export function TopBar() {
         subscription.unsubscribe()
       }
     }
-  }, [])
+  }, [selectedOrg?.id])
 
   return (
     <TooltipProvider>
@@ -256,16 +287,40 @@ export function TopBar() {
 
           {/* Right side - Actions */}
           <div className="flex items-center gap-1">
-            {/* Search */}
+            {/* Quick Actions / Search */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Search" className="text-muted-foreground hover:text-foreground">
-                  <Search className="h-4 w-4" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setQuickActionsOpen(true)}
+                  className="hidden sm:flex items-center gap-2 h-8 px-3 text-muted-foreground hover:text-foreground"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span className="text-sm">Quick actions</span>
+                  <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
+                    <Command className="h-2.5 w-2.5" />K
+                  </kbd>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Search <kbd className="ml-2 text-xs bg-muted px-1 py-0.5 rounded">⌘K</kbd></p>
+                <p>Quick actions & search <kbd className="ml-1 text-xs bg-muted px-1 py-0.5 rounded">⌘K</kbd></p>
               </TooltipContent>
+            </Tooltip>
+            
+            {/* Mobile search button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon-sm" 
+                  onClick={() => setQuickActionsOpen(true)}
+                  className="sm:hidden text-muted-foreground hover:text-foreground"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Quick actions</TooltipContent>
             </Tooltip>
 
             {/* Help */}
@@ -360,11 +415,11 @@ export function TopBar() {
                   <Avatar className="h-8 w-8">
                     <AvatarImage
                       src={user?.avatar_url || ""}
-                      alt={user?.full_name || ""}
+                      alt={userName || user?.full_name || ""}
                     />
                     <AvatarFallback>
-                      {user?.full_name
-                        ? user.full_name
+                      {userName || user?.full_name
+                        ? (userName || user.full_name)
                           .split(" ")
                           .map((n: string) => n[0])
                           .join("")
@@ -377,7 +432,7 @@ export function TopBar() {
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user?.full_name || ""}</p>
+                    <p className="text-sm font-medium">{userName || user?.full_name || ""}</p>
                     <p className="text-xs text-muted-foreground">{user?.email || ""}</p>
                   </div>
                 </DropdownMenuLabel>
@@ -389,6 +444,21 @@ export function TopBar() {
                 <DropdownMenuItem onClick={() => navigate('/configuration')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={async () => {
+                    try {
+                      await reAuthenticateWithGoogle()
+                      toast.success("Re-authenticating with Google...")
+                    } catch (error) {
+                      console.error("Re-authentication failed:", error)
+                      toast.error("Re-authentication failed. Please try again.")
+                    }
+                  }}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-connect Gmail
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -409,6 +479,9 @@ export function TopBar() {
 
       {/* Organization Selector Dialog */}
       <OrganizationSelector open={orgSelectorOpen} onOpenChange={setOrgSelectorOpen} />
+      
+      {/* Quick Actions Dialog */}
+      <QuickActions open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
     </TooltipProvider>
   )
 }

@@ -8,13 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles } from "lucide-react";
-import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, type Email } from "@/lib/api/gmail";
-import { generateSalesReply, type EmailReplyContext } from "@/lib/api/claude-secure";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles, Trash2, X } from "lucide-react";
+import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, deleteGmailLabel, type Email } from "@/lib/api/gmail";
+import { generateSalesReply, type EmailReplyContext, analyzeSentiment } from "@/lib/api/claude-secure";
+import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth";
 import { formatRelativeTime } from "@/lib/utils/formatters";
 import { toast } from "sonner";
+import type { Language } from "@/types/crm";
+import { supabase } from "@/lib/supabaseClient";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 export function EmailThreads() {
+  const { selectedOrg } = useOrganization();
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [replies, setReplies] = useState<Email[]>([]);
@@ -32,6 +38,9 @@ export function EmailThreads() {
   const [replyBody, setReplyBody] = useState("");
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
+  const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
+  const [replyLanguage, setReplyLanguage] = useState<Language>('en'); // User-selected language for AI replies
 
   // Fetch available labels on mount
   useEffect(() => {
@@ -48,15 +57,28 @@ export function EmailThreads() {
   const loadLabels = async () => {
     try {
       const labels = await getGmailLabels();
-      // Filter only custom labels (not system labels like INBOX, SENT, etc.)
-      const customLabels = labels.filter(
-        (l) => !['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT'].includes(l.id)
-      );
+      
+      // Filter systeemlabels - alleen user-created labels tonen
+      const systemLabelPrefixes = ['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT', 'CHAT', 'CATEGORY_'];
+      const systemLabelNames = ['Junk', 'Notes'];
+      
+      const customLabels = labels.filter((l) => {
+        // Filter op ID (systeem labels hebben uppercase IDs die starten met bekend prefixes)
+        const hasSystemPrefix = systemLabelPrefixes.some(prefix => l.id.startsWith(prefix));
+        // Filter op naam
+        const isSystemName = systemLabelNames.includes(l.name);
+        // Filter labels die eindigen op _STAR (zoals YELLOW_STAR, RED_STAR, etc.)
+        const isStar = l.id.endsWith('_STAR');
+        
+        return !hasSystemPrefix && !isSystemName && !isStar && l.type !== 'system';
+      });
+      
       setAvailableLabels(customLabels);
       
-      // Auto-select first label if available
+      // Auto-select laatst aangemaakte label (laatste in de lijst)
       if (customLabels.length > 0 && !selectedLabel) {
-        setSelectedLabel(customLabels[0].name);
+        const latestLabel = customLabels[customLabels.length - 1];
+        setSelectedLabel(latestLabel.name);
       }
     } catch (error) {
       console.error("Error loading labels:", error);
@@ -68,23 +90,41 @@ export function EmailThreads() {
 
     setIsLoading(true);
     try {
-      console.log("Loading emails for label:", selectedLabel);
-      
       // Fetch ALL emails with the label (read + unread)
       const sent = await getEmailsByLabel(selectedLabel, 100);
-      console.log("Sent emails loaded:", sent.length);
       setSentEmails(sent);
 
-      // Haal reacties op emails met dit label
-      const repliesData = await getRepliesByLabel(selectedLabel, false); // Fetch all replies, not just unread
-      console.log("Replies loaded:", repliesData.length);
+      // Haal reacties op emails met dit label (zonder sentiment analyse)
+      const repliesData = await getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
       setReplies(repliesData);
       
       setLastRefresh(new Date());
     } catch (error) {
       console.error("Error loading emails:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`An error occurred while loading emails:\n${errorMessage}\n\nCheck that:\n- You are logged in with Google\n- You have granted Gmail permissions\n- The label "${selectedLabel}" exists in Gmail`);
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        toast.error("Error loading emails", {
+          description: errorMessage,
+          duration: 5000
+        })
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +137,127 @@ export function EmailThreads() {
       await loadEmails();
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleAnalyzeSentiment = async () => {
+    if (selectedEmailIds.size === 0) {
+      toast.error("Select emails first", {
+        description: "Select at least one email to analyse sentiment"
+      });
+      return;
+    }
+
+    setIsAnalyzingSentiment(true);
+    const selectedEmails = replies.filter(r => selectedEmailIds.has(r.id));
+    let successCount = 0;
+    let errorCount = 0;
+    let lastError: string | null = null;
+
+    toast.info(`Sentiment analysis started for ${selectedEmails.length} email${selectedEmails.length !== 1 ? 's' : ''}...`);
+
+    for (const email of selectedEmails) {
+      try {
+        const sentiment = await analyzeSentiment(email.body, email.subject);
+        
+        if (sentiment.error) {
+          throw new Error(sentiment.error);
+        }
+        
+        // Store in UI state only
+        setReplies(prevReplies => 
+          prevReplies.map(r => 
+            r.id === email.id ? { ...r, sentiment } : r
+          )
+        );
+        
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to analyze sentiment for email ${email.id}:`, error);
+        lastError = error instanceof Error ? error.message : String(error);
+        errorCount++;
+      }
+    }
+
+    setIsAnalyzingSentiment(false);
+    setSelectedEmailIds(new Set());
+
+    if (successCount > 0) {
+      toast.success(`Sentiment analysis completed`, {
+        description: `${successCount} email${successCount !== 1 ? 's' : ''} analysed${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+      });
+    } else {
+      toast.error("Sentiment analysis failed", {
+        description: lastError || "No emails could be analysed"
+      });
+    }
+  };
+
+  const handleToggleEmailSelection = (emailId: string) => {
+    setSelectedEmailIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(emailId)) {
+        newSet.delete(emailId);
+      } else {
+        newSet.add(emailId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllEmails = () => {
+    if (selectedEmailIds.size === filteredReplies.length) {
+      setSelectedEmailIds(new Set());
+    } else {
+      setSelectedEmailIds(new Set(filteredReplies.map(r => r.id)));
+    }
+  };
+
+  const handleDeleteLabel = async (labelId: string, labelName: string) => {
+    if (!confirm(`Are you sure you want to delete the label "${labelName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteGmailLabel(labelId);
+      toast.success("Label deleted", {
+        description: `The label "${labelName}" has been deleted successfully`
+      });
+      
+      // Als de verwijderde label de geselecteerde was, clear de selectie
+      if (selectedLabel === labelName) {
+        setSelectedLabel("");
+        setReplies([]);
+        setSentEmails([]);
+      }
+      
+      // Reload labels
+      await loadLabels();
+    } catch (error) {
+      console.error("Error deleting label:", error);
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+                toast.success("Re-authentication successful")
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        toast.error("Failed to delete label", {
+          description: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
     }
   };
 
@@ -132,12 +293,10 @@ export function EmailThreads() {
   };
 
   const handleReplyClick = (email: Email) => {
-    console.log('Reply button clicked for email:', email.id);
     setSelectedEmail(email);
     setReplySubject(`Re: ${email.subject}`);
     setReplyBody("");
     setIsReplyDialogOpen(true);
-    console.log('Reply dialog should be open now');
   };
 
   const handleGenerateAIReply = async () => {
@@ -145,20 +304,86 @@ export function EmailThreads() {
 
     setIsGeneratingReply(true);
     try {
-      // Extract recipient name from email address
+      // Get current session for user data
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Not authenticated');
+        return;
+      }
+
+      // Extract recipient info
       const fromMatch = selectedEmail.from.match(/<(.+)>/);
       const recipientEmail = fromMatch ? fromMatch[1] : selectedEmail.from;
       const recipientName = selectedEmail.from.split('<')[0].trim() || recipientEmail.split('@')[0];
+
+      // Get user profile for user name
+      const { data: profile } = await supabase
+        .from('users')
+        .select('full_name, email')
+        .eq('id', session.user.id)
+        .single();
+
+      const userName = profile?.full_name || profile?.email?.split('@')[0] || 'there';
+
+      // Get organization settings for company info and Calendly link
+      let companyName: string | undefined;
+      let productService: string | undefined;
+      let calendlyLink: string | undefined;
+
+      if (selectedOrg?.id) {
+        try {
+          const { data: orgSettings, error: orgError } = await supabase
+            .from('organization_settings')
+            .select('company_name, product_service, calendly_scheduling_url')
+            .eq('org_id', selectedOrg.id)
+            .single();
+
+          if (orgError) {
+            console.warn('organization_settings query failed:', orgError);
+            // Table might not exist - continue without these values
+          } else {
+            companyName = orgSettings?.company_name;
+            productService = orgSettings?.product_service;
+            calendlyLink = orgSettings?.calendly_scheduling_url;
+            
+            console.log('[REPLY] Organization settings fetched:', {
+              companyName,
+              productService,
+              calendlyLink,
+              sentiment: selectedEmail.sentiment?.sentiment
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to fetch organization settings:', err);
+          // Continue without these values
+        }
+      }
+
+      // CRITICAL: Check if sentiment is positive but no Calendly link
+      if (selectedEmail.sentiment?.sentiment === 'positive' && !calendlyLink) {
+        toast.error('Cannot generate positive reply: Calendly link not configured. Please set up organization settings first.');
+        setIsGeneratingReply(false);
+        return;
+      }
 
       const context: EmailReplyContext = {
         recipientName,
         recipientEmail,
         originalSubject: selectedEmail.subject,
         originalBody: selectedEmail.body || selectedEmail.snippet,
-        sentiment: selectedEmail.sentiment?.sentiment || 'doubtful',
-        companyName: 'jullie bedrijf',
-        productService: 'jullie dienstverlening',
+        sentiment: selectedEmail.sentiment?.sentiment || 'neutral',
+        userName,
+        companyName,
+        productService,
+        calendlyLink,
+        language: replyLanguage,
       };
+
+      console.log('[REPLY] Sending context to Edge Function:', {
+        sentiment: context.sentiment,
+        calendlyLink: context.calendlyLink,
+        hasCalendlyLink: !!context.calendlyLink
+      });
 
       const generatedReply = await generateSalesReply(context);
 
@@ -206,7 +431,26 @@ export function EmailThreads() {
       await loadEmails();
     } catch (error) {
       console.error('Error sending reply:', error);
-      toast.error('Error sending reply');
+      
+      if (isAuthenticationError(error)) {
+        toast.error("Google Re-authentication Required", {
+          description: "Your Gmail connection has expired. Click 'Re-connect Gmail' to continue.",
+          duration: 10000,
+          action: {
+            label: "Re-connect Gmail",
+            onClick: async () => {
+              try {
+                await reAuthenticateWithGoogle()
+              } catch (reAuthError) {
+                console.error("Re-authentication failed:", reAuthError)
+                toast.error("Re-authentication failed. Please try again.")
+              }
+            }
+          }
+        })
+      } else {
+        toast.error('Error sending reply');
+      }
     } finally {
       setIsSendingReply(false);
     }
@@ -256,24 +500,54 @@ export function EmailThreads() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedLabel} onValueChange={setSelectedLabel}>
-            <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Select a label..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableLabels.length === 0 ? (
-                <SelectItem value="none" disabled>
-                  No custom labels found
-                </SelectItem>
-              ) : (
-                availableLabels.map((label) => (
-                  <SelectItem key={label.id} value={label.name}>
-                    {label.name}
+          <div className="space-y-3">
+            <Select value={selectedLabel} onValueChange={setSelectedLabel}>
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder="Select a label..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableLabels.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No custom labels found
                   </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+                ) : (
+                  availableLabels.map((label) => (
+                    <SelectItem key={label.id} value={label.name}>
+                      {label.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            
+            {/* Label Management - Show delete buttons for all labels */}
+            {availableLabels.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Manage Labels</p>
+                <div className="flex flex-wrap gap-2">
+                  {availableLabels.map((label) => (
+                    <div 
+                      key={label.id}
+                      className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-1.5 text-sm"
+                    >
+                      <span className="font-medium">{label.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteLabel(label.id, label.name);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -444,10 +718,44 @@ export function EmailThreads() {
         <TabsContent value="responses" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Replies</CardTitle>
-              <CardDescription>
-                {filteredReplies.length} repl{filteredReplies.length !== 1 ? 'ies' : 'y'} to emails with label "{selectedLabel}"
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Replies</CardTitle>
+                  <CardDescription>
+                    {filteredReplies.length} repl{filteredReplies.length !== 1 ? 'ies' : 'y'} to emails with label "{selectedLabel}"
+                  </CardDescription>
+                </div>
+                {filteredReplies.length > 0 && (
+                  <div className="flex items-center space-x-3">
+                    {selectedEmailIds.size > 0 && (
+                      <Button
+                        onClick={handleAnalyzeSentiment}
+                        disabled={isAnalyzingSentiment}
+                        className="bg-primary"
+                      >
+                        {isAnalyzingSentiment ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyseren...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Analyze Sentiment ({selectedEmailIds.size})
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={handleSelectAllEmails}
+                      size="sm"
+                    >
+                      {selectedEmailIds.size === filteredReplies.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -476,11 +784,18 @@ export function EmailThreads() {
                   {filteredReplies.map((email) => (
                     <div 
                       key={email.id} 
-                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => handleEmailClick(email)}
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          checked={selectedEmailIds.has(email.id)}
+                          onCheckedChange={() => handleToggleEmailSelection(email.id)}
+                          className="mt-1"
+                        />
+                        <div 
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleEmailClick(email)}
+                        >
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="font-medium">{email.from}</h3>
                             <Badge variant="success" className="text-xs">
@@ -490,14 +805,14 @@ export function EmailThreads() {
                               <Badge 
                                 variant={
                                   email.sentiment.sentiment === 'positive' ? 'default' :
-                                  email.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                                  email.sentiment.sentiment === 'neutral' ? 'secondary' :
                                   'destructive'
                                 }
                                 className="text-xs"
                               >
                                 {email.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                                 email.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                                 '🔴 Not Interested'}
+                                 email.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                                 '🔴 Negative'}
                               </Badge>
                             )}
                           </div>
@@ -542,7 +857,8 @@ export function EmailThreads() {
             <>
               <DialogHeader>
                 <DialogTitle className="text-xl">{selectedEmail.subject}</DialogTitle>
-                <DialogDescription className="space-y-2">
+                <DialogDescription>View and manage email thread details</DialogDescription>
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
@@ -566,14 +882,14 @@ export function EmailThreads() {
                         <Badge 
                           variant={
                             selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
-                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
+                            selectedEmail.sentiment.sentiment === 'neutral' ? 'secondary' :
                             'destructive'
                           }
                           className="text-sm"
                         >
                           {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                           '🔴 Not Interested'}
+                           selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                           '🔴 Negative'}
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
@@ -581,7 +897,7 @@ export function EmailThreads() {
                       </span>
                     </div>
                   </div>
-                </DialogDescription>
+                </div>
               </DialogHeader>
 
               <div className="mt-6 space-y-6">
@@ -617,8 +933,8 @@ export function EmailThreads() {
                             <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
                             <div className="text-2xl font-bold">
                               {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
-                               selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Doubtful' :
-                               '🔴 Not Interested'}
+                               selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                               '🔴 Negative'}
                             </div>
                           </div>
                           <div className="border rounded-lg p-4 bg-muted/30">
@@ -681,40 +997,64 @@ export function EmailThreads() {
               <DialogHeader>
                 <DialogTitle>Reply to email</DialogTitle>
                 <DialogDescription>
-                  <div className="space-y-1 mt-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-foreground">To:</span>
-                      <span className="text-foreground">{selectedEmail.from}</span>
-                    </div>
-                    {selectedEmail.sentiment && (
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-foreground">Sentiment:</span>
-                        <Badge 
-                          variant={
-                            selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
-                            selectedEmail.sentiment.sentiment === 'doubtful' ? 'secondary' :
-                            'destructive'
-                          }
-                          className="text-xs"
-                        >
-                          {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positief' :
-                           selectedEmail.sentiment.sentiment === 'doubtful' ? '🟡 Twijfelend' :
-                           '🔴 Niet Geïnteresseerd'}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
+                  Generate an AI-powered reply based on sentiment analysis
                 </DialogDescription>
+                <div className="space-y-1 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-foreground">To:</span>
+                    <span className="text-foreground">{selectedEmail.from}</span>
+                  </div>
+                  {selectedEmail.sentiment && (
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-foreground">Sentiment:</span>
+                      <Badge 
+                        variant={
+                          selectedEmail.sentiment.sentiment === 'positive' ? 'default' :
+                          selectedEmail.sentiment.sentiment === 'neutral' ? 'secondary' :
+                          'destructive'
+                        }
+                        className="text-xs"
+                      >
+                        {selectedEmail.sentiment.sentiment === 'positive' ? '🟢 Positive' :
+                         selectedEmail.sentiment.sentiment === 'neutral' ? '🟡 Neutral' :
+                         '🔴 Negative'}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
               </DialogHeader>
 
               <div className="space-y-4 mt-4">
+                {/* Language Selector for AI Reply */}
+                <div className="space-y-2">
+                  <Label htmlFor="reply-language">AI Reply Language</Label>
+                  <Select value={replyLanguage} onValueChange={(value) => setReplyLanguage(value as Language)}>
+                    <SelectTrigger id="reply-language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">🇬🇧 English</SelectItem>
+                      <SelectItem value="nl">🇳🇱 Nederlands</SelectItem>
+                      <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                      <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                      <SelectItem value="es">🇪🇸 Español</SelectItem>
+                      <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                      <SelectItem value="pt">🇵🇹 Português</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select the language for AI-generated replies
+                  </p>
+                </div>
+
                 {/* AI Generate Button */}
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleGenerateAIReply}
-                    disabled={isGeneratingReply}
+                    disabled={isGeneratingReply || !selectedEmail.sentiment}
+                    title={!selectedEmail.sentiment ? 'Analyze sentiment first' : ''}
                   >
                     {isGeneratingReply ? (
                       <>

@@ -48,13 +48,13 @@ Email inhoud: ${emailBody}
 
 Classificeer de sentiment in één van deze categorieën:
 
-1. NOT_INTERESTED - De persoon is duidelijk niet geïnteresseerd
-2. DOUBTFUL - De persoon twijfelt of toont beperkte interesse
+1. NEGATIVE - De persoon is duidelijk niet geïnteresseerd
+2. NEUTRAL - De persoon twijfelt of toont beperkte interesse
 3. POSITIVE - De persoon is duidelijk geïnteresseerd
 
 Geef je antwoord in JSON format:
 {
-  "sentiment": "NOT_INTERESTED" | "DOUBTFUL" | "POSITIVE",
+  "sentiment": "NEGATIVE" | "NEUTRAL" | "POSITIVE",
   "confidence": 0.0-1.0,
   "reasoning": "Korte uitleg waarom je deze classificatie hebt gekozen"
 }`
@@ -80,13 +80,13 @@ Geef je antwoord in JSON format:
 
     // Map sentiment
     const sentimentMap: Record<string, string> = {
-      NOT_INTERESTED: 'not_interested',
-      DOUBTFUL: 'doubtful',
+      NEGATIVE: 'negative',
+      NEUTRAL: 'neutral',
       POSITIVE: 'positive',
     }
 
     const result = {
-      sentiment: sentimentMap[parsed.sentiment] || 'doubtful',
+      sentiment: sentimentMap[parsed.sentiment] || 'neutral',
       confidence: parsed.confidence || 0.7,
       reasoning: parsed.reasoning || '',
     }

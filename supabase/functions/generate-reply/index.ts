@@ -4,13 +4,16 @@
 const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY')
 
 interface EmailReplyContext {
-  recipientName: string
   recipientEmail: string
+  recipientName: string
   originalSubject: string
   originalBody: string
-  sentiment: 'positive' | 'doubtful' | 'not_interested'
+  sentiment: 'positive' | 'neutral' | 'negative'
+  userName?: string
   companyName?: string
   productService?: string
+  calendlyLink?: string
+  language?: string
 }
 
 interface GeneratedReply {
@@ -38,12 +41,13 @@ Deno.serve(async (req) => {
     const context: EmailReplyContext = await req.json()
     console.log('Context received:', JSON.stringify(context))
 
-    // Validate required fields with detailed error messages
+    // Validate required fields
     const missingFields = []
     if (!context.recipientName) missingFields.push('recipientName')
     if (!context.recipientEmail) missingFields.push('recipientEmail')
     if (!context.originalSubject) missingFields.push('originalSubject')
     if (!context.originalBody) missingFields.push('originalBody')
+    if (!context.sentiment) missingFields.push('sentiment')
     
     if (missingFields.length > 0) {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
@@ -53,84 +57,133 @@ Deno.serve(async (req) => {
       throw new Error('CLAUDE_API_KEY not configured')
     }
 
-    // Default sentiment if not provided
-    const sentiment = context.sentiment || 'doubtful'
-    console.log('Using sentiment:', sentiment)
+    const sentiment = context.sentiment
+    console.log(`[REPLY] Using sentiment from UI: ${sentiment}`)
+    console.log(`[REPLY] Calendly link received: ${context.calendlyLink || 'NOT PROVIDED'}`)
 
-    // Bepaal de prompt strategie op basis van sentiment
+    // GUARDRAIL: Block positive replies without Calendly link
+    if (sentiment === 'positive' && !context.calendlyLink) {
+      console.error('[REPLY] BLOCKED: Positive sentiment but no Calendly link provided')
+      throw new Error('Cannot generate positive reply: Calendly link is required but missing')
+    }
+
+    // Language mapping
+    const languageNames: Record<string, string> = {
+      en: 'English (British)',
+      nl: 'Dutch (Nederlands)',
+      de: 'German (Deutsch)',
+      fr: 'French (Français)',
+      es: 'Spanish (Español)',
+      it: 'Italian (Italiano)',
+      pt: 'Portuguese (Português)',
+    }
+    
+    const targetLanguage = context.language || 'en'
+    const languageName = languageNames[targetLanguage] || 'English (British)'
+    
+    console.log('Using language:', languageName)
+    console.log('Calendly link:', context.calendlyLink || 'not provided')
+
+    // Build strategy based on UI sentiment
     let strategyPrompt = ''
     
     if (sentiment === 'positive') {
-      strategyPrompt = `De prospect is POSITIEF en geïnteresseerd. Jouw doel:
-- Bedank voor de interesse en enthousiasme
-- Stel voor om een meeting te plannen via Calendly
-- Houd de toon professioneel maar enthousiast
-- Maak duidelijk wat ze kunnen verwachten in de meeting
-- Sluit af met een directe call-to-action om een tijdslot te kiezen`
-    } else if (sentiment === 'doubtful') {
-      strategyPrompt = `De prospect is TWIJFELEND en heeft twijfels. Jouw doel:
-- Erken hun twijfels op een empathische manier
-- Geef concrete voordelen en waardepropositie
-- Gebruik social proof (andere klanten, resultaten) als dat relevant is
-- Bied aan om specifieke vragen te beantwoorden
-- Stel voor om een vrijblijvend gesprek te plannen om hun vragen te beantwoorden
-- Gebruik een overtuigende maar niet pusherige toon`
+      strategyPrompt = `The prospect is POSITIVE and interested. Your goal:
+- Thank them warmly for their interest
+- Briefly confirm what ${context.productService || 'your service'} offers
+- Express enthusiasm about helping them
+- Keep tone professional but enthusiastic
+- End with a natural closing like "I would be happy to discuss this further" or "Let me know if you have any questions"
+- CRITICAL: Do NOT mention scheduling, meetings, calendars, or booking calls - the system will add the Calendly link automatically`
+    } else if (sentiment === 'neutral') {
+      strategyPrompt = `The prospect is NEUTRAL - interested but uncertain. Your goal:
+- Acknowledge their inquiry professionally
+- Explain clearly what ${context.productService || 'your service'} does and the value it provides
+- Address potential concerns proactively
+- End with an open invitation to ask questions or discuss further
+- Do NOT push for a meeting`
     } else {
-      strategyPrompt = `De prospect lijkt NIET GEÏNTERESSEERD. Jouw doel:
-- Accepteer hun positie met respect
-- Stel open vragen om de echte bezwaren te achterhalen
-- Probeer te begrijpen wat hun grootste zorgen/uitdagingen zijn
-- Bied waarde zonder direct te verkopen
-- Houd de deur open voor toekomstige conversaties
-- Gebruik een nieuwsgierige, consultative toon`
+      // negative
+      strategyPrompt = `The prospect is NEGATIVE or not interested. Your goal:
+- Thank them professionally for their time
+- Keep it brief and respectful
+- Leave the door open for future communication
+- Do NOT push for a meeting or try to convince them`
     }
 
-    const systemPrompt = `Je bent een expert B2B sales professional met jarenlange ervaring in consultative selling. 
-Je schrijft persoonlijke, overtuigende email responses die klanten helpen en waarde bieden.
+    const systemPrompt = `You are an expert B2B sales professional with years of experience in consultative selling. 
+You write personalised, persuasive email responses that help clients and provide value.
 
-CONTEXT:
-Sentiment van de prospect: ${sentiment.toUpperCase()}
-Bedrijfsnaam: ${context.companyName || 'jouw bedrijf'}
-Product/Service: ${context.productService || 'jullie dienstverlening'}
+CRITICAL LANGUAGE REQUIREMENT:
+Write the ENTIRE email response in ${languageName}.
+- Subject line: in ${languageName}
+- Email body: in ${languageName}
+- All text content: in ${languageName}
+- Tone description can be in English (for internal reference)
 
-STRATEGIE:
+CRITICAL DATA PROVIDED TO YOU:
+Prospect's name: "${context.recipientName}"
+Your name: ${context.userName ? `"${context.userName}"` : '(use natural fallback like "there")'}
+Company name: ${context.companyName ? `"${context.companyName}"` : '(use natural fallback)'}
+Product/Service: ${context.productService ? `"${context.productService}"` : '"your services"'}
+Prospect's sentiment: ${sentiment.toUpperCase()}
+
+STRATEGY:
 ${strategyPrompt}
 
-STIJL RICHTLIJNEN:
-- Schrijf in het Nederlands
-- Gebruik een professionele maar warme toon
-- Personaliseer de email (gebruik de naam van de prospect)
-- Houd het beknopt (max 150 woorden)
-- Eindig met een duidelijke vraag of call-to-action
-- De email moet klinken als geschreven door een mens, niet door AI
+STYLE GUIDELINES:
+- Write in ${languageName}
+- Use a professional but warm tone
+- Keep it concise (max 150 words)
+- End with a clear question or call-to-action
+- The email should sound human-written, not AI-generated
 
-KRITIEK - EMAIL AFSLUITING:
-- NOOIT "Met vriendelijke groet" gebruiken
-- NOOIT een handtekening toevoegen
-- NOOIT placeholders zoals [Naam], [Jouw naam], [Bedrijf] gebruiken
-- De email stopt direct na de laatste zin of vraag
-- Voorbeeld GOED: "Laten we in contact blijven. Wanneer je er klaar voor bent, hoor ik het graag."
-- Voorbeeld FOUT: "Laten we in contact blijven.\n\nMet vriendelijke groet,\n[Jouw naam]"
+ABSOLUTE RULES - NEVER VIOLATE:
+- NEVER use placeholders like [Name], [Your name], [Company], [Prospect's Name]
+- Use the actual values provided above directly in your text
+- If a value is marked as "use natural fallback", write naturally without specifying the name (e.g., "Hi there," instead of "Hi [Name],")
+- Start emails with the prospect's name "${context.recipientName}" if appropriate, or use a natural greeting
+- For POSITIVE sentiment: NEVER mention scheduling, booking, calendars, meetings, or availability - the system handles this automatically
+- The output must be 100% send-ready with NO editing needed
 
-De body moet eindigen waar de inhoud eindigt - zonder groet of naam.`
+CRITICAL - EMAIL CLOSING:
+- NEVER use formal closings like "Best regards", "Kind regards", "Sincerely", "Met vriendelijke groet"
+- NEVER add a signature block
+- The email stops directly after the last sentence or question
+- Example GOOD: "Let's stay in touch. When you're ready, I'd love to hear from you."
+- Example BAD: "Let's stay in touch.\\n\\nBest regards,\\n[Your name]"
 
-    const userPrompt = `Originele email onderwerp: "${context.originalSubject}"
+The body must end where the content ends - without formal closing or signature.`
 
-Originele email van ${context.recipientName} (${context.recipientEmail}):
+    const userPrompt = `Original email subject: "${context.originalSubject}"
+
+Original email from ${context.recipientName} (${context.recipientEmail}):
 """
 ${context.originalBody}
 """
 
-Schrijf nu een perfecte sales reply email. 
+Write a perfect sales reply email now in ${languageName}.
 
-BELANGRIJK: Geef ALLEEN een JSON object terug met exact deze structuur:
+USE THESE EXACT VALUES IN YOUR EMAIL (NO PLACEHOLDERS):
+- Prospect's name: "${context.recipientName}"
+${context.userName ? `- Your name: "${context.userName}"` : '- If you need your name, use a natural fallback (e.g., just skip it or say "I" or "we")'}
+${context.companyName ? `- Company: "${context.companyName}"` : ''}
+${context.productService ? `- Product/Service: "${context.productService}"` : ''}
+
+CRITICAL REMINDERS:
+- Write directly to ${context.recipientName} - use this name, not [Name] or [Prospect's Name]
+- Write in ${languageName}
+- The output must be send-ready with ZERO placeholders
+- If any data is missing, write naturally without that detail
+
+IMPORTANT: Return ONLY a JSON object with exactly this structure:
 {
-  "subject": "Re: [origineel onderwerp]",
-  "body": "[email body tekst - GEEN JSON, ALLEEN PLAIN TEXT]",
-  "tone": "[beschrijving van de gebruikte tone/aanpak]"
+  "subject": "Re: ${context.originalSubject}",
+  "body": "[complete email body in ${languageName} - addressed to ${context.recipientName} - NO placeholders - NO signature]",
+  "tone": "[tone description in English]"
 }
 
-De "body" field moet ALLEEN de email tekst bevatten, GEEN JSON formatting.`
+The "body" field must be 100% ready to send - NO brackets, NO placeholders, NO [Name] anywhere.`
 
     console.log('Calling Claude API...')
 
@@ -168,61 +221,68 @@ De "body" field moet ALLEEN de email tekst bevatten, GEEN JSON formatting.`
     const claudeResponse = data.content[0].text
     console.log('Claude response text:', claudeResponse)
 
-    // Extract JSON from response
+    // Parse Claude response - handle malformed JSON with control characters
     let result: GeneratedReply
     try {
-      // Try to parse as JSON - Claude should return valid JSON
+      // Extract JSON from response
       const jsonMatch = claudeResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0])
-        console.log('Parsed JSON from Claude:', JSON.stringify(parsed).substring(0, 300))
+        // Clean the JSON string by removing/escaping control characters
+        let jsonString = jsonMatch[0]
         
-        // Check if body contains nested JSON string (common Claude mistake)
-        let bodyText = parsed.body || claudeResponse
-        let subjectText = parsed.subject || `Re: ${context.originalSubject}`
-        let toneText = parsed.tone || sentiment
+        // Try parsing - if it fails due to control chars, we'll handle it differently
+        let parsed: any
+        try {
+          parsed = JSON.parse(jsonString)
+        } catch (parseErr) {
+          console.log('Direct JSON parse failed, trying alternate extraction')
+          
+          // Manually extract body using regex (more forgiving than JSON.parse)
+          const subjectMatch = jsonString.match(/"subject"\s*:\s*"([^"]+)"/)
+          const bodyMatch = jsonString.match(/"body"\s*:\s*"([\s\S]+?)"\s*,\s*"tone"/)
+          const toneMatch = jsonString.match(/"tone"\s*:\s*"([^"]+)"/)
+          
+          if (bodyMatch && bodyMatch[1]) {
+            result = {
+              subject: subjectMatch?.[1] || `Re: ${context.originalSubject}`,
+              body: bodyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'),
+              tone: toneMatch?.[1] || sentiment,
+            }
+            console.log('✓ Extracted via regex, body length:', result.body.length)
+          } else {
+            throw parseErr // Re-throw if regex extraction also fails
+          }
+        }
         
-        console.log('Body type:', typeof bodyText)
-        console.log('Body starts with:', bodyText.substring(0, 50))
-        
-        // Handle nested JSON - Claude sometimes returns the ENTIRE response as a JSON string in the body
-        if (typeof bodyText === 'string') {
-          // Check if it starts with { - it's probably nested JSON
-          const trimmedBody = bodyText.trim()
-          if (trimmedBody.startsWith('{')) {
+        // If JSON.parse succeeded, extract fields
+        if (parsed) {
+          let bodyText = parsed.body || claudeResponse
+          let subjectText = parsed.subject || `Re: ${context.originalSubject}`
+          let toneText = parsed.tone || sentiment
+          
+          // Handle nested JSON (if body is itself a JSON string)
+          if (typeof bodyText === 'string' && bodyText.trim().startsWith('{')) {
             try {
-              const nestedJson = JSON.parse(trimmedBody)
-              if (nestedJson && typeof nestedJson === 'object' && nestedJson.body) {
+              const nestedJson = JSON.parse(bodyText)
+              if (nestedJson.body) {
                 bodyText = nestedJson.body
                 subjectText = nestedJson.subject || subjectText
                 toneText = nestedJson.tone || toneText
-                console.log('✓ Successfully extracted from nested JSON')
+                console.log('✓ Extracted from nested JSON')
               }
-            } catch (parseErr) {
-              console.log('Not valid nested JSON, treating as text')
+            } catch {
+              // Not nested, continue
             }
           }
           
-          // Clean up escape sequences if still present
-          if (bodyText.includes('\\n') || bodyText.includes('\\"')) {
-            bodyText = bodyText
-              .replace(/\\n/g, '\n')
-              .replace(/\\"/g, '"')
-              .replace(/\\t/g, '\t')
-            console.log('✓ Cleaned escape sequences')
+          result = {
+            subject: subjectText,
+            body: bodyText,
+            tone: toneText,
           }
         }
-        
-        result = {
-          subject: subjectText,
-          body: bodyText,
-          tone: toneText,
-        }
-        
-        console.log('Final extracted body length:', bodyText.length)
-        console.log('Body preview:', bodyText.substring(0, 100))
       } else {
-        // Fallback: create structured response
+        // No JSON found
         result = {
           subject: `Re: ${context.originalSubject}`,
           body: claudeResponse,
@@ -230,8 +290,8 @@ De "body" field moet ALLEEN de email tekst bevatten, GEEN JSON formatting.`
         }
       }
     } catch (parseError) {
-      console.error('JSON parse error:', parseError)
-      // If parsing fails, use the raw response as body
+      console.error('JSON extraction failed:', parseError)
+      // Final fallback: use raw response
       result = {
         subject: `Re: ${context.originalSubject}`,
         body: claudeResponse,
@@ -239,7 +299,83 @@ De "body" field moet ALLEEN de email tekst bevatten, GEEN JSON formatting.`
       }
     }
 
-    console.log('Final result:', JSON.stringify(result).substring(0, 200))
+    console.log('Result before CTA injection:', {
+      subject: result.subject,
+      bodyLength: result.body.length,
+      bodyPreview: result.body.substring(0, 150)
+    })
+
+    // CRITICAL: CTA injection for positive sentiment
+    // This MUST happen for every positive reply without exception
+    if (sentiment === 'positive') {
+      console.log('[REPLY] Positive sentiment detected - preparing CTA injection')
+      console.log(`[REPLY] Calendly link for injection: ${context.calendlyLink}`)
+      
+      if (!context.calendlyLink) {
+        console.error('[REPLY] FATAL: Positive sentiment but no Calendly link at injection point')
+        throw new Error('Internal error: Cannot inject CTA without Calendly link')
+      }
+
+      // Remove any signature/closing that Claude added (despite instructions)
+      const closingPatterns = [
+        /\n\n(Best|Kind regards|Sincerely|Regards|Cheers|Thanks|Thank you|Met vriendelijke groet|Groeten|Mvg),?\s*\n.*$/is,
+        /\n\n(Best|Kind regards|Sincerely|Regards|Cheers|Thanks|Thank you|Met vriendelijke groet|Groeten|Mvg),?\s*$/is,
+      ]
+      
+      let cleanedBody = result.body
+      for (const pattern of closingPatterns) {
+        cleanedBody = cleanedBody.replace(pattern, '')
+      }
+      cleanedBody = cleanedBody.trim()
+      
+      console.log('[REPLY] Removed signature/closing from body')
+
+      const ctaTemplates: Record<string, string> = {
+        en: `\n\nI would love to discuss this further with you. Please feel free to book a time that works best for you:\n${context.calendlyLink}`,
+        nl: `\n\nIk bespreek dit graag verder met je. Plan gerust een moment in dat jou het beste uitkomt:\n${context.calendlyLink}`,
+        de: `\n\nIch würde dies gerne weiter mit Ihnen besprechen. Buchen Sie gerne einen Termin, der Ihnen am besten passt:\n${context.calendlyLink}`,
+        fr: `\n\nJ'aimerais en discuter davantage avec vous. N'hésitez pas à réserver un créneau qui vous convient le mieux:\n${context.calendlyLink}`,
+        es: `\n\nMe encantaría discutir esto más a fondo contigo. No dudes en reservar un horario que te funcione mejor:\n${context.calendlyLink}`,
+        it: `\n\nMi piacerebbe discuterne ulteriormente con te. Sentiti libero di prenotare un orario che funziona meglio per te:\n${context.calendlyLink}`,
+        pt: `\n\nGostaria de discutir isso mais detalhadamente contigo. Sinta-se à vontade para marcar um horário que funcione melhor para ti:\n${context.calendlyLink}`,
+      }
+      
+      const ctaBlock = ctaTemplates[targetLanguage] || ctaTemplates['en']
+      console.log(`[REPLY] Using CTA template for language: ${targetLanguage}`)
+      
+      // Add signature after Calendly link
+      const signatureTemplates: Record<string, string> = {
+        en: `\n\nBest,\n${context.userName || 'there'}`,
+        nl: `\n\nMet vriendelijke groet,\n${context.userName || 'daar'}`,
+        de: `\n\nMit freundlichen Grüßen,\n${context.userName || 'dort'}`,
+        fr: `\n\nCordialement,\n${context.userName || 'là'}`,
+        es: `\n\nSaludos,\n${context.userName || 'allí'}`,
+        it: `\n\nCordiali saluti,\n${context.userName || 'lì'}`,
+        pt: `\n\nCordialmente,\n${context.userName || 'lá'}`,
+      }
+      
+      const signature = signatureTemplates[targetLanguage] || signatureTemplates['en']
+      
+      // Structure: [cleaned body] + [CTA with Calendly] + [signature]
+      result.body = cleanedBody + ctaBlock + signature
+      
+      console.log('[REPLY] ✓ CTA INJECTED - Positive reply contains Calendly link + signature')
+      
+      // Verify injection
+      if (!result.body.includes(context.calendlyLink)) {
+        console.error('[REPLY] FATAL: CTA injection failed - link not found in body')
+        throw new Error('Internal error: CTA injection verification failed')
+      }
+    } else {
+      console.log(`[REPLY] No CTA injection - Sentiment is ${sentiment}`)
+    }
+
+    console.log('Final result after CTA injection:', {
+      subject: result.subject,
+      bodyLength: result.body.length,
+      bodyPreview: result.body.substring(0, 150),
+      bodyEnding: result.body.substring(result.body.length - 150)
+    })
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
