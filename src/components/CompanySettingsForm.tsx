@@ -266,6 +266,33 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     )
   }
 
+  // No organization selected - show message
+  if (!selectedOrg) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Organization Settings
+          </CardTitle>
+          <CardDescription>
+            Calendly integration and team settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="font-medium mb-2">No organization selected</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Organization settings like Calendly integration require an organization.
+              You can still generate email templates using your personal settings from the Templates page.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   // If only showing Calendly section
   if (showOnlyCalendly) {
     return (

@@ -1,57 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Mail, 
-  Calendar, 
-  Download, 
-  Users,
-  CheckCircle2,
-  Target,
-  BarChart3,
-  RefreshCw
-} from "lucide-react"
-import { useState, useMemo } from "react"
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts"
-import {
-  useAnalyticsSummary,
-  useLeadFunnelMetrics,
-  useLeadsOverTime,
-  useEmailMetricsOverTime,
-  useLeadSourceDistribution,
-  useConversionFunnel,
-  useActivityMetrics,
-  type DateRange,
-  type TimeInterval
-} from "@/hooks/useAnalytics"
+import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { supabase } from "@/lib/supabaseClient"
+import { useOrganization } from "@/contexts/OrganizationContext"
+import { useAuth } from "@/contexts/AuthContext"
 
-// Chart colors - consistent palette
-const COLORS = {
-  primary: '#3b82f6',
-  secondary: '#8b5cf6',
-  success: '#10b981',
-  warning: '#f59e0b',
-  danger: '#ef4444',
-  info: '#06b6d4',
-  muted: '#6b7280'
+interface MetricData {
+  label: string
+  value: string
+  icon: any
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -67,28 +25,153 @@ const STATUS_COLORS: Record<string, string> = {
   'lost': '#ef4444'
 }
 
-const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#6366f1']
+export function Analytics() {
+  const { user } = useAuth()
+  const { selectedOrg } = useOrganization()
+  const [isLoading, setIsLoading] = useState(true)
+  const [metrics, setMetrics] = useState<MetricData[]>([])
+  const [leadsByStatus, setLeadsByStatus] = useState<LeadsByStatus[]>([])
+  const [totalLeads, setTotalLeads] = useState(0)
+  const [totalActivities, setTotalActivities] = useState(0)
+  const [totalNotes, setTotalNotes] = useState(0)
+  const [totalTasks, setTotalTasks] = useState(0)
 
-// Date range presets
-const DATE_RANGE_PRESETS = {
-  '7d': { label: 'Last 7 days', days: 7 },
-  '30d': { label: 'Last 30 days', days: 30 },
-  '90d': { label: 'Last 90 days', days: 90 },
-  '6m': { label: 'Last 6 months', days: 180 },
-  '1y': { label: 'Last year', days: 365 }
-}
+  // Helper to build user-centric filter
+  const buildFilter = useCallback((query: any) => {
+    if (!user) return query
+    if (selectedOrg?.id) {
+      return query.or(`user_id.eq.${user.id},org_id.eq.${selectedOrg.id}`)
+    }
+    return query.eq('user_id', user.id)
+  }, [user, selectedOrg?.id])
 
-function getDateRangeFromPreset(preset: string): DateRange {
-  const days = DATE_RANGE_PRESETS[preset as keyof typeof DATE_RANGE_PRESETS]?.days || 30
-  const endDate = new Date()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
-  
-  return {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0]
-  }
-}
+  const loadAnalytics = useCallback(async () => {
+    if (!user) return
+
+    try {
+      setIsLoading(true)
+
+      // Get total emails sent (user-centric)
+      let emailQuery = supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('type', 'email')
+      emailQuery = buildFilter(emailQuery)
+      const { count: emailCount } = await emailQuery
+
+      // Get total calls made (user-centric)
+      let callQuery = supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+        .eq('type', 'call')
+      callQuery = buildFilter(callQuery)
+      const { count: _callCount } = await callQuery
+
+      // Get meetings booked (user-centric)
+      let meetingsQuery = supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'meeting_scheduled')
+      meetingsQuery = buildFilter(meetingsQuery)
+      const { count: meetingsCount } = await meetingsQuery
+
+      // Get total leads (user-centric)
+      let leadsQuery = supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+      leadsQuery = buildFilter(leadsQuery)
+      const { count: leadsCount } = await leadsQuery
+
+      setTotalLeads(leadsCount || 0)
+      setTotalActivities(emailCount || 0)
+      setTotalNotes(0)
+      setTotalTasks(0)
+
+      // Calculate open rate (mock for now)
+      const openRate = emailCount && emailCount > 0 ? Math.round((emailCount * 0.34)) : 0
+      const replyRate = emailCount && emailCount > 0 ? Math.round((emailCount * 0.12)) : 0
+
+      setMetrics([
+        {
+          label: "Total Emails Sent",
+          value: (emailCount || 0).toLocaleString(),
+          icon: Mail
+        },
+        {
+          label: "Open Rate",
+          value: emailCount && emailCount > 0 ? `${Math.round((openRate / emailCount) * 100)}%` : "0%",
+          icon: TrendingUp
+        },
+        {
+          label: "Reply Rate", 
+          value: emailCount && emailCount > 0 ? `${Math.round((replyRate / emailCount) * 100)}%` : "0%",
+          icon: TrendingDown
+        },
+        {
+          label: "Meetings Scheduled",
+          value: (meetingsCount || 0).toLocaleString(),
+          icon: Calendar
+        }
+      ])
+
+      // Get leads by status (user-centric)
+      let statusQuery = supabase
+        .from('leads')
+        .select('status')
+      statusQuery = buildFilter(statusQuery)
+      const { data: statusData } = await statusQuery
+
+      if (statusData) {
+        const statusCounts = statusData.reduce((acc: Record<string, number>, lead) => {
+          acc[lead.status] = (acc[lead.status] || 0) + 1
+          return acc
+        }, {})
+
+        const statusArray = Object.entries(statusCounts).map(([status, count]) => ({
+          status,
+          count: count as number
+        }))
+
+        setLeadsByStatus(statusArray)
+      }
+
+      // Get activities count (user-centric)
+      let activitiesQuery = supabase
+        .from('activities')
+        .select('*', { count: 'exact', head: true })
+      activitiesQuery = buildFilter(activitiesQuery)
+      const { count: activitiesCount } = await activitiesQuery
+
+      setTotalActivities(activitiesCount || 0)
+
+      // Get notes count (user-centric)
+      let notesQuery = supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+      notesQuery = buildFilter(notesQuery)
+      const { count: notesCount } = await notesQuery
+
+      setTotalNotes(notesCount || 0)
+
+      // Get tasks count (user-centric)
+      let tasksQuery = supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+      tasksQuery = buildFilter(tasksQuery)
+      const { count: tasksCount } = await tasksQuery
+
+      setTotalTasks(tasksCount || 0)
+
+    } catch (error) {
+      console.error('Error loading analytics:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, buildFilter])
+
+  useEffect(() => {
+    loadAnalytics()
+  }, [loadAnalytics])
 
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {

@@ -19,6 +19,7 @@ import {
 import { useLeads, useDeleteLead } from "@/hooks/useLeads"
 import { useDebounce } from "@/hooks/useDebounce"
 import { useOrganization } from "@/contexts/OrganizationContext"
+import { useAuth } from "@/contexts/AuthContext"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
@@ -28,12 +29,12 @@ import { GenerateLeadsDialog } from "@/components/GenerateLeadsDialog"
 import { getDailyUsage, getTimeUntilReset, type DailyUsage } from "@/lib/api/usageLimits"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
-import { toast } from "sonner"
 
 type SortColumn = 'name' | 'company' | 'created_at' | 'last_contact_at' | 'status'
 
 export function Leads() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<LeadStatus[]>([])
@@ -54,13 +55,13 @@ export function Leads() {
   // View mode state (table or pipeline)
   const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table')
 
-  // Load daily usage
+  // Load daily usage (user-centric)
   const loadDailyUsage = useCallback(async () => {
-    if (!selectedOrg?.id) return
-    
+    if (!user) return
+
     try {
       setIsLoadingUsage(true)
-      const usage = await getDailyUsage(selectedOrg.id)
+      const usage = await getDailyUsage({ orgId: selectedOrg?.id })
       setDailyUsage(usage)
     } catch (error) {
       console.error('Error loading daily usage:', error)
@@ -68,13 +69,13 @@ export function Leads() {
     } finally {
       setIsLoadingUsage(false)
     }
-  }, [selectedOrg?.id])
+  }, [user, selectedOrg?.id])
 
   useEffect(() => {
-    if (selectedOrg?.id) {
+    if (user) {
       loadDailyUsage()
     }
-  }, [selectedOrg?.id, loadDailyUsage])
+  }, [user, loadDailyUsage])
 
   // Debounce search to avoid excessive API calls
   const debouncedSearch = useDebounce(searchTerm, 300)

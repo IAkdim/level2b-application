@@ -6,17 +6,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Users, 
-  Mail, 
-  Calendar, 
-  BarChart3, 
-  Settings,
+import {
+  Users,
+  Mail,
+  Calendar,
+  BarChart3,
   Sparkles,
   ArrowRight,
   CheckCircle2,
   MessageSquare,
-  FileText,
 } from 'lucide-react'
 import { eventBus } from '@/lib/eventBus'
 

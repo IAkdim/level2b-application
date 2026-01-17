@@ -1,9 +1,15 @@
 // API functions for meetings
 import { supabase } from '../supabaseClient'
 
+interface UserCentricOptions {
+  includeShared?: boolean
+  orgId?: string
+}
+
 export interface Meeting {
   id: string
-  org_id: string
+  org_id: string | null
+  user_id: string
   lead_id: string | null
   // Calendly Data
   calendly_event_id: string
@@ -40,7 +46,47 @@ export interface Meeting {
 }
 
 /**
- * Get all meetings for an organization
+ * Get all meetings for user (user-centric)
+ */
+export async function getUserMeetings(
+  userId: string,
+  options?: UserCentricOptions
+): Promise<Meeting[]> {
+  console.log('[getUserMeetings] Fetching meetings for userId:', userId, 'options:', options)
+
+  let query = supabase
+    .from('calendly_meetings')
+    .select(`
+      *,
+      lead:leads (
+        id,
+        name,
+        email,
+        company
+      )
+    `)
+
+  // User-centric filtering: user's own OR shared via org
+  if (options?.includeShared && options?.orgId) {
+    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query.order('start_time', { ascending: false })
+
+  console.log('[getUserMeetings] Query result:', { dataLength: data?.length, error })
+
+  if (error) {
+    console.error('[getUserMeetings] Error fetching meetings:', error)
+    throw error
+  }
+
+  return data || []
+}
+
+/**
+ * @deprecated Use getUserMeetings instead
  */
 export async function getMeetings(orgId: string): Promise<Meeting[]> {
   console.log('[getMeetings] Fetching meetings for orgId:', orgId)

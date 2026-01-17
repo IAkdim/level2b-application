@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useOrganization } from "@/contexts/OrganizationContext"
-import { getMeetings, syncCalendlyMeetings, type Meeting } from "@/lib/api/meetings"
+import { useAuth } from "@/contexts/AuthContext"
+import { getUserMeetings, syncCalendlyMeetings, type Meeting } from "@/lib/api/meetings"
 import { isCalendlyConnected } from "@/lib/api/calendly"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,6 +34,7 @@ function getStatusLabel(status: Meeting['status']): string {
 }
 
 export function Meetings() {
+  const { user } = useAuth()
   const { selectedOrg } = useOrganization()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -44,27 +46,22 @@ export function Meetings() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [calendlyConnected, setCalendlyConnected] = useState(false)
 
-  useEffect(() => {
-    if (selectedOrg) {
-      loadMeetings()
-      checkCalendlyConnection()
-    }
-  }, [selectedOrg])
-
-  const loadMeetings = async () => {
-    if (!selectedOrg) {
+  const loadMeetings = useCallback(async () => {
+    console.log('[Meetings] loadMeetings called')
+    if (!user) {
+      console.log('[Meetings] No user, returning')
       return
     }
 
     try {
       setIsLoading(true)
-      // MOCK DATA: Use mock data when enabled
-      if (ENABLE_MOCK_DATA) {
-        setMeetings(MOCK_MEETINGS)
-        setIsLoading(false)
-        return
-      }
-      const data = await getMeetings(selectedOrg.id)
+      console.log('[Meetings] Fetching meetings for user:', user.id)
+      const data = await getUserMeetings(user.id, {
+        includeShared: !!selectedOrg?.id,
+        orgId: selectedOrg?.id
+      })
+      console.log('[Meetings] Meetings loaded:', data.length, 'meetings')
+      console.log('[Meetings] First meeting:', data[0])
       setMeetings(data)
     } catch (error) {
       console.error('[Meetings] Error loading meetings:', error)
@@ -72,10 +69,14 @@ export function Meetings() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user, selectedOrg?.id])
 
-  const checkCalendlyConnection = async () => {
-    if (!selectedOrg) return
+  const checkCalendlyConnection = useCallback(async () => {
+    // Calendly connection is org-specific, only check if org is selected
+    if (!selectedOrg) {
+      setCalendlyConnected(false)
+      return
+    }
 
     try {
       const connected = await isCalendlyConnected(selectedOrg.id)
@@ -83,10 +84,22 @@ export function Meetings() {
     } catch (error) {
       console.error('Error checking Calendly connection:', error)
     }
-  }
+  }, [selectedOrg])
+
+  useEffect(() => {
+    loadMeetings()
+    checkCalendlyConnection()
+  }, [loadMeetings, checkCalendlyConnection])
 
   const handleSyncMeetings = async () => {
-    if (!selectedOrg) return
+    console.log('[Meetings] handleSyncMeetings called')
+    console.log('[Meetings] selectedOrg:', selectedOrg)
+
+    // Calendly sync requires an organization
+    if (!selectedOrg) {
+      toast.error('Select an organization to sync Calendly meetings')
+      return
+    }
 
     setIsSyncing(true)
     try {
@@ -250,10 +263,7 @@ export function Meetings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => {
-                const date = new Date(m.start_time)
-                return (isFuture(date) || isToday(date)) && m.status !== 'canceled'
-              }).length}
+              {meetings.filter(m => m.status === 'active').length}
             </div>
           </CardContent>
         </Card>
@@ -264,10 +274,7 @@ export function Meetings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {meetings.filter(m => {
-                const date = new Date(m.start_time)
-                return isPast(date) && !isToday(date) && m.status !== 'canceled'
-              }).length}
+              {meetings.filter(m => new Date(m.end_time) < new Date()).length}
             </div>
           </CardContent>
         </Card>

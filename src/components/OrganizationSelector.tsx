@@ -27,9 +27,11 @@ interface OrganizationSelectorProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   trigger?: React.ReactNode
+  allowSkip?: boolean
+  onSkip?: () => void
 }
 
-export function OrganizationSelector({ open, onOpenChange, trigger }: OrganizationSelectorProps) {
+export function OrganizationSelector({ open, onOpenChange, trigger, allowSkip, onSkip }: OrganizationSelectorProps) {
   const { userOrgs, setOrganization, refreshOrganizations } = useOrganization()
   const [newOrgName, setNewOrgName] = useState("")
   const [joinOrgId, setJoinOrgId] = useState("")
@@ -161,7 +163,7 @@ export function OrganizationSelector({ open, onOpenChange, trigger }: Organizati
       <DialogHeader>
         <DialogTitle>Select Organization</DialogTitle>
         <DialogDescription>
-          Choose an organization to continue, or create a new one.
+          Organizations let you collaborate with your team. You can also continue without one.
         </DialogDescription>
       </DialogHeader>
 
@@ -184,7 +186,7 @@ export function OrganizationSelector({ open, onOpenChange, trigger }: Organizati
         <TabsContent value="select" className="space-y-4">
           {userOrgs.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              You don't belong to any organizations yet. Create or join one to get started.
+              You don't belong to any organizations yet. Create or join one to collaborate with your team.
             </p>
           ) : (
             <>
@@ -251,6 +253,18 @@ export function OrganizationSelector({ open, onOpenChange, trigger }: Organizati
           </Button>
         </TabsContent>
       </Tabs>
+
+      {allowSkip && onSkip && (
+        <div className="pt-4 border-t">
+          <Button
+            variant="ghost"
+            onClick={onSkip}
+            className="w-full text-muted-foreground hover:text-foreground"
+          >
+            Continue without organization
+          </Button>
+        </div>
+      )}
     </DialogContent>
   )
 

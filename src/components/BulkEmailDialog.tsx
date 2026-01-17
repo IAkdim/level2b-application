@@ -103,46 +103,14 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       return
     }
 
-    if (!selectedOrg?.id) {
-      alert("Geen organisatie geselecteerd")
-      return
-    }
-
     setIsSending(true)
     setSendResult(null)
     setIsComplete(false)
     setSendingProgress({ current: 0, total: selectedLeads.length, success: 0, failed: 0 })
 
     try {
-      // Check Gmail authentication first
-      try {
-        await checkGmailAuthentication()
-      } catch (authError) {
-        // Authentication error detected - redirect to Google OAuth
-        if (isAuthenticationError(authError)) {
-          toast.info("Gmail opnieuw verbinden...", {
-            description: "Je wordt doorgestuurd naar Google om opnieuw in te loggen.",
-            duration: 3000
-          })
-          
-          // Automatically redirect to Google re-authentication
-          try {
-            await reAuthenticateWithGoogle()
-          } catch (reAuthError) {
-            console.error("Re-authentication failed:", reAuthError)
-            toast.error("Re-authenticatie mislukt", {
-              description: "Probeer het later opnieuw of neem contact op met support.",
-              duration: 5000
-            })
-          }
-          return // Stop sending process
-        }
-        throw authError // Re-throw if it's a different error
-      }
-
-      // Check daily email limit from user settings or default
-      const dailyLimit = userSettings?.campaign_daily_send_limit || 50
-      const limitCheck = await checkUsageLimit(selectedOrg.id, 'email')
+      // Check daily email limit (user-centric)
+      const limitCheck = await checkUsageLimit('email', { orgId: selectedOrg?.id })
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -220,13 +188,10 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       )
       console.log("Batch send completed. Message IDs:", messageIds);
 
-      // Mark as complete with animation
-      setIsComplete(true)
-
-      // Increment email usage counter for successful sends
+      // Increment email usage counter for successful sends (user-centric)
       if (messageIds.length > 0) {
         try {
-          await incrementUsage(selectedOrg.id, 'email', messageIds.length)
+          await incrementUsage('email', messageIds.length, { orgId: selectedOrg?.id })
         } catch (error) {
           console.error('Error incrementing email usage:', error)
           // Don't fail the send if usage tracking fails

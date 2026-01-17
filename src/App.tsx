@@ -6,7 +6,7 @@ import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
-import { FirstVisitModal } from "@/components/FirstVisitModal"
+import { AuthProvider } from "@/contexts/AuthContext"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 import { OnboardingProvider } from "@/contexts/OnboardingContext"
@@ -73,10 +73,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Router>
-          <OrganizationProvider>
-            <SubscriptionProvider>
-            <OnboardingProvider>
-            <Suspense fallback={<PageLoader />}>
+          <AuthProvider>
+            <OrganizationProvider>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -204,11 +203,9 @@ function App() {
               }
             />
               </Routes>
-            </Suspense>
-            <Toaster />
-            </OnboardingProvider>
-            </SubscriptionProvider>
-          </OrganizationProvider>
+              </Suspense>
+            </OrganizationProvider>
+          </AuthProvider>
         </Router>
       </ThemeProvider>
     </QueryClientProvider>

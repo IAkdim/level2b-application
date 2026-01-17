@@ -1,7 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom"
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
 import { useAuthRedirect } from "@/hooks/useAuthRedirect"
+import { useAuth } from "@/contexts/AuthContext"
 import { useOrganization } from "@/contexts/OrganizationContext"
 
 interface ProtectedRouteProps {
@@ -9,36 +8,29 @@ interface ProtectedRouteProps {
   requireOrganization?: boolean
 }
 
-export function ProtectedRoute({ children, requireOrganization = true }: ProtectedRouteProps) {
-  const [loading, setLoading] = useState(true)
-  const [session, setSession] = useState<any>(null)
+/**
+ * Protected route component - requires authentication
+ * Organization is now OPTIONAL by default (user-centric model)
+ */
+export function ProtectedRoute({ children, requireOrganization = false }: ProtectedRouteProps) {
   const location = useLocation()
   const { saveRedirectPath } = useAuthRedirect()
+  const { user, loading: authLoading } = useAuth()
   const { selectedOrg, loading: orgLoading } = useOrganization()
 
-  useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession()
-      setSession(data.session)
-      setLoading(false)
-    }
-    getSession()
+  // Wait for auth to load
+  if (authLoading) return null
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s)
-      setLoading(false)
-    })
-    return () => listener.subscription.unsubscribe()
-  }, [])
+  // Wait for org loading only if org is required
+  if (requireOrganization && orgLoading) return null
 
-  if (loading || orgLoading) return null
-
-  if (!session) {
+  // Redirect to login if not authenticated
+  if (!user) {
     saveRedirectPath(location.pathname + location.search)
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
-  // If organization is required and not selected, redirect to organization selection
+  // If organization is explicitly required and not selected, redirect to organization selection
   if (requireOrganization && !selectedOrg) {
     return <Navigate to="/select-organization" replace />
   }

@@ -25,21 +25,24 @@ export async function getNotes(leadId: string): Promise<Note[]> {
 }
 
 /**
- * Create a new note
+ * Create a new note (user-centric)
  */
 export async function createNote(
-  orgId: string,
-  input: CreateNoteInput
+  input: CreateNoteInput & { orgId?: string }
 ): Promise<Note> {
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { orgId, ...noteInput } = input
 
   const { data, error } = await supabase
     .from('notes')
     .insert({
-      org_id: orgId,
-      ...input,
-      is_pinned: input.is_pinned || false,
-      created_by: user?.id
+      user_id: user.id,
+      org_id: orgId || null,
+      ...noteInput,
+      is_pinned: noteInput.is_pinned || false,
+      created_by: user.id
     })
     .select(`
       *,
