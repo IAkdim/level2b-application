@@ -112,23 +112,21 @@ export async function generateColdEmailTemplate(companyInfo: {
 }
 
 /**
- * Save generated template to database (USER-CENTRIC)
+ * Save generated template to database
  */
 export async function saveEmailTemplate(
-  input: CreateEmailTemplateInput & { orgId?: string }
+  input: CreateEmailTemplateInput
 ): Promise<EmailTemplate> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { orgId, ...templateInput } = input
-  console.log('saveEmailTemplate called for user:', user.id, 'orgId:', orgId)
+  console.log('saveEmailTemplate called for user:', user.id)
 
   const { data, error } = await supabase
     .from('email_templates')
     .insert({
       user_id: user.id,
-      org_id: orgId || null,
-      ...templateInput,
+      ...input,
     })
     .select()
     .single()
@@ -143,30 +141,15 @@ export async function saveEmailTemplate(
   return data
 }
 
-interface UserCentricOptions {
-  includeShared?: boolean
-  orgId?: string
-}
-
 /**
- * Get all email templates (USER-CENTRIC)
+ * Get all email templates for a user
  */
-export async function getUserEmailTemplates(
-  userId: string,
-  options?: UserCentricOptions
-): Promise<EmailTemplate[]> {
-  let query = supabase
+export async function getUserEmailTemplates(userId: string): Promise<EmailTemplate[]> {
+  const { data, error } = await supabase
     .from('email_templates')
     .select('*')
-
-  // User-centric filtering: user's own OR shared via org
-  if (options?.includeShared && options?.orgId) {
-    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
-  } else {
-    query = query.eq('user_id', userId)
-  }
-
-  const { data, error } = await query.order('created_at', { ascending: false })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching templates:', error)

@@ -1,5 +1,11 @@
 // Supabase Edge Function: calendly-get-event-types
 // Fetches available event types (scheduling links) from Calendly
+//
+// ⚠️  DEPRECATED: This function requires organization support which has been removed.
+// This function is kept for reference but will not work without organizations.
+// To re-enable, you would need to:
+// 1. Restore organization tables in the database
+// 2. Update to work with user-based approach instead of org-based
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

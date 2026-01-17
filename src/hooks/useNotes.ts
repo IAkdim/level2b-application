@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import * as notesApi from '@/lib/api/notes'
 import type { CreateNoteInput, UpdateNoteInput } from '@/types/crm'
 
@@ -18,19 +17,13 @@ export function useNotes(leadId: string | undefined) {
 }
 
 /**
- * Hook to create a new note (user-centric)
+ * Hook to create a new note
  */
 export function useCreateNote() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: CreateNoteInput) => {
-      return notesApi.createNote({
-        ...input,
-        orgId: selectedOrg?.id,
-      })
-    },
+    mutationFn: (input: CreateNoteInput) => notesApi.createNote(input),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notes', data.lead_id] })
     },
@@ -75,7 +68,7 @@ export function useTogglePinNote() {
 
   return useMutation({
     mutationFn: ({ noteId, isPinned }: { noteId: string; isPinned: boolean }) =>
-      notesApi.togglePinNote(noteId, isPinned),
+      notesApi.toggleNotePin(noteId, isPinned),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notes', data.lead_id] })
     },

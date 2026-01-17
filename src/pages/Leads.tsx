@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useLeads, useDeleteLead } from "@/hooks/useLeads"
 import { useDebounce } from "@/hooks/useDebounce"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { AddLeadDialog } from "@/components/AddLeadDialog"
 import { EditLeadDialog } from "@/components/EditLeadDialog"
@@ -35,7 +34,6 @@ type SortColumn = 'name' | 'company' | 'created_at' | 'last_contact_at' | 'statu
 export function Leads() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<LeadStatus[]>([])
   const [sentimentFilter, setSentimentFilter] = useState<Sentiment[]>([])
@@ -55,13 +53,13 @@ export function Leads() {
   // View mode state (table or pipeline)
   const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table')
 
-  // Load daily usage (user-centric)
+  // Load daily usage
   const loadDailyUsage = useCallback(async () => {
     if (!user) return
 
     try {
       setIsLoadingUsage(true)
-      const usage = await getDailyUsage({ orgId: selectedOrg?.id })
+      const usage = await getDailyUsage()
       setDailyUsage(usage)
     } catch (error) {
       console.error('Error loading daily usage:', error)
@@ -69,7 +67,7 @@ export function Leads() {
     } finally {
       setIsLoadingUsage(false)
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   useEffect(() => {
     if (user) {

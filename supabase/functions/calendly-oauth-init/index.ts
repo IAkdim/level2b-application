@@ -1,5 +1,11 @@
 // Supabase Edge Function: calendly-oauth-init
 // Generates the Calendly OAuth authorization URL
+//
+// ⚠️  DEPRECATED: This function requires organization support which has been removed.
+// This function is kept for reference but will not work without organizations.
+// To re-enable, you would need to:
+// 1. Restore organization tables in the database
+// 2. Update to work with user-based approach instead of org-based
 
 const CALENDLY_CLIENT_ID = Deno.env.get('CALENDLY_CLIENT_ID')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')

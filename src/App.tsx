@@ -9,7 +9,6 @@ import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
 import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { AuthProvider } from "@/contexts/AuthContext"
-import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 import { OnboardingProvider } from "@/contexts/OnboardingContext"
 // Removed unused imports
@@ -17,6 +16,7 @@ import { OnboardingProvider } from "@/contexts/OnboardingContext"
 // import { OnboardingProvider } from "@/contexts/OnboardingContext"
 import { GuidedWalkthrough } from "@/components/GuidedWalkthrough"
 import { DemoUsageTracker } from "@/components/DemoUsageTracker"
+import { FirstVisitModal } from "@/components/FirstVisitModal"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
@@ -29,12 +29,10 @@ const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.M
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.default })));
 const ApiMonitoring = lazy(() => import("@/pages/ApiMonitoring"))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
-const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
 const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
-const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
 const Subscribe = lazy(() => import("@/pages/Subscribe"))
 const SubscribeSuccess = lazy(() => import("@/pages/SubscribeSuccess"))
 const BillingSettings = lazy(() => import("@/pages/BillingSettings"))
@@ -79,6 +77,7 @@ function App() {
       <ThemeProvider>
         <Router>
           <AuthProvider>
+<<<<<<< HEAD
             <OrganizationProvider>
               <SubscriptionProvider>
                 <OnboardingProvider>
@@ -214,6 +213,130 @@ function App() {
                 </OnboardingProvider>
               </SubscriptionProvider>
             </OrganizationProvider>
+=======
+            <SubscriptionProvider>
+              <OnboardingProvider>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
+
+                    {/* Onboarding flow routes - requires auth but not subscription */}
+                    <Route
+                      path="/onboarding"
+                      element={
+                        <ProtectedRoute>
+                          <OnboardingForm />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/paywall"
+                      element={
+                        <ProtectedRoute>
+                          <DemoPaywall />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/thank-you"
+                      element={
+                        <ProtectedRoute>
+                          <ThankYou />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Subscription pages - requires auth but not subscription */}
+                    <Route
+                      path="/subscribe"
+                      element={
+                        <ProtectedRoute>
+                          <Subscribe />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/subscribe/success"
+                      element={
+                        <ProtectedRoute>
+                          <SubscribeSuccess />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Developer Dashboard - admin only */}
+                    <Route
+                      path="/dev/*"
+                      element={
+                        <AdminRoute>
+                          <DevDashboardLayout />
+                        </AdminRoute>
+                      }
+                    >
+                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route path="overview" element={<DevOverview />} />
+                      <Route path="users" element={<DevUsers />} />
+                      <Route path="users/:userId" element={<DevUserDetail />} />
+                      <Route path="logs" element={<DevLogs />} />
+                      <Route path="flags" element={<DevFeatureFlags />} />
+                      <Route path="settings" element={<DevSettings />} />
+                    </Route>
+
+                    {/* Protected app routes - requires subscription OR demo mode */}
+                    <Route
+                      path="/*"
+                      element={
+                        <ProtectedRoute>
+                          <DemoGate>
+                            <div className="min-h-screen bg-background">
+                              <TopBar />
+                              {/* Demo usage tracker - shown in demo mode */}
+                              <div className="px-4 py-2">
+                                <DemoUsageTracker variant="compact" />
+                              </div>
+                              <div className="flex h-[calc(100vh-56px-52px)]">
+                                <AppSidebar />
+                                <main className="flex-1 overflow-auto bg-muted/30">
+                                  <div className="p-6 lg:p-8">
+                                    <Suspense fallback={<PageLoader />}>
+                                      <Routes>
+                                        <Route path="/" element={<Dashboard />} />
+                                        <Route path="/outreach" element={<OutreachLayout />}>
+                                          <Route index element={<Navigate to="templates" replace />} />
+                                          <Route path="templates" element={<Templates />} />
+                                          <Route path="leads" element={<Leads />} />
+                                          <Route path="leads/:leadId" element={<LeadDetail />} />
+                                          <Route path="email-threads" element={<EmailThreads />} />
+                                        </Route>
+                                        <Route path="/meetings" element={<Meetings />} />
+                                        <Route path="/analytics" element={<Analytics />} />
+                                        <Route path="/api-monitoring" element={<ApiMonitoring />} />
+                                        <Route path="/configuration" element={<Configuration />} />
+                                        <Route path="/profile" element={<Profile />} />
+                                        <Route path="/settings/billing" element={<BillingSettings />} />
+                                      </Routes>
+                                    </Suspense>
+                                  </div>
+                                </main>
+                              </div>
+                              {/* Guide Dialog - globally available */}
+                              <GuideDialog />
+                              {/* Guided walkthrough for demo users */}
+                              <GuidedWalkthrough />
+                              {/* First visit onboarding modal - for subscribed users */}
+                              <FirstVisitModal />
+                            </div>
+                          </DemoGate>
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </Suspense>
+              </OnboardingProvider>
+            </SubscriptionProvider>
+>>>>>>> b19906cd00ff665611dd3b74ac447c6681cbb747
           </AuthProvider>
         </Router>
       </ThemeProvider>

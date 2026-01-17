@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,10 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles, Clock } from "lucide-react"
 import { sendBatchEmails, checkGmailAuthentication } from "@/lib/api/gmail"
-import { getEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
+import { getUserEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
 import type { EmailTemplate } from "@/types/crm"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth"
 import type { Lead } from "@/types/crm"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,7 @@ interface BulkEmailDialogProps {
 }
 
 export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSent }: BulkEmailDialogProps) {
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
@@ -45,28 +45,28 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   // Load user settings and templates when dialog opens
   useEffect(() => {
     async function loadUserSettings() {
-      if (!open || !selectedOrg?.id) return
-      
+      if (!open) return
+
       try {
-        const settings = await getUserSettings(selectedOrg.id)
+        const settings = await getUserSettings()
         setUserSettings(settings || getDefaultSettings() as UserSettings)
       } catch (error) {
         console.error('Error loading user settings:', error)
         setUserSettings(getDefaultSettings() as UserSettings)
       }
     }
-    
+
     loadUserSettings()
-  }, [open, selectedOrg?.id])
+  }, [open])
 
   // Load saved templates when dialog opens
   useEffect(() => {
     const loadTemplates = async () => {
-      if (!open || !selectedOrg?.id) return
-      
+      if (!open || !user) return
+
       setIsLoadingTemplates(true)
       try {
-        const templates = await getEmailTemplates(selectedOrg.id)
+        const templates = await getUserEmailTemplates(user.id)
         setSavedTemplates(templates)
       } catch (error) {
         console.error('Error loading templates:', error)
@@ -74,9 +74,9 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         setIsLoadingTemplates(false)
       }
     }
-    
+
     loadTemplates()
-  }, [open, selectedOrg?.id])
+  }, [open, user])
 
   const handleUseTemplate = async (template: EmailTemplate) => {
     setSubject(template.subject)
@@ -110,7 +110,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
 
     try {
       // Check daily email limit (user-centric)
-      const limitCheck = await checkUsageLimit('email', { orgId: selectedOrg?.id })
+      const limitCheck = await checkUsageLimit('email')
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -156,9 +156,9 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         if (userSettings?.email_signature) {
           const signature = userSettings.email_signature
             .replace(/\{\{sender_name\}\}/g, userSettings.full_name || user?.email || '')
-            .replace(/\{\{company\}\}/g, selectedOrg?.name || '')
+            .replace(/\{\{company\}\}/g, userSettings.company_name || '')
             .replace(/\{\{phone\}\}/g, '') // Add phone to user settings if needed
-          
+
           personalizedBody += `\n\n${signature}`
         }
 
@@ -191,7 +191,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       // Increment email usage counter for successful sends (user-centric)
       if (messageIds.length > 0) {
         try {
-          await incrementUsage('email', messageIds.length, { orgId: selectedOrg?.id })
+          await incrementUsage('email', messageIds.length)
         } catch (error) {
           console.error('Error incrementing email usage:', error)
           // Don't fail the send if usage tracking fails

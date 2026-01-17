@@ -2,16 +2,17 @@
 // Form for company information with Calendly OAuth integration
 
 import { useState, useEffect } from 'react'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import {
-  getOrganizationSettings,
-  updateOrganizationSettings,
   initiateCalendlyOAuth,
   getCalendlyEventTypes,
   disconnectCalendly,
   type CalendlyEventType,
-  type OrganizationSettings,
 } from '@/lib/api/calendly'
+import {
+  getUserSettings,
+  updateUserSettings,
+  type UserSettings,
+} from '@/lib/api/userSettings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,10 +34,9 @@ interface CompanySettingsFormProps {
 }
 
 export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySettingsFormProps) {
-  const { selectedOrg } = useOrganization()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [settings, setSettings] = useState<Partial<OrganizationSettings>>({
+  const [settings, setSettings] = useState<Partial<UserSettings>>({
     company_name: '',
     company_description: '',
     product_service: '',
@@ -52,9 +52,9 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   const [eventTypes, setEventTypes] = useState<CalendlyEventType[]>([])
   const [selectedEventTypeUri, setSelectedEventTypeUri] = useState<string>('')
 
-  const loadEventTypes = async (organizationId: string) => {
+  const loadEventTypes = async () => {
     try {
-      const types = await getCalendlyEventTypes(organizationId)
+      const types = await getCalendlyEventTypes()
       setEventTypes(types)
     } catch (error) {
       console.error('Error loading event types:', error)
@@ -62,10 +62,10 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
     }
   }
 
-  const loadSettings = async (organizationId: string) => {
+  const loadSettings = async () => {
     try {
       setIsLoading(true)
-      const data = await getOrganizationSettings(organizationId)
+      const data = await getUserSettings()
       
       // Always set settings, even if data is null
       setSettings({
@@ -83,7 +83,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
       // If connected, load event types
       if (connected && data) {
-        await loadEventTypes(organizationId)
+        await loadEventTypes()
         setSelectedEventTypeUri(data.calendly_event_type_uri || '')
       }
     } catch (error) {
@@ -104,24 +104,18 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   }
 
   useEffect(() => {
-    if (selectedOrg?.id) {
-      loadSettings(selectedOrg.id)
-    } else {
-      setIsLoading(false)
-    }
-  }, [selectedOrg?.id])
+    loadSettings()
+  }, [])
 
   // Listen for settings updates from other components (e.g., TemplateSelector)
   useEffect(() => {
     const handleSettingsUpdate = () => {
-      if (selectedOrg?.id) {
-        loadSettings(selectedOrg.id)
-      }
+      loadSettings()
     }
 
     eventBus.on('companySettingsUpdated', handleSettingsUpdate)
     return () => eventBus.off('companySettingsUpdated', handleSettingsUpdate)
-  }, [selectedOrg?.id])
+  }, [])
 
   // Check for Calendly OAuth callback - only once on mount
   useEffect(() => {
@@ -143,19 +137,12 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
   const handleSaveSettings = async () => {
     console.log('[CompanySettingsForm] handleSaveSettings called')
-    console.log('[CompanySettingsForm] selectedOrg:', selectedOrg)
     console.log('[CompanySettingsForm] settings:', settings)
     console.log('[CompanySettingsForm] settings.company_name:', settings.company_name)
     console.log('[CompanySettingsForm] settings.company_name?.trim():', settings.company_name?.trim())
     console.log('[CompanySettingsForm] selectedEventTypeUri:', selectedEventTypeUri)
-    
-    try {
-      if (!selectedOrg) {
-        console.log('[CompanySettingsForm] No selectedOrg, returning')
-        toast.error('No organisation selected')
-        return
-      }
 
+    try {
       console.log('[CompanySettingsForm] Checking company_name...')
       if (!settings.company_name?.trim()) {
         console.log('[CompanySettingsForm] No company name, returning. Value:', settings.company_name)
@@ -165,7 +152,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
       console.log('[CompanySettingsForm] Validation passed, setting isSaving to true')
       setIsSaving(true)
-      
+
       // If Calendly event type selected, add scheduling URL
       let calendlyUpdates = {}
       if (selectedEventTypeUri) {
@@ -182,7 +169,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
       }
 
       console.log('[CompanySettingsForm] Saving settings with updates:', { ...settings, ...calendlyUpdates })
-      await updateOrganizationSettings(selectedOrg.id, {
+      await updateUserSettings({
         ...settings,
         ...calendlyUpdates,
       })
@@ -203,17 +190,11 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
   const handleConnectCalendly = async () => {
     console.log('[CompanySettingsForm] handleConnectCalendly called')
-    console.log('[CompanySettingsForm] selectedOrg:', selectedOrg)
-    
-    if (!selectedOrg) {
-      toast.error('No organisation selected')
-      return
-    }
 
     setIsConnectingCalendly(true)
     try {
       console.log('[CompanySettingsForm] Calling initiateCalendlyOAuth...')
-      const authUrl = await initiateCalendlyOAuth(selectedOrg.id)
+      const authUrl = await initiateCalendlyOAuth()
       console.log('[CompanySettingsForm] Got authUrl:', authUrl)
       // Open OAuth in popup or redirect
       window.location.href = authUrl
@@ -225,10 +206,8 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
   }
 
   const handleDisconnectCalendly = async () => {
-    if (!selectedOrg) return
-
     try {
-      await disconnectCalendly(selectedOrg.id)
+      await disconnectCalendly()
       setIsCalendlyConnected(false)
       setEventTypes([])
       setSelectedEventTypeUri('')

@@ -19,12 +19,13 @@ import {
   type DailyUsage
 } from '@/lib/api/usageLimits'
 import type { EmailTemplate, Language } from '@/types/crm'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   validateSettingsForTemplateGeneration,
   type CompanySettings
 } from '@/lib/api/settings'
+import { getUserSettings, updateUserSettings } from '@/lib/api/userSettings'
+import { eventBus } from '@/lib/eventBus'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,7 +50,6 @@ import { toast } from 'sonner'
 
 export default function Templates() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -74,7 +74,7 @@ export default function Templates() {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('en')
 
   // Quick settings form state
-  const [quickSettings, setQuickSettings] = useState<Partial<OrganizationSettings>>({
+  const [quickSettings, setQuickSettings] = useState<Partial<CompanySettings>>({
     company_name: '',
     product_service: '',
     target_audience: '',
@@ -87,7 +87,7 @@ export default function Templates() {
 
     try {
       setIsLoadingUsage(true)
-      const usage = await getDailyUsage({ orgId: selectedOrg?.id })
+      const usage = await getDailyUsage()
       setDailyUsage(usage)
     } catch (error) {
       console.error('Error loading daily usage:', error)
@@ -97,7 +97,7 @@ export default function Templates() {
     } finally {
       setIsLoadingUsage(false)
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   // Load daily usage on mount and when user/org changes
   useEffect(() => {
@@ -109,34 +109,30 @@ export default function Templates() {
   // Check validation on mount and update
   useEffect(() => {
     const checkValidation = async () => {
-      if (!selectedOrg?.id) return
-      const settings = await getOrganizationSettings(selectedOrg.id)
+      const settings = await getUserSettings()
       const result = validateSettingsForTemplateGeneration(settings)
       setValidation(result)
     }
     checkValidation()
-    
+
     // Re-check when window gets focus (after coming back from config)
     const handleFocus = () => checkValidation()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [selectedOrg?.id])
+  }, [])
 
   const loadTemplates = useCallback(async () => {
     if (!user) return
 
     try {
       setIsLoadingTemplates(true)
-      const templates = await getUserEmailTemplates(user.id, {
-        includeShared: !!selectedOrg?.id,
-        orgId: selectedOrg?.id
-      })
+      const templates = await getUserEmailTemplates(user.id)
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
       toast.error('Could not load templates')
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   // Load saved templates on mount
   useEffect(() => {
@@ -150,12 +146,8 @@ export default function Templates() {
   }, [loadTemplates])
 
   const handleGenerateTemplate = async () => {
-    if (!selectedOrg?.id) {
-      toast.error('No organisation selected')
-      return
-    }
     // Always show quick settings dialog so user can add extra context
-    const existing = await getOrganizationSettings(selectedOrg.id)
+    const existing = await getUserSettings()
     if (existing) {
       setQuickSettings(existing)
     }
@@ -164,11 +156,6 @@ export default function Templates() {
   }
 
   const handleQuickSettingsSave = async () => {
-    if (!selectedOrg?.id) {
-      toast.error('No organisation selected')
-      return
-    }
-    
     // Validate required fields
     if (!quickSettings.company_name?.trim()) {
       toast.error('Company name is required')
@@ -185,7 +172,7 @@ export default function Templates() {
 
     // Save settings to database
     try {
-      await updateOrganizationSettings(selectedOrg.id, quickSettings)
+      await updateUserSettings(quickSettings)
       // Emit event to notify other components
       eventBus.emit('companySettingsUpdated')
     } catch (error) {
@@ -193,7 +180,7 @@ export default function Templates() {
       toast.error('Failed to save settings')
       return
     }
-    
+
     // Update validation
     const result = validateSettingsForTemplateGeneration(quickSettings)
     setValidation(result)

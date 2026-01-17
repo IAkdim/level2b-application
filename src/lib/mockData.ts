@@ -10,7 +10,7 @@ import { Meeting } from './api/meetings'
 export const MOCK_LEADS: Lead[] = [
   {
     id: 'mock-lead-1',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Sarah Johnson',
     email: 'sarah.johnson@techcorp.com',
     phone: '+1 555 1234 5678',
@@ -27,7 +27,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-2',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Michael Davis',
     email: 'michael@innovateplus.com',
     phone: '+1 555 9876 5432',
@@ -44,7 +44,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-3',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Emma Thompson',
     email: 'e.thompson@mediagroup.com',
     phone: '+1 555 5555 7777',
@@ -61,7 +61,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-4',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'James Wilson',
     email: 'james@salesforce.com',
     phone: '+1 555 3333 4444',
@@ -77,7 +77,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-5',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Rachel Anderson',
     email: 'rachel@brandworks.com',
     phone: '+1 555 7777 8888',
@@ -94,7 +94,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-6',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Robert Martinez',
     email: 'robert@digitalnow.com',
     company: 'DigitalNow',
@@ -110,7 +110,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-7',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'Jennifer Parker',
     email: 'jennifer@creativelab.com',
     company: 'Creative Lab',
@@ -126,7 +126,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'mock-lead-8',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     name: 'David Harrison',
     email: 'david@startuphub.com',
     company: 'StartupHub',
@@ -145,7 +145,7 @@ export const MOCK_LEADS: Lead[] = [
 export const MOCK_MEETINGS: Meeting[] = [
   {
     id: 'mock-meeting-1',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: 'mock-lead-1',
     calendly_event_id: 'mock-calendly-1',
     calendly_uri: 'https://calendly.com/demo/mock-event-1',
@@ -179,7 +179,7 @@ export const MOCK_MEETINGS: Meeting[] = [
   },
   {
     id: 'mock-meeting-2',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: 'mock-lead-5',
     calendly_event_id: 'mock-calendly-2',
     calendly_uri: 'https://calendly.com/demo/mock-event-2',
@@ -213,7 +213,7 @@ export const MOCK_MEETINGS: Meeting[] = [
   },
   {
     id: 'mock-meeting-3',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: null,
     calendly_event_id: 'mock-calendly-3',
     calendly_uri: 'https://calendly.com/demo/mock-event-3',
@@ -239,7 +239,7 @@ export const MOCK_MEETINGS: Meeting[] = [
   },
   {
     id: 'mock-meeting-4',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: null,
     calendly_event_id: 'mock-calendly-4',
     calendly_uri: 'https://calendly.com/demo/mock-event-4',
@@ -267,7 +267,7 @@ export const MOCK_MEETINGS: Meeting[] = [
   },
   {
     id: 'mock-meeting-5',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: 'mock-lead-2',
     calendly_event_id: 'mock-calendly-5',
     calendly_uri: 'https://calendly.com/demo/mock-event-5',
@@ -299,7 +299,7 @@ export const MOCK_MEETINGS: Meeting[] = [
   },
   {
     id: 'mock-meeting-6',
-    org_id: 'mock-org',
+    user_id: 'mock-org',
     lead_id: null,
     calendly_event_id: 'mock-calendly-6',
     calendly_uri: 'https://calendly.com/demo/mock-event-6',

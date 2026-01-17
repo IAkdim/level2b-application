@@ -22,8 +22,6 @@ import {
 import { Settings, User, LogOut, Plus, X } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState, useEffect, useCallback } from "react"
-import { useOrganization } from "@/contexts/OrganizationContext"
-import { OrganizationSelector } from "@/components/OrganizationSelector"
 import { QuickActions } from "@/components/QuickActions"
 import { 
   getNotifications, 
@@ -45,9 +43,13 @@ export function TopBar() {
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>('')
+<<<<<<< HEAD
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const { selectedOrg, userOrgs, setOrganization, clearOrganization } = useOrganization()
+=======
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
+>>>>>>> b19906cd00ff665611dd3b74ac447c6681cbb747
 
   // Global keyboard shortcut for quick actions (⌘K / Ctrl+K)
   useEffect(() => {
@@ -173,23 +175,7 @@ export function TopBar() {
 
           if (!userResponse.error && userResponse.data) {
             setUser(userResponse.data)
-          }
-          
-          // Load user settings to get display name
-          if (selectedOrg?.id) {
-            try {
-              const settings = await getUserSettings(selectedOrg.id)
-              if (settings?.full_name) {
-                setUserName(settings.full_name)
-              } else if (userResponse.data?.full_name) {
-                setUserName(userResponse.data.full_name)
-              } else {
-                setUserName(session.user.email?.split('@')[0] || 'User')
-              }
-            } catch (error) {
-              console.error('Error loading user settings:', error)
-              setUserName(userResponse.data?.full_name || session.user.email?.split('@')[0] || 'User')
-            }
+            setUserName(userResponse.data.full_name || session.user.email?.split('@')[0] || 'User')
           }
         }
       } catch (error) {
@@ -220,70 +206,17 @@ export function TopBar() {
         subscription.unsubscribe()
       }
     }
-  }, [selectedOrg?.id])
+  }, [])
 
   return (
     <TooltipProvider>
       <div className="h-14 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="flex h-full items-center justify-between px-4 lg:px-6">
-          {/* Left side - Workspace/Organization Selector */}
+          {/* Left side - Branding */}
           <div className="flex items-center gap-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 h-9 px-3 hover:bg-muted">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-                    {selectedOrg ? (
-                      <Building2 className="h-3.5 w-3.5 text-primary" />
-                    ) : (
-                      <User className="h-3.5 w-3.5 text-primary" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium">
-                    {selectedOrg ? selectedOrg.name : "Personal Workspace"}
-                  </span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {/* Personal Workspace option */}
-                <DropdownMenuItem
-                  onClick={() => clearOrganization()}
-                  className={cn("cursor-pointer", !selectedOrg && "bg-muted")}
-                >
-                  <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-col">
-                    <span className="text-sm">Personal Workspace</span>
-                    <span className="text-xs text-muted-foreground">Your private data</span>
-                  </div>
-                </DropdownMenuItem>
-
-                {userOrgs.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Organizations</DropdownMenuLabel>
-                    {userOrgs.map((userOrg) => (
-                      <DropdownMenuItem
-                        key={userOrg.org_id}
-                        onClick={() => setOrganization(userOrg.organization)}
-                        className={cn("cursor-pointer", selectedOrg?.id === userOrg.org_id && "bg-muted")}
-                      >
-                        <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <div className="flex flex-col">
-                          <span className="text-sm">{userOrg.organization.name}</span>
-                          <span className="text-xs text-muted-foreground capitalize">{userOrg.role}</span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setOrgSelectorOpen(true)} className="cursor-pointer">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {userOrgs.length > 0 ? "Manage Organizations" : "Create or Join Organization"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Level2B
+            </h1>
           </div>
 
           {/* Right side - Actions */}
@@ -478,9 +411,6 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Organization Selector Dialog */}
-      <OrganizationSelector open={orgSelectorOpen} onOpenChange={setOrgSelectorOpen} />
-      
       {/* Quick Actions Dialog */}
       <QuickActions open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
     </TooltipProvider>

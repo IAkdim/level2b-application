@@ -1,14 +1,8 @@
 // API functions for meetings
 import { supabase } from '../supabaseClient'
 
-interface UserCentricOptions {
-  includeShared?: boolean
-  orgId?: string
-}
-
 export interface Meeting {
   id: string
-  org_id: string | null
   user_id: string
   lead_id: string | null
   // Calendly Data
@@ -46,15 +40,12 @@ export interface Meeting {
 }
 
 /**
- * Get all meetings for user (user-centric)
+ * Get all meetings for user
  */
-export async function getUserMeetings(
-  userId: string,
-  options?: UserCentricOptions
-): Promise<Meeting[]> {
-  console.log('[getUserMeetings] Fetching meetings for userId:', userId, 'options:', options)
+export async function getUserMeetings(userId: string): Promise<Meeting[]> {
+  console.log('[getUserMeetings] Fetching meetings for userId:', userId)
 
-  let query = supabase
+  const { data, error } = await supabase
     .from('calendly_meetings')
     .select(`
       *,
@@ -65,15 +56,8 @@ export async function getUserMeetings(
         company
       )
     `)
-
-  // User-centric filtering: user's own OR shared via org
-  if (options?.includeShared && options?.orgId) {
-    query = query.or(`user_id.eq.${userId},org_id.eq.${options.orgId}`)
-  } else {
-    query = query.eq('user_id', userId)
-  }
-
-  const { data, error } = await query.order('start_time', { ascending: false })
+    .eq('user_id', userId)
+    .order('start_time', { ascending: false })
 
   console.log('[getUserMeetings] Query result:', { dataLength: data?.length, error })
 
@@ -86,38 +70,9 @@ export async function getUserMeetings(
 }
 
 /**
- * @deprecated Use getUserMeetings instead
+ * Get upcoming meetings for a user
  */
-export async function getMeetings(orgId: string): Promise<Meeting[]> {
-  console.log('[getMeetings] Fetching meetings for orgId:', orgId)
-  const { data, error } = await supabase
-    .from('calendly_meetings')
-    .select(`
-      *,
-      lead:leads (
-        id,
-        name,
-        email,
-        company
-      )
-    `)
-    .eq('org_id', orgId)
-    .order('start_time', { ascending: false })
-
-  console.log('[getMeetings] Query result:', { dataLength: data?.length, error })
-
-  if (error) {
-    console.error('[getMeetings] Error fetching meetings:', error)
-    throw error
-  }
-
-  return data || []
-}
-
-/**
- * Get upcoming meetings for an organization
- */
-export async function getUpcomingMeetings(orgId: string): Promise<Meeting[]> {
+export async function getUpcomingMeetings(userId: string): Promise<Meeting[]> {
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -131,10 +86,10 @@ export async function getUpcomingMeetings(orgId: string): Promise<Meeting[]> {
         company
       )
     `)
-    .eq('org_id', orgId)
-    .gte('scheduled_at', now)
-    .in('status', ['scheduled', 'confirmed'])
-    .order('scheduled_at', { ascending: true })
+    .eq('user_id', userId)
+    .gte('start_time', now)
+    .eq('status', 'active')
+    .order('start_time', { ascending: true })
 
   if (error) {
     console.error('Error fetching upcoming meetings:', error)
@@ -149,7 +104,7 @@ export async function getUpcomingMeetings(orgId: string): Promise<Meeting[]> {
  */
 export async function getMeetingById(meetingId: string): Promise<Meeting | null> {
   const { data, error } = await supabase
-    .from('meetings')
+    .from('calendly_meetings')
     .select(`
       *,
       lead:leads (
@@ -171,44 +126,6 @@ export async function getMeetingById(meetingId: string): Promise<Meeting | null>
 }
 
 /**
- * Create a new meeting manually
- */
-export async function createMeeting(
-  orgId: string,
-  meeting: {
-    lead_id?: string
-    title: string
-    description?: string
-    scheduled_at: string
-    duration_minutes: number
-    location?: string
-    meeting_url?: string
-    attendee_name?: string
-    attendee_email?: string
-  }
-): Promise<Meeting> {
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data, error } = await supabase
-    .from('meetings')
-    .insert({
-      org_id: orgId,
-      ...meeting,
-      status: 'scheduled',
-      created_by: user?.id,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error creating meeting:', error)
-    throw error
-  }
-
-  return data
-}
-
-/**
  * Update meeting status
  */
 export async function updateMeetingStatus(
@@ -216,18 +133,14 @@ export async function updateMeetingStatus(
   status: Meeting['status'],
   cancelReason?: string
 ): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser()
-
   const updates: any = { status }
 
   if (status === 'canceled') {
-    updates.canceled_at = new Date().toISOString()
-    updates.canceled_by = user?.id
     updates.cancel_reason = cancelReason
   }
 
   const { error } = await supabase
-    .from('meetings')
+    .from('calendly_meetings')
     .update(updates)
     .eq('id', meetingId)
 
@@ -238,32 +151,15 @@ export async function updateMeetingStatus(
 }
 
 /**
- * Delete a meeting
- */
-export async function deleteMeeting(meetingId: string): Promise<void> {
-  const { error } = await supabase
-    .from('meetings')
-    .delete()
-    .eq('id', meetingId)
-
-  if (error) {
-    console.error('Error deleting meeting:', error)
-    throw error
-  }
-}
-
-/**
  * Sync meetings from Calendly via API
  * Fetches scheduled events from Calendly and syncs to database
  */
-export async function syncCalendlyMeetings(orgId: string): Promise<{
+export async function syncCalendlyMeetings(): Promise<{
   synced: number
   skipped: number
   total: number
 }> {
-  const { data, error } = await supabase.functions.invoke('calendly-sync-meetings', {
-    body: { orgId },
-  })
+  const { data, error } = await supabase.functions.invoke('calendly-sync-meetings')
 
   if (error) {
     console.error('Error syncing Calendly meetings:', error)

@@ -29,7 +29,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { submitFeedback } from '@/lib/api/feedback'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import type { FeedbackType } from '@/types/crm'
 
 interface NavItem {
@@ -51,14 +50,12 @@ const navigation: NavItem[] = [
 
 const secondaryNavigation: NavItem[] = [
   { name: "API Monitoring", href: "/api-monitoring", icon: Activity, shortcut: "⌘I" },
-  { name: "Organization", href: "/organization", icon: Building2, shortcut: "⌘G" },
   { name: "Billing", href: "/settings/billing", icon: CreditCard, shortcut: "⌘B", description: "Subscription & invoices" },
   { name: "Configuration", href: "/configuration", icon: Settings, shortcut: "⌘," },
 ]
 
 export function AppSidebar() {
   const location = useLocation()
-  const { selectedOrg } = useOrganization()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('other')
@@ -101,7 +98,6 @@ export function AppSidebar() {
         message: feedbackMessage.trim(),
         rating: feedbackRating > 0 ? feedbackRating : undefined,
         page_url: window.location.href,
-        orgId: selectedOrg?.id,
       })
       
       toast.success('Thank you for your feedback!')

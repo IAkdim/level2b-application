@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { useOrganization } from "@/contexts/OrganizationContext"
+import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabaseClient"
 import { isCalendlyConnected } from "@/lib/api/calendly"
 import { getDailyUsage, type DailyUsage } from "@/lib/api/usageLimits"
@@ -51,7 +51,7 @@ interface QuickStat {
 
 export function WorkflowHub() {
   const navigate = useNavigate()
-  const { selectedOrg } = useOrganization()
+  const { user } = useAuth()
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null)
@@ -64,13 +64,13 @@ export function WorkflowHub() {
   })
 
   useEffect(() => {
-    if (selectedOrg?.id) {
+    if (user) {
       loadWorkflowData()
     }
-  }, [selectedOrg?.id])
+  }, [user])
 
   const loadWorkflowData = async () => {
-    if (!selectedOrg?.id) return
+    if (!user) return
 
     setIsLoading(true)
     try {
@@ -83,12 +83,12 @@ export function WorkflowHub() {
         calendlyConnected,
         usage
       ] = await Promise.all([
-        supabase.from('templates').select('*', { count: 'exact', head: true }).eq('organization_id', selectedOrg.id),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('org_id', selectedOrg.id),
-        supabase.from('activities').select('*', { count: 'exact', head: true }).eq('org_id', selectedOrg.id).eq('type', 'email'),
-        supabase.from('meetings').select('*', { count: 'exact', head: true }).eq('org_id', selectedOrg.id),
-        isCalendlyConnected(selectedOrg.id).catch(() => false),
-        getDailyUsage(selectedOrg.id).catch(() => null)
+        supabase.from('email_templates').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('activities').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('type', 'email'),
+        supabase.from('meetings').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        isCalendlyConnected().catch(() => false),
+        getDailyUsage().catch(() => null)
       ])
 
       const templatesCount = templatesResult.count || 0

@@ -4,7 +4,6 @@ import { Mail, Users, Calendar, TrendingUp, ArrowUpRight, Sparkles, Play, Chevro
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/contexts/AuthContext"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useNavigate } from "react-router-dom"
 import { ENABLE_MOCK_DATA, MOCK_ACTIVITIES, MOCK_LEADS, MOCK_MEETINGS } from "@/lib/mockData"
 import { WorkflowHub } from "@/components/WorkflowHub"
@@ -27,7 +26,6 @@ interface Activity {
 export function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [stats, setStats] = useState<DashboardStats>({
     totalEmails: 0,
     activeLeads: 0,
@@ -41,7 +39,7 @@ export function Dashboard() {
     if (user) {
       loadDashboardData()
     }
-  }, [user, selectedOrg])
+  }, [user])
 
   async function loadDashboardData() {
     if (!user) return
@@ -49,38 +47,26 @@ export function Dashboard() {
     try {
       setIsLoading(true)
 
-      // Build user-centric query filter
-      // If user has org, include shared data; otherwise just user's own data
-      const buildFilter = (query: any) => {
-        if (selectedOrg?.id) {
-          return query.or(`user_id.eq.${user.id},org_id.eq.${selectedOrg.id}`)
-        }
-        return query.eq('user_id', user.id)
-      }
-
       // Get total emails sent (activities with type='email')
-      let emailQuery = supabase
+      const { count: emailCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
         .eq('type', 'email')
-      emailQuery = buildFilter(emailQuery)
-      const { count: emailCount } = await emailQuery
+        .eq('user_id', user.id)
 
       // Get active leads (not lost or won)
-      let leadsQuery = supabase
+      const { count: activeLeadsCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .not('status', 'in', '("lost","won")')
-      leadsQuery = buildFilter(leadsQuery)
-      const { count: activeLeadsCount } = await leadsQuery
+        .eq('user_id', user.id)
 
       // Get meetings booked
-      let meetingsQuery = supabase
+      const { count: meetingsCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'meeting_scheduled')
-      meetingsQuery = buildFilter(meetingsQuery)
-      const { count: meetingsCount } = await meetingsQuery
+        .eq('user_id', user.id)
 
       // Calculate reply rate
       const totalEmails = emailCount || 0
@@ -93,8 +79,8 @@ export function Dashboard() {
         replyRate: totalEmails > 0 ? Math.round((replyRate / totalEmails) * 100) : 0
       })
 
-      // Get recent activities (user-centric)
-      let activitiesQuery = supabase
+      // Get recent activities
+      const { data: activitiesData } = await supabase
         .from('activities')
         .select(`
           id,
@@ -103,10 +89,9 @@ export function Dashboard() {
           created_at,
           lead:leads(name)
         `)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5)
-      activitiesQuery = buildFilter(activitiesQuery)
-      const { data: activitiesData } = await activitiesQuery
 
       if (activitiesData) {
         const formattedActivities: Activity[] = activitiesData.map((act: any) => ({

@@ -12,7 +12,7 @@ export type Language = 'en' | 'nl' | 'de' | 'fr' | 'es' | 'it' | 'pt'
 // ============================================================================
 export interface Lead {
   id: string
-  org_id: string
+  user_id: string
 
   // Contact Information
   name: string
@@ -69,7 +69,7 @@ export interface UpdateLeadInput {
 // ============================================================================
 export interface Task {
   id: string
-  org_id: string
+  user_id: string
   lead_id?: string
 
   // Task Details
@@ -129,7 +129,7 @@ export interface UpdateTaskInput {
 // ============================================================================
 export interface Note {
   id: string
-  org_id: string
+  user_id: string
   lead_id: string
 
   // Note Content
@@ -165,8 +165,8 @@ export interface UpdateNoteInput {
 // ============================================================================
 export interface EmailTemplate {
   id: string
-  org_id: string
-  
+  user_id: string
+
   // Template content
   name: string
   subject: string
@@ -211,9 +211,8 @@ export type FeedbackStatus = 'new' | 'in_review' | 'planned' | 'completed' | 're
 
 export interface Feedback {
   id: string
-  org_id: string
-  user_id?: string
-  
+  user_id: string
+
   // Feedback content
   type: FeedbackType
   message: string
@@ -246,7 +245,7 @@ export interface CreateFeedbackInput {
 // ============================================================================
 export interface Deal {
   id: string
-  org_id: string
+  user_id: string
   lead_id: string
 
   // Deal Information

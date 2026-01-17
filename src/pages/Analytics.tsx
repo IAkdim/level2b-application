@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
 import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useAuth } from "@/contexts/AuthContext"
 
 interface MetricData {
@@ -25,6 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   'lost': '#ef4444'
 }
 
+<<<<<<< HEAD
  const Analytics = () => {
   const { user } = useAuth()
   const { selectedOrg } = useOrganization()
@@ -237,6 +237,8 @@ function ChartSkeleton() {
   )
 }
 
+=======
+>>>>>>> b19906cd00ff665611dd3b74ac447c6681cbb747
 export function Analytics() {
   const [dateRangePreset, setDateRangePreset] = useState<string>('30d')
   const [interval, setInterval] = useState<TimeInterval>('day')

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { getUserMeetings, syncCalendlyMeetings, type Meeting } from "@/lib/api/meetings"
 import { isCalendlyConnected } from "@/lib/api/calendly"
@@ -35,7 +34,6 @@ function getStatusLabel(status: Meeting['status']): string {
 
 export function Meetings() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -56,10 +54,7 @@ export function Meetings() {
     try {
       setIsLoading(true)
       console.log('[Meetings] Fetching meetings for user:', user.id)
-      const data = await getUserMeetings(user.id, {
-        includeShared: !!selectedOrg?.id,
-        orgId: selectedOrg?.id
-      })
+      const data = await getUserMeetings(user.id)
       console.log('[Meetings] Meetings loaded:', data.length, 'meetings')
       console.log('[Meetings] First meeting:', data[0])
       setMeetings(data)
@@ -69,22 +64,16 @@ export function Meetings() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   const checkCalendlyConnection = useCallback(async () => {
-    // Calendly connection is org-specific, only check if org is selected
-    if (!selectedOrg) {
-      setCalendlyConnected(false)
-      return
-    }
-
     try {
-      const connected = await isCalendlyConnected(selectedOrg.id)
+      const connected = await isCalendlyConnected()
       setCalendlyConnected(connected)
     } catch (error) {
       console.error('Error checking Calendly connection:', error)
     }
-  }, [selectedOrg])
+  }, [])
 
   useEffect(() => {
     loadMeetings()
@@ -93,17 +82,10 @@ export function Meetings() {
 
   const handleSyncMeetings = async () => {
     console.log('[Meetings] handleSyncMeetings called')
-    console.log('[Meetings] selectedOrg:', selectedOrg)
-
-    // Calendly sync requires an organization
-    if (!selectedOrg) {
-      toast.error('Select an organization to sync Calendly meetings')
-      return
-    }
 
     setIsSyncing(true)
     try {
-      const result = await syncCalendlyMeetings(selectedOrg.id)
+      const result = await syncCalendlyMeetings()
       
       // Always refresh the meetings list after sync
       await loadMeetings()

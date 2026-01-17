@@ -1,32 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import * as leadsApi from '@/lib/api/leads'
 import type { Lead, CreateLeadInput, UpdateLeadInput, LeadFilters, PaginationParams } from '@/types/crm'
 
-interface UseLeadsOptions {
-  includeShared?: boolean
-}
-
 /**
- * Hook to fetch paginated leads with filters (USER-CENTRIC)
+ * Hook to fetch paginated leads with filters
  */
 export function useLeads(
   filters?: LeadFilters,
-  pagination?: PaginationParams,
-  options?: UseLeadsOptions
+  pagination?: PaginationParams
 ) {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['leads', user?.id, selectedOrg?.id, filters, pagination, options?.includeShared],
+    queryKey: ['leads', user?.id, filters, pagination],
     queryFn: () => {
       if (!user) throw new Error('Not authenticated')
-      return leadsApi.getUserLeads(user.id, filters, pagination, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
+      return leadsApi.getUserLeads(user.id, filters, pagination)
     },
     enabled: !!user,
   })
@@ -47,59 +37,46 @@ export function useLead(leadId: string | undefined) {
 }
 
 /**
- * Hook to fetch lead statistics (USER-CENTRIC)
+ * Hook to fetch lead statistics
  */
-export function useLeadStats(options?: UseLeadsOptions) {
+export function useLeadStats() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['lead-stats', user?.id, selectedOrg?.id, options?.includeShared],
+    queryKey: ['lead-stats', user?.id],
     queryFn: () => {
       if (!user) throw new Error('Not authenticated')
-      return leadsApi.getUserLeadStats(user.id, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
+      return leadsApi.getUserLeadStats(user.id)
     },
     enabled: !!user,
   })
 }
 
 /**
- * Hook to fetch unique source tags (USER-CENTRIC)
+ * Hook to fetch unique source tags
  */
-export function useUniqueSources(options?: UseLeadsOptions) {
+export function useUniqueSources() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['unique-sources', user?.id, selectedOrg?.id, options?.includeShared],
+    queryKey: ['unique-sources', user?.id],
     queryFn: () => {
       if (!user) throw new Error('Not authenticated')
-      return leadsApi.getUserUniqueSources(user.id, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
+      return leadsApi.getUserUniqueSources(user.id)
     },
     enabled: !!user,
   })
 }
 
 /**
- * Hook to create a new lead (USER-CENTRIC)
+ * Hook to create a new lead
  */
 export function useCreateLead() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: CreateLeadInput) => {
-      // org_id is optional - only set if user has an org selected
-      return leadsApi.createLead({ ...input, orgId: selectedOrg?.id })
-    },
+    mutationFn: (input: CreateLeadInput) => leadsApi.createLead(input),
     onSuccess: () => {
-      // Invalidate leads queries to refetch
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },
@@ -107,7 +84,7 @@ export function useCreateLead() {
 }
 
 /**
- * Hook to update a lead (USER-CENTRIC)
+ * Hook to update a lead
  */
 export function useUpdateLead() {
   const queryClient = useQueryClient()
@@ -116,7 +93,6 @@ export function useUpdateLead() {
     mutationFn: ({ leadId, input }: { leadId: string; input: UpdateLeadInput }) =>
       leadsApi.updateLead(leadId, input),
     onSuccess: (data) => {
-      // Invalidate all leads queries (user-centric invalidation)
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['lead', data.id] })
       queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
@@ -125,7 +101,7 @@ export function useUpdateLead() {
 }
 
 /**
- * Hook to delete a lead (USER-CENTRIC)
+ * Hook to delete a lead
  */
 export function useDeleteLead() {
   const queryClient = useQueryClient()
@@ -140,7 +116,7 @@ export function useDeleteLead() {
 }
 
 /**
- * Hook to update lead status (USER-CENTRIC)
+ * Hook to update lead status
  */
 export function useUpdateLeadStatus() {
   const queryClient = useQueryClient()
@@ -157,11 +133,10 @@ export function useUpdateLeadStatus() {
 }
 
 /**
- * Hook to import leads from CSV with progress tracking (USER-CENTRIC)
+ * Hook to import leads from CSV with progress tracking
  */
 export function useImportLeads() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -174,16 +149,12 @@ export function useImportLeads() {
     }) => {
       if (!user) throw new Error('Not authenticated')
 
-      // Check for existing emails (user-centric)
+      // Check for existing emails
       const emails = leads.map(lead => lead.email.toLowerCase())
-      const existingEmails = await leadsApi.checkUserExistingEmails(user.id, emails, {
-        includeShared: !!selectedOrg?.id,
-        orgId: selectedOrg?.id
-      })
+      const existingEmails = await leadsApi.checkUserExistingEmails(user.id, emails)
 
       // Helper to check if lead data actually changed
       const hasChanges = (oldLead: Lead, newData: CreateLeadInput): boolean => {
-        // Compare relevant fields
         if (oldLead.name !== newData.name) return true
         if (oldLead.email !== newData.email) return true
         if ((oldLead.phone || '') !== (newData.phone || '')) return true
@@ -215,13 +186,10 @@ export function useImportLeads() {
       for (let i = 0; i < leads.length; i += BATCH_SIZE) {
         const batch = leads.slice(i, i + BATCH_SIZE)
 
-        // Process batch sequentially (could be parallelized but may hit rate limits)
         const batchResults = await Promise.allSettled(
           batch.map(async (input) => {
             const existingLeadId = existingEmails.get(input.email.toLowerCase())
-            // User-centric upsert - org_id is optional
-            const result = await leadsApi.upsertLead({ ...input, orgId: selectedOrg?.id }, existingLeadId)
-            return result
+            return leadsApi.upsertLead(input, existingLeadId)
           })
         )
 
@@ -230,7 +198,7 @@ export function useImportLeads() {
           if (result.status === 'fulfilled') {
             const actuallyChanged = result.value.wasUpdate && result.value.oldLead
               ? hasChanges(result.value.oldLead, batch[idx])
-              : true // New leads always count as changed
+              : true
 
             results.push({
               success: true,
@@ -250,18 +218,15 @@ export function useImportLeads() {
           }
         })
 
-        // Update progress
         if (onProgress) {
           onProgress(Math.min(i + BATCH_SIZE, leads.length), leads.length)
         }
       }
 
-      // Transform results into categorized arrays
       const createdLeads = results
         .filter(r => r.success && !r.wasUpdate && r.lead)
         .map(r => r.lead!)
 
-      // Only include updated leads where data actually changed
       const updatedLeads = results
         .filter(r => r.success && r.wasUpdate && r.hasChanges && r.lead)
         .map(r => r.lead!)
@@ -270,7 +235,6 @@ export function useImportLeads() {
         .filter(r => !r.success)
         .map(r => ({ lead: r.input, error: r.error || 'Unknown error' }))
 
-      // Count skipped duplicates (no changes)
       const skippedDuplicates = results.filter(
         r => r.success && r.wasUpdate && !r.hasChanges
       ).length
@@ -286,7 +250,6 @@ export function useImportLeads() {
       }
     },
     onSuccess: () => {
-      // Invalidate all leads queries to refetch (user-centric)
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['lead-stats'] })
     },

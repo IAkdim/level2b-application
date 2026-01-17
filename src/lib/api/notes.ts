@@ -25,23 +25,18 @@ export async function getNotes(leadId: string): Promise<Note[]> {
 }
 
 /**
- * Create a new note (user-centric)
+ * Create a new note
  */
-export async function createNote(
-  input: CreateNoteInput & { orgId?: string }
-): Promise<Note> {
+export async function createNote(input: CreateNoteInput): Promise<Note> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-
-  const { orgId, ...noteInput } = input
 
   const { data, error } = await supabase
     .from('notes')
     .insert({
       user_id: user.id,
-      org_id: orgId || null,
-      ...noteInput,
-      is_pinned: noteInput.is_pinned || false,
+      ...input,
+      is_pinned: input.is_pinned || false,
       created_by: user.id
     })
     .select(`
@@ -100,8 +95,8 @@ export async function deleteNote(noteId: string): Promise<void> {
 }
 
 /**
- * Toggle pin status of a note
+ * Toggle note pinned status
  */
-export async function togglePinNote(noteId: string, isPinned: boolean): Promise<Note> {
+export async function toggleNotePin(noteId: string, isPinned: boolean): Promise<Note> {
   return updateNote(noteId, { is_pinned: isPinned })
 }

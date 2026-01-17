@@ -6,22 +6,18 @@ import type { Feedback, CreateFeedbackInput } from '@/types/crm'
 
 /**
  * Submit feedback (USER-CENTRIC)
- * org_id is now optional
  */
 export async function submitFeedback(
-  input: CreateFeedbackInput & { orgId?: string }
+  input: CreateFeedbackInput
 ): Promise<Feedback> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-
-  const { orgId, ...feedbackInput } = input
 
   const { data, error } = await supabase
     .from('feedback')
     .insert({
       user_id: user.id,
-      org_id: orgId || null,
-      ...feedbackInput,
+      ...input,
       user_agent: navigator.userAgent,
     })
     .select()
