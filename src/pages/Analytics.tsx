@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
 import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useAuth } from "@/contexts/AuthContext"
 
 interface MetricData {
@@ -19,7 +18,6 @@ interface LeadsByStatus {
 
 export function Analytics() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [isLoading, setIsLoading] = useState(true)
   const [metrics, setMetrics] = useState<MetricData[]>([])
   const [leadsByStatus, setLeadsByStatus] = useState<LeadsByStatus[]>([])
@@ -28,51 +26,38 @@ export function Analytics() {
   const [totalNotes, setTotalNotes] = useState(0)
   const [totalTasks, setTotalTasks] = useState(0)
 
-  // Helper to build user-centric filter
-  const buildFilter = useCallback((query: any) => {
-    if (!user) return query
-    if (selectedOrg?.id) {
-      return query.or(`user_id.eq.${user.id},org_id.eq.${selectedOrg.id}`)
-    }
-    return query.eq('user_id', user.id)
-  }, [user, selectedOrg?.id])
-
   const loadAnalytics = useCallback(async () => {
     if (!user) return
 
     try {
       setIsLoading(true)
 
-      // Get total emails sent (user-centric)
-      let emailQuery = supabase
+      // Get total emails sent
+      const { count: emailCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
         .eq('type', 'email')
-      emailQuery = buildFilter(emailQuery)
-      const { count: emailCount } = await emailQuery
+        .eq('user_id', user.id)
 
-      // Get total calls made (user-centric)
-      let callQuery = supabase
+      // Get total calls made
+      const { count: _callCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
         .eq('type', 'call')
-      callQuery = buildFilter(callQuery)
-      const { count: _callCount } = await callQuery
+        .eq('user_id', user.id)
 
-      // Get meetings booked (user-centric)
-      let meetingsQuery = supabase
+      // Get meetings booked
+      const { count: meetingsCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'meeting_scheduled')
-      meetingsQuery = buildFilter(meetingsQuery)
-      const { count: meetingsCount } = await meetingsQuery
+        .eq('user_id', user.id)
 
-      // Get total leads (user-centric)
-      let leadsQuery = supabase
+      // Get total leads
+      const { count: leadsCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
-      leadsQuery = buildFilter(leadsQuery)
-      const { count: leadsCount } = await leadsQuery
+        .eq('user_id', user.id)
 
       setTotalLeads(leadsCount || 0)
       setTotalActivities(emailCount || 0)
@@ -106,12 +91,11 @@ export function Analytics() {
         }
       ])
 
-      // Get leads by status (user-centric)
-      let statusQuery = supabase
+      // Get leads by status
+      const { data: statusData } = await supabase
         .from('leads')
         .select('status')
-      statusQuery = buildFilter(statusQuery)
-      const { data: statusData } = await statusQuery
+        .eq('user_id', user.id)
 
       if (statusData) {
         const statusCounts = statusData.reduce((acc: Record<string, number>, lead) => {
@@ -127,30 +111,27 @@ export function Analytics() {
         setLeadsByStatus(statusArray)
       }
 
-      // Get activities count (user-centric)
-      let activitiesQuery = supabase
+      // Get activities count
+      const { count: activitiesCount } = await supabase
         .from('activities')
         .select('*', { count: 'exact', head: true })
-      activitiesQuery = buildFilter(activitiesQuery)
-      const { count: activitiesCount } = await activitiesQuery
+        .eq('user_id', user.id)
 
       setTotalActivities(activitiesCount || 0)
 
-      // Get notes count (user-centric)
-      let notesQuery = supabase
+      // Get notes count
+      const { count: notesCount } = await supabase
         .from('notes')
         .select('*', { count: 'exact', head: true })
-      notesQuery = buildFilter(notesQuery)
-      const { count: notesCount } = await notesQuery
+        .eq('user_id', user.id)
 
       setTotalNotes(notesCount || 0)
 
-      // Get tasks count (user-centric)
-      let tasksQuery = supabase
+      // Get tasks count
+      const { count: tasksCount } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-      tasksQuery = buildFilter(tasksQuery)
-      const { count: tasksCount } = await tasksQuery
+        .eq('user_id', user.id)
 
       setTotalTasks(tasksCount || 0)
 
@@ -159,7 +140,7 @@ export function Analytics() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, buildFilter])
+  }, [user])
 
   useEffect(() => {
     loadAnalytics()

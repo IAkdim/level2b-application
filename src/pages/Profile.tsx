@@ -7,13 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Mail, Calendar, Building2, Save, Loader2 } from 'lucide-react'
+import { Mail, Calendar, Save, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
-import { useOrganization } from '@/contexts/OrganizationContext'
 
 export function Profile() {
-  const { selectedOrg } = useOrganization()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -149,19 +147,6 @@ export function Profile() {
                   </p>
                 </div>
               </div>
-
-              {selectedOrg && (
-                <>
-                  <Separator />
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Current Organisation</p>
-                      <p className="text-sm text-muted-foreground">{selectedOrg.name}</p>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           </CardContent>
         </Card>

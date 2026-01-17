@@ -19,7 +19,6 @@ import {
   type DailyUsage
 } from '@/lib/api/usageLimits'
 import type { EmailTemplate } from '@/types/crm'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   getCompanySettings,
@@ -51,7 +50,6 @@ import { toast } from 'sonner'
 
 export default function Templates() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [generatedTemplate, setGeneratedTemplate] = useState<GeneratedTemplate | null>(null)
   const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -88,7 +86,7 @@ export default function Templates() {
 
     try {
       setIsLoadingUsage(true)
-      const usage = await getDailyUsage({ orgId: selectedOrg?.id })
+      const usage = await getDailyUsage()
       setDailyUsage(usage)
     } catch (error) {
       console.error('Error loading daily usage:', error)
@@ -98,7 +96,7 @@ export default function Templates() {
     } finally {
       setIsLoadingUsage(false)
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   // Load daily usage on mount and when user/org changes
   useEffect(() => {
@@ -127,10 +125,7 @@ export default function Templates() {
 
     try {
       setIsLoadingTemplates(true)
-      const templates = await getUserEmailTemplates(user.id, {
-        includeShared: !!selectedOrg?.id,
-        orgId: selectedOrg?.id
-      })
+      const templates = await getUserEmailTemplates(user.id)
       setSavedTemplates(templates)
     } catch (error) {
       console.error('Error loading templates:', error)
@@ -138,7 +133,7 @@ export default function Templates() {
     } finally {
       setIsLoadingTemplates(false)
     }
-  }, [user, selectedOrg?.id])
+  }, [user])
 
   // Load saved templates on mount
   useEffect(() => {
@@ -191,9 +186,9 @@ export default function Templates() {
     setGenerationError(null) // Clear previous errors
 
     try {
-      // Check usage limit before generating (user-centric)
+      // Check usage limit before generating
       if (dailyUsage) {
-        const limitCheck = await checkUsageLimit('template', { orgId: selectedOrg?.id })
+        const limitCheck = await checkUsageLimit('template')
 
         if (!limitCheck.allowed) {
           const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -216,10 +211,10 @@ export default function Templates() {
         additionalContext: additionalContext.trim() || undefined,
       })
 
-      // Increment usage counter after successful generation (user-centric)
+      // Increment usage counter after successful generation
       if (dailyUsage) {
         try {
-          const incrementResult = await incrementUsage('template', 1, { orgId: selectedOrg?.id })
+          const incrementResult = await incrementUsage('template', 1)
           if (incrementResult.success) {
             // Reload usage to update UI
             await loadDailyUsage()
@@ -300,7 +295,6 @@ export default function Templates() {
         body: templateBody,
         company_info: settings || undefined,
         additional_context: additionalContext || undefined,
-        orgId: selectedOrg?.id,
       })
       console.log('Template saved successfully:', result)
       toast.success('Template saved!')

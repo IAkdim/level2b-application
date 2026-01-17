@@ -4,7 +4,6 @@ import { supabase } from '../supabaseClient'
 export interface Notification {
   id: string
   user_id: string
-  org_id: string
   type: 'meeting_scheduled' | 'meeting_canceled' | 'email_received' | 'email_bounced' | 'lead_status_changed' | 'campaign_completed' | 'daily_limit_warning' | 'info' | 'success' | 'warning' | 'error'
   title: string
   message: string
@@ -103,7 +102,6 @@ export async function deleteNotification(notificationId: string): Promise<void> 
  * Create a notification (typically used by system/admin)
  */
 export async function createNotification(notification: {
-  org_id: string
   type: Notification['type']
   title: string
   message: string
@@ -111,7 +109,7 @@ export async function createNotification(notification: {
   metadata?: Record<string, any>
 }): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     throw new Error('User not authenticated')
   }

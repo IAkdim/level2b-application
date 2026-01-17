@@ -1,28 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOrganization } from '@/contexts/OrganizationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import * as tasksApi from '@/lib/api/tasks'
 import type { CreateTaskInput, UpdateTaskInput, TaskFilters } from '@/types/crm'
 
-interface UseTasksOptions {
-  includeShared?: boolean
-}
-
 /**
- * Hook to fetch tasks with filters (USER-CENTRIC)
+ * Hook to fetch tasks with filters
  */
-export function useTasks(filters?: TaskFilters, options?: UseTasksOptions) {
+export function useTasks(filters?: TaskFilters) {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
 
   return useQuery({
-    queryKey: ['tasks', user?.id, selectedOrg?.id, filters, options?.includeShared],
+    queryKey: ['tasks', user?.id, filters],
     queryFn: () => {
       if (!user) throw new Error('Not authenticated')
-      return tasksApi.getUserTasks(user.id, filters, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
+      return tasksApi.getUserTasks(user.id, filters)
     },
     enabled: !!user,
   })
@@ -43,66 +34,21 @@ export function useTask(taskId: string | undefined) {
 }
 
 /**
- * Hook to fetch overdue tasks (USER-CENTRIC)
- */
-export function useOverdueTasks(options?: UseTasksOptions) {
-  const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
-
-  return useQuery({
-    queryKey: ['overdue-tasks', user?.id, selectedOrg?.id, options?.includeShared],
-    queryFn: () => {
-      if (!user) throw new Error('Not authenticated')
-      return tasksApi.getOverdueTasks(user.id, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
-    },
-    enabled: !!user,
-  })
-}
-
-/**
- * Hook to fetch tasks due today (USER-CENTRIC)
- */
-export function useTasksDueToday(options?: UseTasksOptions) {
-  const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
-
-  return useQuery({
-    queryKey: ['tasks-due-today', user?.id, selectedOrg?.id, options?.includeShared],
-    queryFn: () => {
-      if (!user) throw new Error('Not authenticated')
-      return tasksApi.getTasksDueToday(user.id, {
-        includeShared: options?.includeShared,
-        orgId: selectedOrg?.id
-      })
-    },
-    enabled: !!user,
-  })
-}
-
-/**
- * Hook to create a new task (USER-CENTRIC)
+ * Hook to create a new task
  */
 export function useCreateTask() {
-  const { selectedOrg } = useOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: CreateTaskInput) => {
-      return tasksApi.createTask({ ...input, orgId: selectedOrg?.id })
-    },
+    mutationFn: (input: CreateTaskInput) => tasksApi.createTask(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks-due-today'] })
     },
   })
 }
 
 /**
- * Hook to update a task (USER-CENTRIC)
+ * Hook to update a task
  */
 export function useUpdateTask() {
   const queryClient = useQueryClient()
@@ -113,14 +59,12 @@ export function useUpdateTask() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['task', data.id] })
-      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks-due-today'] })
     },
   })
 }
 
 /**
- * Hook to delete a task (USER-CENTRIC)
+ * Hook to delete a task
  */
 export function useDeleteTask() {
   const queryClient = useQueryClient()
@@ -129,8 +73,6 @@ export function useDeleteTask() {
     mutationFn: (taskId: string) => tasksApi.deleteTask(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks-due-today'] })
     },
   })
 }

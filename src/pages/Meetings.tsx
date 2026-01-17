@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import { useAuth } from "@/contexts/AuthContext"
-import { getUserMeetings, syncCalendlyMeetings, type Meeting } from "@/lib/api/meetings"
-import { isCalendlyConnected } from "@/lib/api/calendly"
+import { getUserMeetings, type Meeting } from "@/lib/api/meetings"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,13 +30,10 @@ function getStatusLabel(status: Meeting['status']): string {
 
 export function Meetings() {
   const { user } = useAuth()
-  const { selectedOrg } = useOrganization()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isSyncing, setIsSyncing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [calendlyConnected, setCalendlyConnected] = useState(false)
 
   const loadMeetings = useCallback(async () => {
     console.log('[Meetings] loadMeetings called')
@@ -50,10 +45,7 @@ export function Meetings() {
     try {
       setIsLoading(true)
       console.log('[Meetings] Fetching meetings for user:', user.id)
-      const data = await getUserMeetings(user.id, {
-        includeShared: !!selectedOrg?.id,
-        orgId: selectedOrg?.id
-      })
+      const data = await getUserMeetings(user.id)
       console.log('[Meetings] Meetings loaded:', data.length, 'meetings')
       console.log('[Meetings] First meeting:', data[0])
       setMeetings(data)
@@ -63,65 +55,11 @@ export function Meetings() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, selectedOrg?.id])
-
-  const checkCalendlyConnection = useCallback(async () => {
-    // Calendly connection is org-specific, only check if org is selected
-    if (!selectedOrg) {
-      setCalendlyConnected(false)
-      return
-    }
-
-    try {
-      const connected = await isCalendlyConnected(selectedOrg.id)
-      setCalendlyConnected(connected)
-    } catch (error) {
-      console.error('Error checking Calendly connection:', error)
-    }
-  }, [selectedOrg])
+  }, [user])
 
   useEffect(() => {
     loadMeetings()
-    checkCalendlyConnection()
-  }, [loadMeetings, checkCalendlyConnection])
-
-  const handleSyncMeetings = async () => {
-    console.log('[Meetings] handleSyncMeetings called')
-    console.log('[Meetings] selectedOrg:', selectedOrg)
-
-    // Calendly sync requires an organization
-    if (!selectedOrg) {
-      toast.error('Select an organization to sync Calendly meetings')
-      return
-    }
-
-    setIsSyncing(true)
-    try {
-      console.log('[Meetings] Calling syncCalendlyMeetings...')
-      const result = await syncCalendlyMeetings(selectedOrg.id)
-      console.log('[Meetings] Sync result:', JSON.stringify(result))
-      console.log('[Meetings] Synced:', result.synced, 'Skipped:', result.skipped, 'Total:', result.total)
-      
-      // Always refresh the meetings list after sync
-      await loadMeetings()
-      
-      if (result.synced > 0) {
-        toast.success(`${result.synced} new meeting(s) synchronised!`)
-      } else if (result.skipped > 0) {
-        toast.info(`${result.skipped} meeting(s) were already synchronised`)
-      } else if (result.total > 0) {
-        toast.info('Meetings checked, no changes')
-      } else {
-        toast.info('No meetings found in Calendly')
-      }
-    } catch (error) {
-      console.error('[Meetings] Error syncing meetings:', error)
-      toast.error('Error synchronising meetings')
-    } finally {
-      console.log('[Meetings] Setting isSyncing to false')
-      setIsSyncing(false)
-    }
-  }
+  }, [loadMeetings])
 
   const filteredMeetings = meetings.filter(meeting => {
     const matchesSearch = 
@@ -144,56 +82,7 @@ export function Meetings() {
             Automatic synchronisation of Calendly meetings with your CRM
           </p>
         </div>
-        <div className="flex gap-2">
-          {calendlyConnected && (
-            <Button 
-              onClick={handleSyncMeetings} 
-              disabled={isSyncing}
-              variant="outline"
-              className="gap-2"
-            >
-              {isSyncing ? (
-                <>
-                  <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin"></div>
-                  Synchronising...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" />
-                  Sync Calendly
-                </>
-              )}
-            </Button>
-          )}
-        </div>
       </div>
-
-      {/* Calendly Connection Warning */}
-      {!calendlyConnected && (
-        <Card className="border-warning/30 bg-warning/5">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-warning/10 p-2">
-                <CalendarCheck className="h-5 w-5 text-warning" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-sm">Calendly not connected</p>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Connect your Calendly account in configuration to automatically synchronise meetings.
-                </p>
-                <Button
-                  onClick={() => window.location.href = '/configuration?tab=company'}
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                >
-                  Go to Configuration
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">

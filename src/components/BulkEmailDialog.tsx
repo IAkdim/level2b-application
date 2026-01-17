@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Mail, Tag } from "lucide-react"
 import { sendBatchEmails } from "@/lib/api/gmail"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
-import { useOrganization } from "@/contexts/OrganizationContext"
 import type { Lead } from "@/types/crm"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -21,7 +20,6 @@ interface BulkEmailDialogProps {
 }
 
 export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSent }: BulkEmailDialogProps) {
-  const { selectedOrg } = useOrganization()
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [labelName, setLabelName] = useState("")
@@ -44,8 +42,8 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
     setSendResult(null)
 
     try {
-      // Check daily email limit (user-centric)
-      const limitCheck = await checkUsageLimit('email', { orgId: selectedOrg?.id })
+      // Check daily email limit
+      const limitCheck = await checkUsageLimit('email')
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -104,10 +102,10 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       const messageIds = await sendBatchEmails(emails, labelName || undefined)
       console.log("Batch send completed. Message IDs:", messageIds);
 
-      // Increment email usage counter for successful sends (user-centric)
+      // Increment email usage counter for successful sends
       if (messageIds.length > 0) {
         try {
-          await incrementUsage('email', messageIds.length, { orgId: selectedOrg?.id })
+          await incrementUsage('email', messageIds.length)
         } catch (error) {
           console.error('Error incrementing email usage:', error)
           // Don't fail the send if usage tracking fails
