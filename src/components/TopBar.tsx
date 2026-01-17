@@ -43,13 +43,7 @@ export function TopBar() {
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>('')
-<<<<<<< HEAD
-  const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
-  const { selectedOrg, userOrgs, setOrganization, clearOrganization } = useOrganization()
-=======
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
->>>>>>> b19906cd00ff665611dd3b74ac447c6681cbb747
 
   // Global keyboard shortcut for quick actions (⌘K / Ctrl+K)
   useEffect(() => {
