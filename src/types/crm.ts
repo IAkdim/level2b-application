@@ -11,7 +11,7 @@ export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'clo
 // ============================================================================
 export interface Lead {
   id: string
-  org_id: string
+  user_id: string
 
   // Contact Information
   name: string
@@ -66,7 +66,7 @@ export interface UpdateLeadInput {
 // ============================================================================
 export interface Task {
   id: string
-  org_id: string
+  user_id: string
   lead_id?: string
 
   // Task Details
@@ -126,7 +126,7 @@ export interface UpdateTaskInput {
 // ============================================================================
 export interface Note {
   id: string
-  org_id: string
+  user_id: string
   lead_id: string
 
   // Note Content
@@ -162,21 +162,21 @@ export interface UpdateNoteInput {
 // ============================================================================
 export interface EmailTemplate {
   id: string
-  org_id: string
-  
+  user_id: string
+
   // Template content
   name: string
   subject: string
   body: string
-  
+
   // Generation metadata
   company_info?: Record<string, any>
   additional_context?: string
-  
+
   // Usage tracking
   times_used: number
   last_used_at?: string
-  
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -206,23 +206,22 @@ export type FeedbackStatus = 'new' | 'in_review' | 'planned' | 'completed' | 're
 
 export interface Feedback {
   id: string
-  org_id: string
-  user_id?: string
-  
+  user_id: string
+
   // Feedback content
   type: FeedbackType
   message: string
   rating?: number
-  
+
   // Optional metadata
   page_url?: string
   user_agent?: string
   metadata?: Record<string, any>
-  
+
   // Status tracking
   status: FeedbackStatus
   admin_notes?: string
-  
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -241,7 +240,7 @@ export interface CreateFeedbackInput {
 // ============================================================================
 export interface Deal {
   id: string
-  org_id: string
+  user_id: string
   lead_id: string
 
   // Deal Information

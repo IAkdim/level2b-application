@@ -19,48 +19,58 @@ export interface UsageLimitError {
   resetsAt: Date
 }
 
-// Default limits for users without organization
+// Default limits for free users
 const DEFAULT_TEMPLATE_LIMIT = 10
 const DEFAULT_EMAIL_LIMIT = 50
 
 /**
- * Get current daily usage for a user (USER-CENTRIC)
- * Falls back to user-based limits if no org
+ * Get current daily usage for a user
+ * Reads limits from subscriptions table
  */
-export async function getDailyUsage(options?: { orgId?: string }): Promise<DailyUsage> {
+export async function getDailyUsage(): Promise<DailyUsage> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
   // Try to get usage from database
   const today = new Date().toISOString().split('T')[0]
 
-  let query = supabase
+  const { data, error } = await supabase
     .from('daily_usage')
     .select('*')
     .eq('user_id', user.id)
     .eq('usage_date', today)
-
-  const { data, error } = await query.maybeSingle()
+    .maybeSingle()
 
   if (error) {
     console.error('Error fetching daily usage:', error)
     throw new Error('Failed to fetch usage limits')
   }
 
-  // Get limits from org if available, otherwise use defaults
+  // Get limits from subscription if available, otherwise use defaults
   let templateLimit = DEFAULT_TEMPLATE_LIMIT
   let emailLimit = DEFAULT_EMAIL_LIMIT
 
-  if (options?.orgId) {
-    const { data: orgData } = await supabase
-      .from('organizations')
-      .select('daily_template_limit, daily_email_limit')
-      .eq('id', options.orgId)
-      .single()
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('plan_tier')
+    .eq('user_id', user.id)
+    .maybeSingle()
 
-    if (orgData) {
-      templateLimit = orgData.daily_template_limit || DEFAULT_TEMPLATE_LIMIT
-      emailLimit = orgData.daily_email_limit || DEFAULT_EMAIL_LIMIT
+  if (subscription) {
+    // Set limits based on plan tier
+    switch (subscription.plan_tier) {
+      case 'starter':
+        templateLimit = 10
+        emailLimit = 50
+        break
+      case 'pro':
+        templateLimit = 100
+        emailLimit = 500
+        break
+      case 'enterprise':
+        templateLimit = 1000
+        emailLimit = 5000
+        break
     }
   }
 
@@ -77,14 +87,13 @@ export async function getDailyUsage(options?: { orgId?: string }): Promise<Daily
 }
 
 /**
- * Check if an action is allowed (under limit) - USER-CENTRIC
+ * Check if an action is allowed (under limit)
  */
 export async function checkUsageLimit(
-  actionType: 'template' | 'email',
-  options?: { orgId?: string }
+  actionType: 'template' | 'email'
 ): Promise<{ allowed: boolean; usage?: DailyUsage; error?: UsageLimitError }> {
   // Get current usage
-  const usage = await getDailyUsage(options)
+  const usage = await getDailyUsage()
 
   // Check limit
   const isUnderLimit = actionType === 'template'
@@ -116,12 +125,11 @@ export async function checkUsageLimit(
 }
 
 /**
- * Increment usage counter (USER-CENTRIC)
+ * Increment usage counter
  */
 export async function incrementUsage(
   actionType: 'template' | 'email',
-  amount: number = 1,
-  options?: { orgId?: string }
+  amount: number = 1
 ): Promise<{ success: boolean; error?: UsageLimitError }> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -156,7 +164,6 @@ export async function incrementUsage(
       .from('daily_usage')
       .insert({
         user_id: user.id,
-        org_id: options?.orgId || null,
         usage_date: today,
         [column]: amount,
       })
