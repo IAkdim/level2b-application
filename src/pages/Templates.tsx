@@ -18,14 +18,14 @@ import {
   getTimeUntilReset,
   type DailyUsage
 } from '@/lib/api/usageLimits'
-import type { EmailTemplate } from '@/types/crm'
+import type { EmailTemplate, Language } from '@/types/crm'
 import { useAuth } from '@/contexts/AuthContext'
 import {
-  getCompanySettings,
-  saveCompanySettings,
   validateSettingsForTemplateGeneration,
   type CompanySettings
 } from '@/lib/api/settings'
+import { getUserSettings, updateUserSettings } from '@/lib/api/userSettings'
+import { eventBus } from '@/lib/eventBus'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,9 +71,10 @@ export default function Templates() {
 
   // Extra context for template generation
   const [additionalContext, setAdditionalContext] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>('en')
 
   // Quick settings form state
-  const [quickSettings, setQuickSettings] = useState<CompanySettings>({
+  const [quickSettings, setQuickSettings] = useState<Partial<CompanySettings>>({
     company_name: '',
     product_service: '',
     target_audience: '',
@@ -107,13 +108,13 @@ export default function Templates() {
 
   // Check validation on mount and update
   useEffect(() => {
-    const checkValidation = () => {
-      const settings = getCompanySettings()
+    const checkValidation = async () => {
+      const settings = await getUserSettings()
       const result = validateSettingsForTemplateGeneration(settings)
       setValidation(result)
     }
     checkValidation()
-    
+
     // Re-check when window gets focus (after coming back from config)
     const handleFocus = () => checkValidation()
     window.addEventListener('focus', handleFocus)
@@ -130,8 +131,6 @@ export default function Templates() {
     } catch (error) {
       console.error('Error loading templates:', error)
       toast.error('Could not load templates')
-    } finally {
-      setIsLoadingTemplates(false)
     }
   }, [user])
 
@@ -140,9 +139,15 @@ export default function Templates() {
     loadTemplates()
   }, [loadTemplates])
 
+  // Listen for template saved events from other components (e.g., BulkEmailDialog)
+  useEffect(() => {
+    const unsubscribe = eventBus.on('templateSaved', loadTemplates)
+    return unsubscribe
+  }, [loadTemplates])
+
   const handleGenerateTemplate = async () => {
     // Always show quick settings dialog so user can add extra context
-    const existing = getCompanySettings()
+    const existing = await getUserSettings()
     if (existing) {
       setQuickSettings(existing)
     }
@@ -165,9 +170,17 @@ export default function Templates() {
       return
     }
 
-    // Save settings
-    saveCompanySettings(quickSettings)
-    
+    // Save settings to database
+    try {
+      await updateUserSettings(quickSettings)
+      // Emit event to notify other components
+      eventBus.emit('companySettingsUpdated')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+      return
+    }
+
     // Update validation
     const result = validateSettingsForTemplateGeneration(quickSettings)
     setValidation(result)
@@ -181,14 +194,14 @@ export default function Templates() {
     }
   }
 
-  const generateTemplate = async (settings: CompanySettings): Promise<boolean> => {
+  const generateTemplate = async (settings: Partial<OrganizationSettings>): Promise<boolean> => {
     setIsGenerating(true)
     setGenerationError(null) // Clear previous errors
 
     try {
-      // Check usage limit before generating
+      // Check usage limit before generating (user-centric)
       if (dailyUsage) {
-        const limitCheck = await checkUsageLimit('template')
+        const limitCheck = await checkUsageLimit('template', { orgId: selectedOrg?.id })
 
         if (!limitCheck.allowed) {
           const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -207,14 +220,15 @@ export default function Templates() {
         uniqueSellingPoints: settings.unique_selling_points,
         targetAudience: settings.target_audience!,
         industry: settings.industry,
-        calendlyLink: settings.calendly_link,
+        calendlyLink: settings.calendly_scheduling_url,
         additionalContext: additionalContext.trim() || undefined,
+        language: selectedLanguage,
       })
 
-      // Increment usage counter after successful generation
+      // Increment usage counter after successful generation (user-centric)
       if (dailyUsage) {
         try {
-          const incrementResult = await incrementUsage('template', 1)
+          const incrementResult = await incrementUsage('template', 1, { orgId: selectedOrg?.id })
           if (incrementResult.success) {
             // Reload usage to update UI
             await loadDailyUsage()
@@ -280,9 +294,7 @@ export default function Templates() {
   }
 
   const handleSaveTemplate = async () => {
-    console.log('handleSaveTemplate called')
     if (!generatedTemplate) {
-      console.log('No generated template to save')
       return
     }
 
@@ -295,10 +307,12 @@ export default function Templates() {
         body: templateBody,
         company_info: settings || undefined,
         additional_context: additionalContext || undefined,
+        orgId: selectedOrg?.id,
       })
-      console.log('Template saved successfully:', result)
       toast.success('Template saved!')
       await loadTemplates() // Reload templates
+      setShowGenerateDialog(false) // Close the GENERATE dialog (not preview)
+      setGeneratedTemplate(null) // Reset generated template
     } catch (error) {
       console.error('Error saving template:', error)
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -344,7 +358,7 @@ export default function Templates() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cold Email Templates</h1>
           <p className="text-muted-foreground mt-1">
-            Generate persuasive cold emails with AI
+            Generate Persuasive Cold Emails with AI
           </p>
         </div>
         <Button
@@ -483,17 +497,66 @@ export default function Templates() {
         </Card>
       )}
 
-      {/* Empty State */}
-      {!generatedTemplate && validation.isValid && (
+      {/* Empty State - First time users */}
+      {!generatedTemplate && validation.isValid && savedTemplates.length === 0 && (
+        <Card className="border-dashed border-2">
+          <CardContent className="py-16 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="relative inline-block">
+                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center ring-1 ring-primary/20 mx-auto">
+                  <Sparkles className="h-10 w-10 text-primary" />
+                </div>
+                <div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-lg">
+                  1
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-semibold mt-6 mb-2">
+                Create Your First Email Template
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Use AI to generate personalized cold email templates that convert. 
+                This is the first step in your outreach workflow.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button 
+                  onClick={handleGenerateTemplate}
+                  disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Generate Template with AI
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-6">
+                Next step: Add leads to send your emails to
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Empty State - Has saved templates but no generated */}
+      {!generatedTemplate && validation.isValid && savedTemplates.length > 0 && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              No templates generated yet
+          <CardContent className="py-8 text-center">
+            <Sparkles className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <h3 className="font-semibold mb-1">
+              Generate a new template
             </h3>
-            <p className="text-muted-foreground mb-4">
-              Click on "Generate New Template" to get started
+            <p className="text-sm text-muted-foreground mb-4">
+              Or use one of your {savedTemplates.length} saved templates below
             </p>
+            <Button 
+              onClick={handleGenerateTemplate}
+              disabled={isGenerating || (dailyUsage?.templatesRemaining === 0)}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate New Template
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -627,9 +690,9 @@ export default function Templates() {
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Fill in Company Information</DialogTitle>
+            <DialogTitle>Company Information</DialogTitle>
             <DialogDescription>
-              Fill in the fields below to generate a template
+              Complete the fields below to generate a template
             </DialogDescription>
           </DialogHeader>
           
@@ -653,7 +716,7 @@ export default function Templates() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="quick_company_name">
-                Company name <span className="text-red-500">*</span>
+                Company Name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_company_name"
@@ -678,7 +741,7 @@ export default function Templates() {
 
             <div className="space-y-2">
               <Label htmlFor="quick_target_audience">
-                Target audience <span className="text-red-500">*</span>
+                Target Audience <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="quick_target_audience"
@@ -686,6 +749,26 @@ export default function Templates() {
                 onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
                 placeholder="e.g. B2B SaaS companies with 10-50 employees"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="language">
+                Template Language <span className="text-red-500">*</span>
+              </Label>
+              <Select value={selectedLanguage} onValueChange={(value) => setSelectedLanguage(value as Language)}>
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">🇬🇧 English</SelectItem>
+                  <SelectItem value="nl">🇳🇱 Nederlands</SelectItem>
+                  <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                  <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                  <SelectItem value="es">🇪🇸 Español</SelectItem>
+                  <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                  <SelectItem value="pt">🇵🇹 Português</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -711,13 +794,13 @@ export default function Templates() {
                   {quickSettings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                       >
                         <X className="h-3 w-3" />
                       </button>

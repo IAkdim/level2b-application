@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabaseClient"
 import { analyzeSentiment, type SentimentAnalysis } from "./claude-secure"
+import { AuthenticationError } from "./reauth"
+import { rateLimiter } from "./rateLimiter"
 
 interface GmailMessage {
   id: string
@@ -75,6 +77,17 @@ async function getGmailAccessToken(): Promise<string | null> {
 }
 
 /**
+ * Check if Gmail authentication is valid before sending emails
+ * @throws {AuthenticationError} if authentication is required
+ */
+export async function checkGmailAuthentication(): Promise<void> {
+  const token = await getGmailAccessToken()
+  if (!token) {
+    throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
+  }
+}
+
+/**
  * Decode base64url gecodeerde string
  */
 function decodeBase64Url(str: string): string {
@@ -141,7 +154,7 @@ export async function getEmailsByLabel(
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     console.log("Fetching emails with label:", labelName);
@@ -276,7 +289,7 @@ export async function getUnreadEmailsByLabel(
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     console.log("Fetching unread emails with label:", labelName);
@@ -404,7 +417,7 @@ export async function getRecentEmailsByLabel(
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     // Format date as YYYY/MM/DD voor Gmail query
@@ -497,11 +510,20 @@ export async function sendEmail(
   try {
     console.log("sendEmail called with:", { to, subject: subject.substring(0, 50), labelName, isHtml });
     
+    // Check rate limit first
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const rateCheck = await rateLimiter.checkLimit('email_send', session.user.id)
+      if (!rateCheck.allowed) {
+        throw new Error(rateCheck.message || 'Email sending rate limit exceeded. Please try again later.')
+      }
+    }
+    
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
       console.error("No access token available");
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     console.log("Access token retrieved successfully");
@@ -513,7 +535,7 @@ export async function sendEmail(
     console.log("Sending from:", fromEmail);
     
     if (!fromEmail) {
-      throw new Error("Kan afzender email niet bepalen. Log opnieuw in.")
+      throw new AuthenticationError("Cannot determine sender email. Please re-authenticate.")
     }
     
     // Maak email in RFC 2822 format
@@ -588,6 +610,7 @@ export async function sendEmail(
  * Verstuur meerdere emails in batch
  * @param emails - Array van email objecten met to, subject, body
  * @param labelName - Optional: Label to add to all sent emails
+ * @param onProgress - Optional: Callback function called after each email is sent
  * @returns Array van message IDs van verzonden emails
  */
 export async function sendBatchEmails(
@@ -597,10 +620,12 @@ export async function sendBatchEmails(
     body: string
     isHtml?: boolean
   }>,
-  labelName?: string
+  labelName?: string,
+  onProgress?: (current: number, total: number, success: number, failed: number) => void
 ): Promise<string[]> {
   try {
     const messageIds: string[] = []
+    let failedCount = 0
     
     console.log(`Starting batch send of ${emails.length} emails with label: ${labelName || 'none'}`);
     
@@ -623,6 +648,12 @@ export async function sendBatchEmails(
           console.log(`✓ Email verzonden naar ${email.to}, message ID: ${messageId}`)
         } else {
           console.error(`✗ Email naar ${email.to} returned null message ID`)
+          failedCount++
+        }
+        
+        // Call progress callback
+        if (onProgress) {
+          onProgress(i + 1, emails.length, messageIds.length, failedCount)
         }
         
         // Kleine delay tussen emails om rate limiting te voorkomen
@@ -632,6 +663,12 @@ export async function sendBatchEmails(
         console.error(`✗ Failed to send email to ${email.to}:`, error)
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`  Error details: ${errorMessage}`);
+        failedCount++
+        
+        // Call progress callback even on error
+        if (onProgress) {
+          onProgress(i + 1, emails.length, messageIds.length, failedCount)
+        }
       }
     }
     
@@ -654,7 +691,7 @@ async function ensureLabelExists(labelName: string): Promise<string | null> {
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     // Fetch all labels
@@ -710,7 +747,7 @@ async function addLabelToMessage(messageId: string, labelId: string): Promise<bo
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     const response = await fetch(
@@ -751,7 +788,7 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     const response = await fetch(
@@ -815,7 +852,7 @@ export async function getRepliesByLabel(
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     // Haal huidige gebruiker email op
@@ -919,7 +956,7 @@ export async function markEmailAsRead(messageId: string): Promise<boolean> {
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     const response = await fetch(
@@ -960,7 +997,7 @@ export async function markEmailsAsRead(messageIds: string[]): Promise<number> {
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     // Gebruik batchModify voor efficiëntie (max 1000 messages per call)
@@ -997,12 +1034,12 @@ export async function markEmailsAsRead(messageIds: string[]): Promise<number> {
  * Fetch all available labels
  * @returns Array van label objecten met id en name
  */
-export async function getGmailLabels(): Promise<Array<{ id: string; name: string }>> {
+export async function getGmailLabels(): Promise<Array<{ id: string; name: string; type?: string }>> {
   try {
     const accessToken = await getGmailAccessToken()
     
     if (!accessToken) {
-      throw new Error("Niet geautoriseerd. Log opnieuw in.")
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
     const response = await fetch(
@@ -1024,6 +1061,41 @@ export async function getGmailLabels(): Promise<Array<{ id: string; name: string
     
   } catch (error) {
     console.error("Error fetching labels:", error)
+    throw error
+  }
+}
+
+/**
+ * Delete a Gmail label
+ * @param labelId - The ID of the label to delete
+ */
+export async function deleteGmailLabel(labelId: string): Promise<void> {
+  try {
+    const accessToken = await getGmailAccessToken()
+    
+    if (!accessToken) {
+      throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
+    }
+    
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Failed to delete label: ${error.error?.message || 'Unknown error'}`)
+    }
+    
+    console.log(`Label ${labelId} deleted successfully`)
+    
+  } catch (error) {
+    console.error("Error deleting label:", error)
     throw error
   }
 }

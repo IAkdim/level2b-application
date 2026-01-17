@@ -44,9 +44,10 @@ export function saveCompanySettings(settings: CompanySettings): void {
 
 /**
  * Check if company settings are complete for template generation
+ * Works with both CompanySettings (localStorage) and OrganizationSettings (Supabase)
  */
 export function validateSettingsForTemplateGeneration(
-  settings: CompanySettings | null
+  settings: CompanySettings | { company_name?: string; product_service?: string; target_audience?: string } | null
 ): { isValid: boolean; missingFields: string[] } {
   const requiredFields = [
     'company_name',
@@ -84,15 +85,15 @@ export function validateSettingsForTemplateGeneration(
  */
 export function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
-    company_name: 'Company name',
-    company_description: 'Company description',
+    company_name: 'Company Name',
+    company_description: 'Company Description',
     product_service: 'Product/Service',
     unique_selling_points: 'Unique Selling Points (USPs)',
-    target_audience: 'Target audience',
+    target_audience: 'Target Audience',
     industry: 'Industry',
     website_url: 'Website',
     contact_email: 'Contact Email',
-    contact_phone: 'Phone number',
+    contact_phone: 'Phone Number',
     calendly_link: 'Calendly Link',
   }
   return labels[fieldName] || fieldName

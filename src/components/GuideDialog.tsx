@@ -29,7 +29,7 @@ export function GuideDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-4xl max-h-[85vh]">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="text-2xl">Level2b Platform Guide</DialogTitle>
           <DialogDescription>
@@ -37,8 +37,8 @@ export function GuideDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="overview" className="w-full flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-5 flex-shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="leads">Leads</TabsTrigger>
             <TabsTrigger value="outreach">Outreach</TabsTrigger>
@@ -46,9 +46,9 @@ export function GuideDialog() {
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="h-[500px] mt-4">
+          <div className="flex-1 overflow-y-auto mt-4 pr-4">
             {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
+            <TabsContent value="overview" className="space-y-6 mt-0">
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Welcome to Level2b!</h3>
                 <p className="text-muted-foreground">
@@ -272,9 +272,9 @@ export function GuideDialog() {
                 </ul>
               </div>
             </TabsContent>
-          </ScrollArea>
+          </div>
 
-          <div className="flex justify-between items-center pt-4 border-t">
+          <div className="flex justify-between items-center pt-4 mt-4 border-t flex-shrink-0">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MessageSquare className="h-4 w-4" />
               <span>Questions? Use the Feedback button!</span>

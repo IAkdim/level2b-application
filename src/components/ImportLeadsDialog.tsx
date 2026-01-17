@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import {
-  parseCSVFile,
+  parseFile,
   detectColumnMapping,
   processCSVRows,
   generateErrorReportCSV,
@@ -24,7 +24,7 @@ import {
 } from "@/lib/csvParser"
 import type { CreateLeadInput, Lead } from "@/types/crm"
 
-interface ImportCSVDialogProps {
+interface ImportLeadsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -34,7 +34,7 @@ type Step = 'upload' | 'preview' | 'processing' | 'results'
 const MAX_FILE_SIZE = 1_000_000 // 1MB
 const MAX_PREVIEW_ROWS = 10
 
-export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
+export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps) {
   const [step, setStep] = useState<Step>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({})
@@ -77,16 +77,16 @@ export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
 
   const handleFileSelect = async (selectedFile: File) => {
     try {
-      // Parse CSV
-      const parsed = await parseCSVFile(selectedFile)
+      // Parse file (CSV or Excel)
+      const parsed = await parseFile(selectedFile)
 
       if (parsed.errors.length > 0) {
-        alert(`CSV parsing errors: ${parsed.errors[0].message}`)
+        alert(`File parsing errors: ${parsed.errors[0].message}`)
         return
       }
 
       if (parsed.rows.length === 0) {
-        alert('CSV file is empty')
+        alert('File is empty')
         return
       }
 
@@ -94,7 +94,7 @@ export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
       const mapping = detectColumnMapping(parsed.headers)
 
       if (!mapping.name || !mapping.email) {
-        alert('Could not detect required columns (name and email). Please ensure your CSV has these columns.')
+        alert('Could not detect required columns (name and email). Please ensure your file has these columns.')
         return
       }
 
@@ -186,9 +186,9 @@ export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import Leads from CSV</DialogTitle>
+          <DialogTitle>Import Leads from CSV or Excel</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with lead data. Required columns: name, email
+            Upload a CSV or Excel file with lead data. Required columns: name, email
           </DialogDescription>
         </DialogHeader>
 
@@ -202,14 +202,14 @@ export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-medium mb-2">Drop CSV file here or click to browse</p>
+              <p className="text-lg font-medium mb-2">Drop CSV or Excel file here or click to browse</p>
               <p className="text-sm text-muted-foreground mb-4">
                 Maximum file size: 1MB (~1000 rows recommended)
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileInputChange}
                 className="hidden"
               />
@@ -219,9 +219,10 @@ export function ImportCSVDialog({ open, onOpenChange }: ImportCSVDialogProps) {
               <CardContent className="pt-6">
                 <h4 className="font-medium mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  CSV Format Guidelines
+                  File Format Guidelines
                 </h4>
                 <div className="text-sm text-muted-foreground space-y-2">
+                  <p><strong>Accepted formats:</strong> CSV (.csv), Excel (.xlsx, .xls)</p>
                   <p><strong>Required columns:</strong> name, email</p>
                   <p><strong>Optional columns:</strong> phone, company, title, status, sentiment, source, notes</p>
                   <p><strong>Source tags:</strong> Can be comma-separated (e.g., "linkedin,referral")</p>

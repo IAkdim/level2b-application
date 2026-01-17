@@ -1,24 +1,42 @@
 // src/components/CompanySettingsForm.tsx
-// Form for personal company information (used for template generation)
+// Form for company information with Calendly OAuth integration
 
 import { useState, useEffect } from 'react'
 import {
-  getCompanySettings,
-  saveCompanySettings,
-  type CompanySettings,
-} from '@/lib/api/settings'
+  initiateCalendlyOAuth,
+  getCalendlyEventTypes,
+  disconnectCalendly,
+  type CalendlyEventType,
+} from '@/lib/api/calendly'
+import {
+  getUserSettings,
+  updateUserSettings,
+  type UserSettings,
+} from '@/lib/api/userSettings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Save, Plus, X, Building2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Save, Plus, X, Building2, Calendar, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { eventBus } from '@/lib/eventBus'
 
-export function CompanySettingsForm() {
+interface CompanySettingsFormProps {
+  showOnlyCalendly?: boolean
+}
+
+export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySettingsFormProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [settings, setSettings] = useState<Partial<CompanySettings>>({
+  const [settings, setSettings] = useState<Partial<UserSettings>>({
     company_name: '',
     company_description: '',
     product_service: '',
@@ -28,40 +46,175 @@ export function CompanySettingsForm() {
   })
   const [newUsp, setNewUsp] = useState('')
 
-  useEffect(() => {
-    // Load settings from local storage
-    setIsLoading(true)
-    const data = getCompanySettings()
-    if (data) {
-      setSettings({
-        company_name: data.company_name || '',
-        company_description: data.company_description || '',
-        product_service: data.product_service || '',
-        unique_selling_points: data.unique_selling_points || [],
-        target_audience: data.target_audience || '',
-        industry: data.industry || '',
-      })
+  // Calendly state
+  const [isCalendlyConnected, setIsCalendlyConnected] = useState(false)
+  const [isConnectingCalendly, setIsConnectingCalendly] = useState(false)
+  const [eventTypes, setEventTypes] = useState<CalendlyEventType[]>([])
+  const [selectedEventTypeUri, setSelectedEventTypeUri] = useState<string>('')
+
+  const loadEventTypes = async () => {
+    try {
+      const types = await getCalendlyEventTypes()
+      setEventTypes(types)
+    } catch (error) {
+      console.error('Error loading event types:', error)
+      toast.error('Error loading Calendly event types')
     }
-    setIsLoading(false)
+  }
+
+  const loadSettings = async () => {
+    try {
+      setIsLoading(true)
+      const data = await getUserSettings()
+      
+      // Always set settings, even if data is null
+      setSettings({
+        company_name: data?.company_name || '',
+        company_description: data?.company_description || '',
+        product_service: data?.product_service || '',
+        unique_selling_points: data?.unique_selling_points || [],
+        target_audience: data?.target_audience || '',
+        industry: data?.industry || '',
+      })
+
+      // Check if Calendly is connected
+      const connected = !!(data?.calendly_access_token)
+      setIsCalendlyConnected(connected)
+
+      // If connected, load event types
+      if (connected && data) {
+        await loadEventTypes()
+        setSelectedEventTypeUri(data.calendly_event_type_uri || '')
+      }
+    } catch (error) {
+      console.error('[CompanySettingsForm] Error loading settings:', error)
+      toast.error('Error loading settings')
+      // Set empty settings on error
+      setSettings({
+        company_name: '',
+        company_description: '',
+        product_service: '',
+        unique_selling_points: [],
+        target_audience: '',
+        industry: '',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSettings()
   }, [])
 
-  const handleSaveSettings = () => {
+  // Listen for settings updates from other components (e.g., TemplateSelector)
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      loadSettings()
+    }
+
+    eventBus.on('companySettingsUpdated', handleSettingsUpdate)
+    return () => eventBus.off('companySettingsUpdated', handleSettingsUpdate)
+  }, [])
+
+  // Check for Calendly OAuth callback - only once on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const calendlyConnected = params.get('calendly_connected')
+    const calendlyError = params.get('calendly_error')
+
+    if (calendlyConnected === 'true') {
+      toast.success('Calendly successfully connected!')
+      // Clean up URL and trigger reload through selectedOrganization change
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
+    if (calendlyError) {
+      toast.error(`Calendly connection failed: ${calendlyError}`)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  const handleSaveSettings = async () => {
+    console.log('[CompanySettingsForm] handleSaveSettings called')
+    console.log('[CompanySettingsForm] settings:', settings)
+    console.log('[CompanySettingsForm] settings.company_name:', settings.company_name)
+    console.log('[CompanySettingsForm] settings.company_name?.trim():', settings.company_name?.trim())
+    console.log('[CompanySettingsForm] selectedEventTypeUri:', selectedEventTypeUri)
+
     try {
+      console.log('[CompanySettingsForm] Checking company_name...')
       if (!settings.company_name?.trim()) {
+        console.log('[CompanySettingsForm] No company name, returning. Value:', settings.company_name)
         toast.error('Company name is required')
         return
       }
 
+      console.log('[CompanySettingsForm] Validation passed, setting isSaving to true')
       setIsSaving(true)
 
-      saveCompanySettings(settings as CompanySettings)
+      // If Calendly event type selected, add scheduling URL
+      let calendlyUpdates = {}
+      if (selectedEventTypeUri) {
+        console.log('[CompanySettingsForm] Finding selected event type...')
+        const selectedEventType = eventTypes.find(et => et.uri === selectedEventTypeUri)
+        console.log('[CompanySettingsForm] Selected event type:', selectedEventType)
+        if (selectedEventType) {
+          calendlyUpdates = {
+            calendly_event_type_uri: selectedEventType.uri,
+            calendly_scheduling_url: selectedEventType.scheduling_url,
+            calendly_event_type_name: selectedEventType.name,
+          }
+        }
+      }
 
+      console.log('[CompanySettingsForm] Saving settings with updates:', { ...settings, ...calendlyUpdates })
+      await updateUserSettings({
+        ...settings,
+        ...calendlyUpdates,
+      })
+      
+      console.log('[CompanySettingsForm] Settings saved successfully')
       toast.success('Settings saved!')
+      
+      // Notify other components (like TemplateSelector) that settings were updated
+      eventBus.emit('companySettingsUpdated')
     } catch (error) {
-      console.error('Error saving settings:', error)
+      console.error('[CompanySettingsForm] CAUGHT ERROR:', error)
       toast.error('Error saving settings')
     } finally {
+      console.log('[CompanySettingsForm] Finally block, setting isSaving to false')
       setIsSaving(false)
+    }
+  }
+
+  const handleConnectCalendly = async () => {
+    console.log('[CompanySettingsForm] handleConnectCalendly called')
+
+    setIsConnectingCalendly(true)
+    try {
+      console.log('[CompanySettingsForm] Calling initiateCalendlyOAuth...')
+      const authUrl = await initiateCalendlyOAuth()
+      console.log('[CompanySettingsForm] Got authUrl:', authUrl)
+      // Open OAuth in popup or redirect
+      window.location.href = authUrl
+    } catch (error) {
+      console.error('[CompanySettingsForm] Error connecting Calendly:', error)
+      toast.error('Error connecting to Calendly')
+      setIsConnectingCalendly(false)
+    }
+  }
+
+  const handleDisconnectCalendly = async () => {
+    try {
+      await disconnectCalendly()
+      setIsCalendlyConnected(false)
+      setEventTypes([])
+      setSelectedEventTypeUri('')
+      toast.success('Calendly connection removed')
+    } catch (error) {
+      console.error('Error disconnecting Calendly:', error)
+      toast.error('Error removing Calendly connection')
     }
   }
 
@@ -92,17 +245,149 @@ export function CompanySettingsForm() {
     )
   }
 
+  // No organization selected - show message
+  if (!selectedOrg) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Organization Settings
+          </CardTitle>
+          <CardDescription>
+            Calendly integration and team settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="font-medium mb-2">No organization selected</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Organization settings like Calendly integration require an organization.
+              You can still generate email templates using your personal settings from the Templates page.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // If only showing Calendly section
+  if (showOnlyCalendly) {
+    return (
+      <div className="space-y-4">
+        {/* Calendly Connection Status */}
+        <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+          <div className="flex items-center gap-3">
+            {isCalendlyConnected ? (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium">Calendly connected</p>
+                  <p className="text-sm text-muted-foreground">Your account is successfully linked</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+                <div>
+                  <p className="font-medium">Calendly not connected</p>
+                  <p className="text-sm text-muted-foreground">Connect your Calendly account to synchronise meetings</p>
+                </div>
+              </>
+            )}
+          </div>
+          {isCalendlyConnected ? (
+            <Button
+              onClick={handleDisconnectCalendly}
+              variant="outline"
+              size="sm"
+            >
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              onClick={handleConnectCalendly}
+              disabled={isConnectingCalendly}
+              size="sm"
+              className="gap-2"
+            >
+              {isConnectingCalendly ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Calendar className="h-4 w-4" />
+                  Connect Calendly
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+
+        {/* Event Type Selector */}
+        {isCalendlyConnected && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="event_type">Select meeting type</Label>
+              <Select
+                value={selectedEventTypeUri}
+                onValueChange={setSelectedEventTypeUri}
+              >
+                <SelectTrigger id="event_type">
+                  <SelectValue placeholder="Choose a meeting type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {eventTypes.map((eventType) => (
+                    <SelectItem key={eventType.uri} value={eventType.uri}>
+                      {eventType.name} ({eventType.duration} min)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This meeting type will be used in your outreach emails
+              </p>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end pt-4 border-t">
+              <Button type="button" onClick={handleSaveSettings} disabled={isSaving} className="gap-2">
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Full company settings view
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Company Information
-        </CardTitle>
-        <CardDescription>
-          This information is used to generate AI cold email templates
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Company Info Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Company Information
+          </CardTitle>
+          <CardDescription>
+            This information is used to generate AI cold email templates
+          </CardDescription>
+        </CardHeader>
         <CardContent className="space-y-6">
           {/* Required fields */}
           <div className="space-y-4 p-4 border border-blue-200 bg-blue-50 rounded-lg">
@@ -195,13 +480,13 @@ export function CompanySettingsForm() {
                   {settings.unique_selling_points.map((usp, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                      className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-sm"
                     >
                       <span>{usp}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveUsp(index)}
-                        className="text-gray-500 hover:text-red-500"
+                        className="text-gray-500 dark:text-gray-400 hover:text-red-500"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -229,6 +514,7 @@ export function CompanySettingsForm() {
             </Button>
           </div>
         </CardContent>
-    </Card>
+      </Card>
+    </div>
   )
 }

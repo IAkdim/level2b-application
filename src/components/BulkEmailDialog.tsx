@@ -1,16 +1,24 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Mail, Tag } from "lucide-react"
-import { sendBatchEmails } from "@/lib/api/gmail"
+import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles, Clock } from "lucide-react"
+import { sendBatchEmails, checkGmailAuthentication } from "@/lib/api/gmail"
+import { getUserEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
+import type { EmailTemplate } from "@/types/crm"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
+import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth"
 import type { Lead } from "@/types/crm"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
+import { getUserSettings, getDefaultSettings, type UserSettings } from "@/lib/api/userSettings"
+import { supabase } from "@/lib/supabaseClient"
 
 interface BulkEmailDialogProps {
   open: boolean
@@ -20,12 +28,69 @@ interface BulkEmailDialogProps {
 }
 
 export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSent }: BulkEmailDialogProps) {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [labelName, setLabelName] = useState("")
   const [isHtml, setIsHtml] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
+  const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
+  const [isComplete, setIsComplete] = useState(false)
+  const [savedTemplates, setSavedTemplates] = useState<EmailTemplate[]>([])
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
+
+  // Load user settings and templates when dialog opens
+  useEffect(() => {
+    async function loadUserSettings() {
+      if (!open) return
+
+      try {
+        const settings = await getUserSettings()
+        setUserSettings(settings || getDefaultSettings() as UserSettings)
+      } catch (error) {
+        console.error('Error loading user settings:', error)
+        setUserSettings(getDefaultSettings() as UserSettings)
+      }
+    }
+
+    loadUserSettings()
+  }, [open])
+
+  // Load saved templates when dialog opens
+  useEffect(() => {
+    const loadTemplates = async () => {
+      if (!open || !user) return
+
+      setIsLoadingTemplates(true)
+      try {
+        const templates = await getUserEmailTemplates(user.id)
+        setSavedTemplates(templates)
+      } catch (error) {
+        console.error('Error loading templates:', error)
+      } finally {
+        setIsLoadingTemplates(false)
+      }
+    }
+
+    loadTemplates()
+  }, [open, user])
+
+  const handleUseTemplate = async (template: EmailTemplate) => {
+    setSubject(template.subject)
+    setBody(template.body)
+    
+    // Increment usage counter
+    try {
+      await incrementTemplateUsage(template.id)
+    } catch (error) {
+      console.error('Error incrementing template usage:', error)
+    }
+    
+    toast.success('Template toegepast')
+  }
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
@@ -40,15 +105,17 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
 
     setIsSending(true)
     setSendResult(null)
+    setIsComplete(false)
+    setSendingProgress({ current: 0, total: selectedLeads.length, success: 0, failed: 0 })
 
     try {
-      // Check daily email limit
+      // Check daily email limit (user-centric)
       const limitCheck = await checkUsageLimit('email')
       
       if (!limitCheck.allowed) {
         const errorMsg = formatUsageLimitError(limitCheck.error!)
         const resetTime = getTimeUntilReset()
-        toast.error(`Dagelijkse email limiet bereikt. Reset over ${resetTime}`, {
+        toast.error(`Dagelijkse email limiet bereikt (${dailyLimit}). Reset over ${resetTime}`, {
           description: errorMsg,
           duration: 5000
         })
@@ -60,7 +127,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       const emailsRemaining = limitCheck.usage?.emailsRemaining || 0
       if (selectedLeads.length > emailsRemaining) {
         toast.error(`Kan niet ${selectedLeads.length} emails versturen`, {
-          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag. Reset over ${getTimeUntilReset()}`,
+          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag (limiet: ${dailyLimit}). Reset over ${getTimeUntilReset()}`,
           duration: 5000
         })
         setIsSending(false)
@@ -68,6 +135,9 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       }
 
       console.log("Starting to send emails to", selectedLeads.length, "leads");
+      
+      // Get user info for signature
+      const { data: { user } } = await supabase.auth.getUser()
       
       // Personaliseer emails met lead data
       const emails = selectedLeads.map((lead) => {
@@ -81,6 +151,16 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           .replace(/\{name\}/g, lead.name)
           .replace(/\{company\}/g, lead.company || "uw bedrijf")
           .replace(/\{title\}/g, lead.title || "")
+        
+        // Add email signature if configured
+        if (userSettings?.email_signature) {
+          const signature = userSettings.email_signature
+            .replace(/\{\{sender_name\}\}/g, userSettings.full_name || user?.email || '')
+            .replace(/\{\{company\}\}/g, userSettings.company_name || '')
+            .replace(/\{\{phone\}\}/g, '') // Add phone to user settings if needed
+
+          personalizedBody += `\n\n${signature}`
+        }
 
         console.log("Preparing email for:", lead.email, {
           subject: personalizedSubject,
@@ -99,10 +179,16 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
 
       // Send emails
       console.log("Calling sendBatchEmails with label:", labelName || "none");
-      const messageIds = await sendBatchEmails(emails, labelName || undefined)
+      const messageIds = await sendBatchEmails(
+        emails, 
+        labelName || undefined,
+        (current, total, success, failed) => {
+          setSendingProgress({ current, total, success, failed })
+        }
+      )
       console.log("Batch send completed. Message IDs:", messageIds);
 
-      // Increment email usage counter for successful sends
+      // Increment email usage counter for successful sends (user-centric)
       if (messageIds.length > 0) {
         try {
           await incrementUsage('email', messageIds.length)
@@ -131,8 +217,32 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       }
     } catch (error) {
       console.error("Error sending emails:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`Er is een fout opgetreden bij het versturen van emails:\n${errorMessage}`)
+      
+      // Check if it's an authentication error
+      if (isAuthenticationError(error)) {
+        toast.info("Gmail opnieuw verbinden...", {
+          description: "Je wordt doorgestuurd naar Google om opnieuw in te loggen.",
+          duration: 3000
+        })
+        
+        // Automatically redirect to Google re-authentication
+        try {
+          await reAuthenticateWithGoogle()
+        } catch (reAuthError) {
+          console.error("Re-authentication failed:", reAuthError)
+          toast.error("Re-authenticatie mislukt", {
+            description: "Probeer het later opnieuw of neem contact op met support.",
+            duration: 5000
+          })
+        }
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        toast.error("Error sending emails", {
+          description: errorMessage,
+          duration: 5000
+        })
+      }
+      
       setSendResult({
         success: 0,
         failed: selectedLeads.length,
@@ -148,6 +258,8 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
     setLabelName("")
     setIsHtml(false)
     setSendResult(null)
+    setSendingProgress({ current: 0, total: 0, success: 0, failed: 0 })
+    setIsComplete(false)
   }
 
   const handleClose = () => {
@@ -158,20 +270,80 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[100]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Bulk Email Versturen
-          </DialogTitle>
-          <DialogDescription>
-            Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
-            {selectedLeads.length === 1 ? "lead" : "leads"}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Bulk Email Versturen
+            </DialogTitle>
+            <DialogDescription>
+              Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
+              {selectedLeads.length === 1 ? "lead" : "leads"}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4">
+          {/* Saved Templates Section */}
+          {savedTemplates.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Saved Templates</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false)
+                    navigate('/outreach/templates')
+                  }}
+                  disabled={isSending}
+                >
+                  <Sparkles className="mr-2 h-3 w-3" />
+                  Maak nieuwe template
+                </Button>
+              </div>
+              <div className="grid gap-2 max-h-60 overflow-y-auto">
+                {savedTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                    onClick={() => handleUseTemplate(template)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{template.name}</div>
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">{template.subject}</div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                        <Clock className="h-3 w-3" />
+                        {template.times_used || 0}x
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No templates - show link to create */}
+          {savedTemplates.length === 0 && !isLoadingTemplates && (
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false)
+                  navigate('/outreach/templates')
+                }}
+                disabled={isSending}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Maak nieuwe template
+              </Button>
+            </div>
+          )}
+
           {/* Selected Leads Preview */}
           <div className="space-y-2">
             <Label>Ontvangers ({selectedLeads.length})</Label>
@@ -307,5 +479,73 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Progress Dialog - Appears on top when sending */}
+    <Dialog open={isSending} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {isComplete ? (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                Verzenden voltooid!
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                Emails versturen...
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {isComplete 
+              ? `${sendingProgress.success} email${sendingProgress.success !== 1 ? 's' : ''} succesvol verzonden`
+              : `Bezig met verzenden naar ${selectedLeads.length} ${selectedLeads.length === 1 ? 'lead' : 'leads'}`
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Voortgang</span>
+            <span className="font-medium">
+              {sendingProgress.current} / {sendingProgress.total}
+            </span>
+          </div>
+
+          <Progress 
+            value={(sendingProgress.current / sendingProgress.total) * 100} 
+            className="h-3"
+          />
+
+          <div className="flex justify-between text-sm pt-2">
+            <span className="text-green-600 dark:text-green-400 font-medium">
+              ✓ {sendingProgress.success} geslaagd
+            </span>
+            {sendingProgress.failed > 0 && (
+              <span className="text-red-600 dark:text-red-400 font-medium">
+                ✗ {sendingProgress.failed} mislukt
+              </span>
+            )}
+          </div>
+        </div>
+
+        {isComplete && (
+          <DialogFooter>
+            <Button onClick={() => {
+              setIsSending(false)
+              setIsComplete(false)
+              if (sendingProgress.success > 0) {
+                onOpenChange(false)
+                resetForm()
+              }
+            }}>
+              Sluiten
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

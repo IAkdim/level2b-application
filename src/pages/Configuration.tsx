@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -6,9 +6,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings, Bell, Mail, Shield, Save, User, Building2, Link2 } from "lucide-react"
+import { Settings, Bell, Mail, Shield, User, Building2, Link2, Loader2 } from "lucide-react"
 import { useTheme } from "@/contexts/ThemeContext"
 import { CompanySettingsForm } from "@/components/CompanySettingsForm"
+import { useOrganization } from "@/contexts/OrganizationContext"
+import { getUserSettings, upsertUserSettings, getDefaultSettings, type UserSettings } from "@/lib/api/userSettings"
+import { supabase } from "@/lib/supabaseClient"
+import { toast } from "sonner"
 
 interface ConfigSection {
   id: string
@@ -20,38 +24,38 @@ interface ConfigSection {
 const configSections: ConfigSection[] = [
   {
     id: "company",
-    title: "Company Information",
-    description: "Info for template generation",
+    title: "Company",
+    description: "Company info",
     icon: Building2
   },
   {
     id: "connections",
     title: "Connections",
-    description: "Integraties met externe services",
+    description: "External integrations",
     icon: Link2
   },
   {
     id: "profile",
-    title: "Profile Settings",
-    description: "Personal information and preferences",
+    title: "Profile",
+    description: "Personal info",
     icon: User
   },
   {
     id: "email",
-    title: "Email Settings", 
-    description: "Email signature and sending preferences",
+    title: "Email", 
+    description: "Signature settings",
     icon: Mail
   },
   {
     id: "notifications",
     title: "Notifications",
-    description: "Alert preferences and timing",
+    description: "Alert settings",
     icon: Bell
   },
   {
     id: "campaigns",
-    title: "Campaign Settings",
-    description: "Default campaign behavior and limits",
+    title: "Campaigns",
+    description: "Campaign limits",
     icon: Settings
   }
 ]
@@ -59,40 +63,62 @@ const configSections: ConfigSection[] = [
 export function Configuration() {
   const [selectedSection, setSelectedSection] = useState("company")
   const { theme, setTheme } = useTheme()
-  const [settings, setSettings] = useState({
-    profile: {
-      name: "John Doe",
-      email: "john@company.com",
-      company: "Your Company",
-      timezone: "Europe/Amsterdam"
-    },
-    email: {
-      signature: "Best regards,\n{{sender_name}}\n{{company}}\n{{phone}}",
-      defaultFromName: "John Doe",
-      replyToEmail: "john@company.com",
-      trackOpens: true,
-      trackClicks: true
-    },
-    notifications: {
-      emailReplies: true,
-      meetingBookings: true,
-      campaignUpdates: false,
-      weeklyReports: true,
-      dailyDigest: false
-    },
-    campaigns: {
-      dailySendLimit: 50,
-      followUpDelay: 3,
-      maxFollowUps: 3,
-      sendingTimeStart: "09:00",
-      sendingTimeEnd: "17:00",
-      excludeWeekends: true
-    }
-  })
+  const { selectedOrg } = useOrganization()
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [userEmail, setUserEmail] = useState("")
+  const [settings, setSettings] = useState<UserSettings>(() => getDefaultSettings() as UserSettings)
 
-  const handleSaveSettings = () => {
-    // Here you would save to your backend
-    alert("Settings saved successfully!")
+  // Load user data and settings
+  useEffect(() => {
+    async function loadData() {
+      if (!selectedOrg?.id) return
+      
+      setIsLoading(true)
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.email) {
+          setUserEmail(user.email)
+        }
+
+        // Load user settings
+        const userSettings = await getUserSettings(selectedOrg.id)
+        if (userSettings) {
+          setSettings(userSettings)
+        } else {
+          // Use defaults for new users
+          const defaults = getDefaultSettings()
+          setSettings({
+            organization_id: selectedOrg.id,
+            ...defaults
+          } as UserSettings)
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error)
+        toast.error('Failed to load settings')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadData()
+  }, [selectedOrg?.id])
+
+  // Save settings to database
+  const handleSaveSettings = async () => {
+    if (!selectedOrg?.id) return
+    
+    setIsSaving(true)
+    try {
+      await upsertUserSettings(selectedOrg.id, settings)
+      toast.success('Settings saved successfully')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const renderProfileSettings = () => (
@@ -103,10 +129,10 @@ export function Configuration() {
           <Input
             id="profile-name"
             type="text"
-            value={settings.profile.name}
+            value={settings.full_name || ''}
             onChange={(e) => setSettings({
               ...settings,
-              profile: { ...settings.profile, name: e.target.value }
+              full_name: e.target.value
             })}
           />
         </div>
@@ -115,32 +141,19 @@ export function Configuration() {
           <Input
             id="profile-email"
             type="email"
-            value={settings.profile.email}
-            onChange={(e) => setSettings({
-              ...settings,
-              profile: { ...settings.profile, email: e.target.value }
-            })}
+            value={userEmail}
+            disabled
+            className="bg-muted"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="profile-company">Company</Label>
-          <Input
-            id="profile-company"
-            type="text"
-            value={settings.profile.company}
-            onChange={(e) => setSettings({
-              ...settings,
-              profile: { ...settings.profile, company: e.target.value }
-            })}
-          />
+          <p className="text-xs text-muted-foreground">Email cannot be changed</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="profile-timezone">Timezone</Label>
           <Select
-            value={settings.profile.timezone}
+            value={settings.timezone || 'Europe/Amsterdam'}
             onValueChange={(value) => setSettings({
               ...settings,
-              profile: { ...settings.profile, timezone: value }
+              timezone: value
             })}
           >
             <SelectTrigger id="profile-timezone">
@@ -148,6 +161,7 @@ export function Configuration() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Europe/Amsterdam">Europe/Amsterdam</SelectItem>
+              <SelectItem value="Europe/London">Europe/London</SelectItem>
               <SelectItem value="America/New_York">America/New_York</SelectItem>
               <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
               <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
@@ -176,6 +190,19 @@ export function Configuration() {
           </p>
         </div>
       </div>
+
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+      </div>
     </div>
   )
 
@@ -185,10 +212,10 @@ export function Configuration() {
         <Label htmlFor="email-signature">Email Signature</Label>
         <textarea
           id="email-signature"
-          value={settings.email.signature}
+          value={settings.email_signature || ''}
           onChange={(e) => setSettings({
             ...settings,
-            email: { ...settings.email, signature: e.target.value }
+            email_signature: e.target.value
           })}
           rows={4}
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -204,10 +231,10 @@ export function Configuration() {
           <Input
             id="email-from-name"
             type="text"
-            value={settings.email.defaultFromName}
+            value={settings.default_from_name || ''}
             onChange={(e) => setSettings({
               ...settings,
-              email: { ...settings.email, defaultFromName: e.target.value }
+              default_from_name: e.target.value
             })}
           />
         </div>
@@ -216,10 +243,10 @@ export function Configuration() {
           <Input
             id="email-reply-to"
             type="email"
-            value={settings.email.replyToEmail}
+            value={settings.reply_to_email || ''}
             onChange={(e) => setSettings({
               ...settings,
-              email: { ...settings.email, replyToEmail: e.target.value }
+              reply_to_email: e.target.value
             })}
           />
         </div>
@@ -229,10 +256,10 @@ export function Configuration() {
         <div className="flex items-center space-x-2">
           <Checkbox
             id="track-opens"
-            checked={settings.email.trackOpens}
+            checked={settings.track_opens ?? true}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              email: { ...settings.email, trackOpens: checked as boolean }
+              track_opens: checked as boolean
             })}
           />
           <Label htmlFor="track-opens" className="text-sm font-normal cursor-pointer">
@@ -242,16 +269,29 @@ export function Configuration() {
         <div className="flex items-center space-x-2">
           <Checkbox
             id="track-clicks"
-            checked={settings.email.trackClicks}
+            checked={settings.track_clicks ?? true}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              email: { ...settings.email, trackClicks: checked as boolean }
+              track_clicks: checked as boolean
             })}
           />
           <Label htmlFor="track-clicks" className="text-sm font-normal cursor-pointer">
             Track link clicks
           </Label>
         </div>
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
       </div>
     </div>
   )
@@ -269,10 +309,10 @@ export function Configuration() {
           </div>
           <Checkbox
             id="notif-email-replies"
-            checked={settings.notifications.emailReplies}
+            checked={settings.notif_email_replies ?? true}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              notifications: { ...settings.notifications, emailReplies: checked as boolean }
+              notif_email_replies: checked as boolean
             })}
           />
         </div>
@@ -285,10 +325,10 @@ export function Configuration() {
           </div>
           <Checkbox
             id="notif-meeting-bookings"
-            checked={settings.notifications.meetingBookings}
+            checked={settings.notif_meeting_bookings ?? true}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              notifications: { ...settings.notifications, meetingBookings: checked as boolean }
+              notif_meeting_bookings: checked as boolean
             })}
           />
         </div>
@@ -301,10 +341,10 @@ export function Configuration() {
           </div>
           <Checkbox
             id="notif-campaign-updates"
-            checked={settings.notifications.campaignUpdates}
+            checked={settings.notif_campaign_updates ?? false}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              notifications: { ...settings.notifications, campaignUpdates: checked as boolean }
+              notif_campaign_updates: checked as boolean
             })}
           />
         </div>
@@ -317,10 +357,10 @@ export function Configuration() {
           </div>
           <Checkbox
             id="notif-weekly-reports"
-            checked={settings.notifications.weeklyReports}
+            checked={settings.notif_weekly_reports ?? true}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              notifications: { ...settings.notifications, weeklyReports: checked as boolean }
+              notif_weekly_reports: checked as boolean
             })}
           />
         </div>
@@ -333,13 +373,26 @@ export function Configuration() {
           </div>
           <Checkbox
             id="notif-daily-digest"
-            checked={settings.notifications.dailyDigest}
+            checked={settings.notif_daily_digest ?? false}
             onCheckedChange={(checked) => setSettings({
               ...settings,
-              notifications: { ...settings.notifications, dailyDigest: checked as boolean }
+              notif_daily_digest: checked as boolean
             })}
           />
         </div>
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
       </div>
     </div>
   )
@@ -352,10 +405,10 @@ export function Configuration() {
           <Input
             id="campaign-send-limit"
             type="number"
-            value={settings.campaigns.dailySendLimit}
+            value={settings.campaign_daily_send_limit ?? 50}
             onChange={(e) => setSettings({
               ...settings,
-              campaigns: { ...settings.campaigns, dailySendLimit: parseInt(e.target.value) }
+              campaign_daily_send_limit: parseInt(e.target.value) || 50
             })}
             min="1"
             max="200"
@@ -367,10 +420,10 @@ export function Configuration() {
           <Input
             id="campaign-followup-delay"
             type="number"
-            value={settings.campaigns.followUpDelay}
+            value={settings.campaign_followup_delay ?? 3}
             onChange={(e) => setSettings({
               ...settings,
-              campaigns: { ...settings.campaigns, followUpDelay: parseInt(e.target.value) }
+              campaign_followup_delay: parseInt(e.target.value) || 3
             })}
             min="1"
             max="30"
@@ -381,10 +434,10 @@ export function Configuration() {
           <Input
             id="campaign-max-followups"
             type="number"
-            value={settings.campaigns.maxFollowUps}
+            value={settings.campaign_max_followups ?? 3}
             onChange={(e) => setSettings({
               ...settings,
-              campaigns: { ...settings.campaigns, maxFollowUps: parseInt(e.target.value) }
+              campaign_max_followups: parseInt(e.target.value) || 3
             })}
             min="1"
             max="10"
@@ -396,10 +449,10 @@ export function Configuration() {
             <Input
               id="campaign-time-start"
               type="time"
-              value={settings.campaigns.sendingTimeStart}
+              value={settings.campaign_sending_time_start || '09:00'}
               onChange={(e) => setSettings({
                 ...settings,
-                campaigns: { ...settings.campaigns, sendingTimeStart: e.target.value }
+                campaign_sending_time_start: e.target.value
               })}
               className="flex-1"
             />
@@ -407,10 +460,10 @@ export function Configuration() {
             <Input
               id="campaign-time-end"
               type="time"
-              value={settings.campaigns.sendingTimeEnd}
+              value={settings.campaign_sending_time_end || '17:00'}
               onChange={(e) => setSettings({
                 ...settings,
-                campaigns: { ...settings.campaigns, sendingTimeEnd: e.target.value }
+                campaign_sending_time_end: e.target.value
               })}
               className="flex-1"
             />
@@ -420,35 +473,47 @@ export function Configuration() {
       <div className="flex items-center space-x-2">
         <Checkbox
           id="campaign-exclude-weekends"
-          checked={settings.campaigns.excludeWeekends}
+          checked={settings.campaign_exclude_weekends ?? true}
           onCheckedChange={(checked) => setSettings({
             ...settings,
-            campaigns: { ...settings.campaigns, excludeWeekends: checked as boolean }
+            campaign_exclude_weekends: checked as boolean
           })}
         />
         <Label htmlFor="campaign-exclude-weekends" className="text-sm font-normal cursor-pointer">
           Exclude weekends from sending
         </Label>
       </div>
+
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+      </div>
     </div>
   )
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your account settings and preferences
-          </p>
-        </div>
-        <Button onClick={handleSaveSettings} size="sm">
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your account settings and preferences
+        </p>
       </div>
 
-      <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <Tabs value={selectedSection} onValueChange={setSelectedSection} className="grid grid-cols-1 lg:grid-cols-4 gap-8">{/*... rest stays same ...*/}
         {/* Settings Navigation - Keep card for navigation */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="border-border/30">
@@ -463,11 +528,11 @@ export function Configuration() {
                     value={section.id}
                     className="w-full justify-start px-4 py-3 data-[state=active]:bg-muted rounded-none first:rounded-t-md last:rounded-b-md"
                   >
-                    <div className="flex items-center space-x-3">
-                      <section.icon className="h-4 w-4" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">{section.title}</div>
-                        <div className="text-xs text-muted-foreground">
+                    <div className="flex items-start space-x-3 w-full">
+                      <section.icon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div className="text-left flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{section.title}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2">
                           {section.description}
                         </div>
                       </div>
@@ -574,6 +639,7 @@ export function Configuration() {
           </TabsContent>
         </div>
       </Tabs>
+      )}
     </div>
   )
 }

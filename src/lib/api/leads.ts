@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { rateLimiter } from './rateLimiter'
 import type {
   Lead,
   CreateLeadInput,
@@ -16,8 +17,17 @@ export async function getUserLeads(
   filters?: LeadFilters,
   pagination?: PaginationParams
 ): Promise<PaginatedResponse<Lead>> {
+  // Rate limit check
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    const rateCheck = await rateLimiter.checkLimit('database', session.user.id)
+    if (!rateCheck.allowed) {
+      throw new Error(rateCheck.message || 'Too many requests. Please try again later.')
+    }
+  }
+
   const page = pagination?.page || 1
-  const limit = pagination?.limit || 50
+  const limit = pagination?.limit || 500
   const offset = (page - 1) * limit
 
   let query = supabase

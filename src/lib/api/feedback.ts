@@ -5,9 +5,11 @@ import { supabase } from '@/lib/supabaseClient'
 import type { Feedback, CreateFeedbackInput } from '@/types/crm'
 
 /**
- * Submit feedback
+ * Submit feedback (USER-CENTRIC)
  */
-export async function submitFeedback(input: CreateFeedbackInput): Promise<Feedback> {
+export async function submitFeedback(
+  input: CreateFeedbackInput
+): Promise<Feedback> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
@@ -27,21 +29,4 @@ export async function submitFeedback(input: CreateFeedbackInput): Promise<Feedba
   }
 
   return data
-}
-
-/**
- * Get all feedback (admin only)
- */
-export async function getAllFeedback(): Promise<Feedback[]> {
-  const { data, error } = await supabase
-    .from('feedback')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching feedback:', error)
-    throw new Error(error.message)
-  }
-
-  return data || []
 }

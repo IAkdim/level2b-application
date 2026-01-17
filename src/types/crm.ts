@@ -5,6 +5,7 @@ export type Sentiment = 'positive' | 'neutral' | 'negative'
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost'
+export type Language = 'en' | 'nl' | 'de' | 'fr' | 'es' | 'it' | 'pt'
 
 // ============================================================================
 // LEAD
@@ -24,6 +25,7 @@ export interface Lead {
   status: LeadStatus
   sentiment?: Sentiment
   source?: string[] // Changed to array for multiple tags
+  language?: Language // Language for outreach (en, nl, de, fr, es, it, pt)
 
   // Additional Data
   notes?: string
@@ -44,6 +46,7 @@ export interface CreateLeadInput {
   status?: LeadStatus
   sentiment?: Sentiment
   source?: string[] // Changed to array for multiple tags
+  language?: Language
   notes?: string
   metadata?: Record<string, any>
 }
@@ -168,15 +171,16 @@ export interface EmailTemplate {
   name: string
   subject: string
   body: string
-
+  language?: Language // Language the template is written in
+  
   // Generation metadata
   company_info?: Record<string, any>
   additional_context?: string
-
+  
   // Usage tracking
   times_used: number
   last_used_at?: string
-
+  
   // Timestamps
   created_at: string
   updated_at: string
@@ -186,6 +190,7 @@ export interface CreateEmailTemplateInput {
   name: string
   subject: string
   body: string
+  language?: Language
   company_info?: Record<string, any>
   additional_context?: string
 }
@@ -212,16 +217,16 @@ export interface Feedback {
   type: FeedbackType
   message: string
   rating?: number
-
+  
   // Optional metadata
   page_url?: string
   user_agent?: string
   metadata?: Record<string, any>
-
+  
   // Status tracking
   status: FeedbackStatus
   admin_notes?: string
-
+  
   // Timestamps
   created_at: string
   updated_at: string
