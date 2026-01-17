@@ -6,7 +6,6 @@ import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { GuideDialog } from "@/components/GuideDialog"
 import { AuthProvider } from "@/contexts/AuthContext"
-import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { ThemeProvider } from "@/contexts/ThemeContext"
 
 // Lazy load pages
@@ -18,12 +17,10 @@ const Templates = lazy(() => import("@/pages/Templates"))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
 const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
-const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
 const OutreachLayout = lazy(() => import("@/pages/Outreach"))
 const Login = lazy(() => import("@/pages/Login").then(m => ({ default: m.Login })))
 const AuthCallback = lazy(() => import("@/pages/AuthCallback").then(m => ({ default: m.AuthCallback })))
-const SelectOrganization = lazy(() => import("@/pages/SelectOrganization").then(m => ({ default: m.SelectOrganization })))
 
 const queryClient = new QueryClient()
 
@@ -48,24 +45,13 @@ function App() {
       <ThemeProvider>
         <Router>
           <AuthProvider>
-            <OrganizationProvider>
-              <Suspense fallback={<PageLoader />}>
+            <Suspense fallback={<PageLoader />}>
               <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
 
-              {/* Organization selection - requires auth but not org */}
-              <Route
-                path="/select-organization"
-                element={
-                  <ProtectedRoute requireOrganization={false}>
-                    <SelectOrganization />
-                  </ProtectedRoute>
-                }
-              />
-
-            {/* Protected app routes */}
+                {/* Protected app routes */}
             <Route
               path="/*"
               element={
@@ -89,7 +75,6 @@ function App() {
                               <Route path="/meetings" element={<Meetings />} />
                               <Route path="/analytics" element={<Analytics />} />
                               <Route path="/configuration" element={<Configuration />} />
-                              <Route path="/organization" element={<OrganizationManagement />} />
                               <Route path="/profile" element={<Profile />} />
                             </Routes>
                           </Suspense>
@@ -103,8 +88,7 @@ function App() {
               }
             />
               </Routes>
-              </Suspense>
-            </OrganizationProvider>
+            </Suspense>
           </AuthProvider>
         </Router>
       </ThemeProvider>
