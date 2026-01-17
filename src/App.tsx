@@ -11,12 +11,9 @@ import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 import { OnboardingProvider } from "@/contexts/OnboardingContext"
-// Removed unused imports
-// import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
-// import { OnboardingProvider } from "@/contexts/OnboardingContext"
 import { GuidedWalkthrough } from "@/components/GuidedWalkthrough"
 import { DemoUsageTracker } from "@/components/DemoUsageTracker"
-import { FirstVisitModal } from "@/components/FirstVisitModal"
+import { DemoGate } from "@/components/DemoGate"
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })))
