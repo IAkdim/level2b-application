@@ -46,6 +46,7 @@ export function TopBar() {
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>('')
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const { selectedOrg, userOrgs, setOrganization, clearOrganization } = useOrganization()
 
   // Global keyboard shortcut for quick actions (⌘K / Ctrl+K)

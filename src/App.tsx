@@ -1,3 +1,4 @@
+import { ThemeProvider } from "@/contexts/ThemeContext"
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { lazy, Suspense } from "react"
@@ -6,14 +7,14 @@ import { TopBar } from "@/components/TopBar"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { AdminRoute } from "@/components/AdminRoute"
 import { GuideDialog } from "@/components/GuideDialog"
+import { FirstVisitModal } from "@/components/FirstVisitModal"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { OrganizationProvider } from "@/contexts/OrganizationContext"
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 import { OnboardingProvider } from "@/contexts/OnboardingContext"
-import { ThemeProvider } from "@/contexts/ThemeContext"
-import { Toaster } from "@/components/ui/sonner"
-import { SubscriptionGate } from "@/components/SubscriptionGate"
-import { DemoGate } from "@/components/DemoGate"
+// Removed unused imports
+// import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
+// import { OnboardingProvider } from "@/contexts/OnboardingContext"
 import { GuidedWalkthrough } from "@/components/GuidedWalkthrough"
 import { DemoUsageTracker } from "@/components/DemoUsageTracker"
 
@@ -24,7 +25,8 @@ const LeadDetail = lazy(() => import("@/pages/LeadDetail").then(m => ({ default:
 const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ default: m.EmailThreads })))
 const Templates = lazy(() => import("@/pages/Templates"))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
-const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
+// @ts-ignore
+const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.default })));
 const ApiMonitoring = lazy(() => import("@/pages/ApiMonitoring"))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
 const OrganizationManagement = lazy(() => import("@/pages/OrganizationManagement").then(m => ({ default: m.OrganizationManagement })))
@@ -39,6 +41,7 @@ const BillingSettings = lazy(() => import("@/pages/BillingSettings"))
 
 // Onboarding pages
 const OnboardingForm = lazy(() => import("@/pages/OnboardingForm"))
+const DemoGate = lazy(() => import("@/components/DemoGate"))
 const DemoPaywall = lazy(() => import("@/components/DemoPaywall"))
 const ThankYou = lazy(() => import("@/pages/ThankYou"))
 
@@ -68,6 +71,8 @@ function PageLoader() {
   )
 }
 
+export default App;
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -75,141 +80,143 @@ function App() {
         <Router>
           <AuthProvider>
             <OrganizationProvider>
-              <Suspense fallback={<PageLoader />}>
-              <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+              <SubscriptionProvider>
+                <OnboardingProvider>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      {/* Public routes */}
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
 
-              {/* Organization selection - requires auth but not org */}
-              <Route
-                path="/select-organization"
-                element={
-                  <ProtectedRoute requireOrganization={false}>
-                    <SelectOrganization />
-                  </ProtectedRoute>
-                }
-              />
+                      {/* Organization selection - requires auth but not org */}
+                      <Route
+                        path="/select-organization"
+                        element={
+                          <ProtectedRoute requireOrganization={false}>
+                            <SelectOrganization />
+                          </ProtectedRoute>
+                        }
+                      />
 
-              {/* Onboarding flow routes - requires auth but not subscription */}
-              <Route
-                path="/onboarding"
-                element={
-                  <ProtectedRoute>
-                    <OnboardingForm />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/paywall"
-                element={
-                  <ProtectedRoute>
-                    <DemoPaywall />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/thank-you"
-                element={
-                  <ProtectedRoute>
-                    <ThankYou />
-                  </ProtectedRoute>
-                }
-              />
+                      {/* Onboarding flow routes - requires auth but not subscription */}
+                      <Route
+                        path="/onboarding"
+                        element={
+                          <ProtectedRoute>
+                            <OnboardingForm />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/paywall"
+                        element={
+                          <ProtectedRoute>
+                            <DemoPaywall />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/thank-you"
+                        element={
+                          <ProtectedRoute>
+                            <ThankYou />
+                          </ProtectedRoute>
+                        }
+                      />
 
-              {/* Subscription pages - requires auth and org but not subscription */}
-              <Route
-                path="/subscribe"
-                element={
-                  <ProtectedRoute>
-                    <Subscribe />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/subscribe/success"
-                element={
-                  <ProtectedRoute>
-                    <SubscribeSuccess />
-                  </ProtectedRoute>
-                }
-              />
+                      {/* Subscription pages - requires auth and org but not subscription */}
+                      <Route
+                        path="/subscribe"
+                        element={
+                          <ProtectedRoute>
+                            <Subscribe />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/subscribe/success"
+                        element={
+                          <ProtectedRoute>
+                            <SubscribeSuccess />
+                          </ProtectedRoute>
+                        }
+                      />
 
-              {/* Developer Dashboard - admin only */}
-              <Route
-                path="/dev/*"
-                element={
-                  <AdminRoute>
-                    <DevDashboardLayout />
-                  </AdminRoute>
-                }
-              >
-                <Route index element={<Navigate to="overview" replace />} />
-                <Route path="overview" element={<DevOverview />} />
-                <Route path="users" element={<DevUsers />} />
-                <Route path="users/:userId" element={<DevUserDetail />} />
-                <Route path="logs" element={<DevLogs />} />
-                <Route path="flags" element={<DevFeatureFlags />} />
-                <Route path="settings" element={<DevSettings />} />
-              </Route>
+                      {/* Developer Dashboard - admin only */}
+                      <Route
+                        path="/dev/*"
+                        element={
+                          <AdminRoute>
+                            <DevDashboardLayout />
+                          </AdminRoute>
+                        }
+                      >
+                        <Route index element={<Navigate to="overview" replace />} />
+                        <Route path="overview" element={<DevOverview />} />
+                        <Route path="users" element={<DevUsers />} />
+                        <Route path="users/:userId" element={<DevUserDetail />} />
+                        <Route path="logs" element={<DevLogs />} />
+                        <Route path="flags" element={<DevFeatureFlags />} />
+                        <Route path="settings" element={<DevSettings />} />
+                      </Route>
 
-            {/* Protected app routes - requires subscription OR demo mode */}
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <DemoGate>
-                  <div className="min-h-screen bg-background">
-                    <TopBar />
-                    {/* Demo usage tracker - shown in demo mode */}
-                    <div className="px-4 py-2">
-                      <DemoUsageTracker variant="compact" />
-                    </div>
-                    <div className="flex h-[calc(100vh-56px-52px)]">
-                      <AppSidebar />
-                      <main className="flex-1 overflow-auto bg-muted/30">
-                        <div className="p-6 lg:p-8">
-                          <Suspense fallback={<PageLoader />}>
-                            <Routes>
-                              <Route path="/" element={<Dashboard />} />
-                              <Route path="/outreach" element={<OutreachLayout />}>
-                                <Route index element={<Navigate to="templates" replace />} />
-                                <Route path="templates" element={<Templates />} />
-                                <Route path="leads" element={<Leads />} />
-                                <Route path="leads/:leadId" element={<LeadDetail />} />
-                                <Route path="email-threads" element={<EmailThreads />} />
-                              </Route>
-                              <Route path="/meetings" element={<Meetings />} />
-                              <Route path="/analytics" element={<Analytics />} />
-                              <Route path="/api-monitoring" element={<ApiMonitoring />} />
-                              <Route path="/configuration" element={<Configuration />} />
-                              <Route path="/organization" element={<OrganizationManagement />} />
-                              <Route path="/profile" element={<Profile />} />
-                              <Route path="/settings/billing" element={<BillingSettings />} />
-                            </Routes>
-                          </Suspense>
-                        </div>
-                      </main>
-                    </div>
-                    {/* Guide Dialog - globally available */}
-                    <GuideDialog />
-                    {/* Guided walkthrough for demo users */}
-                    <GuidedWalkthrough />
-                    {/* First visit onboarding modal - for subscribed users */}
-                    <FirstVisitModal />
-                  </div>
-                  </DemoGate>
-                </ProtectedRoute>
-              }
-            />
-              </Routes>
-              </Suspense>
+                      {/* Protected app routes - requires subscription OR demo mode */}
+                      <Route
+                        path="/*"
+                        element={
+                          <ProtectedRoute>
+                            <DemoGate>
+                              <div className="min-h-screen bg-background">
+                                <TopBar />
+                                {/* Demo usage tracker - shown in demo mode */}
+                                <div className="px-4 py-2">
+                                  <DemoUsageTracker variant="compact" />
+                                </div>
+                                <div className="flex h-[calc(100vh-56px-52px)]">
+                                  <AppSidebar />
+                                  <main className="flex-1 overflow-auto bg-muted/30">
+                                    <div className="p-6 lg:p-8">
+                                      <Suspense fallback={<PageLoader />}>
+                                        <Routes>
+                                          <Route path="/" element={<Dashboard />} />
+                                          <Route path="/outreach" element={<OutreachLayout />}>
+                                            <Route index element={<Navigate to="templates" replace />} />
+                                            <Route path="templates" element={<Templates />} />
+                                            <Route path="leads" element={<Leads />} />
+                                            <Route path="leads/:leadId" element={<LeadDetail />} />
+                                            <Route path="email-threads" element={<EmailThreads />} />
+                                          </Route>
+                                          <Route path="/meetings" element={<Meetings />} />
+                                          <Route path="/analytics" element={<Analytics />} />
+                                          <Route path="/api-monitoring" element={<ApiMonitoring />} />
+                                          <Route path="/configuration" element={<Configuration />} />
+                                          <Route path="/organization" element={<OrganizationManagement />} />
+                                          <Route path="/profile" element={<Profile />} />
+                                          <Route path="/settings/billing" element={<BillingSettings />} />
+                                        </Routes>
+                                      </Suspense>
+                                    </div>
+                                  </main>
+                                </div>
+                                {/* Guide Dialog - globally available */}
+                                <GuideDialog />
+                                {/* Guided walkthrough for demo users */}
+                                <GuidedWalkthrough />
+                                {/* First visit onboarding modal - for subscribed users */}
+                                <FirstVisitModal />
+                              </div>
+                            </DemoGate>
+                          </ProtectedRoute>
+                        }
+                      />
+                    </Routes>
+                  </Suspense>
+                </OnboardingProvider>
+              </SubscriptionProvider>
             </OrganizationProvider>
           </AuthProvider>
         </Router>
       </ThemeProvider>
     </QueryClientProvider>
-  )
+  );
 }
-
-export default App

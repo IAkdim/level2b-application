@@ -25,7 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
   'lost': '#ef4444'
 }
 
-export function Analytics() {
+ const Analytics = () => {
   const { user } = useAuth()
   const { selectedOrg } = useOrganization()
   const [isLoading, setIsLoading] = useState(true)
@@ -188,6 +188,7 @@ function getStatusLabel(status: string): string {
   }
   return labels[status] || status
 }
+export default Analytics;
 
 // Custom tooltip component
 function CustomTooltip({ active, payload, label }: any) {
