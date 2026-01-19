@@ -240,9 +240,9 @@ export function Leads() {
                   </Button>
                 </>
               )}
-              {selectedOrg && (
+              {user && (
                 <GenerateLeadsDialog
-                  organizationId={selectedOrg.id}
+                  userId={user.id}
                   onLeadsGenerated={refetch}
                 />
               )}

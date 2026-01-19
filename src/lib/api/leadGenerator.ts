@@ -7,7 +7,7 @@ export interface GenerateLeadsParams {
   location: string
   maxLeads: number
   emailProvider?: string
-  orgId: string
+  userId: string
 }
 
 export interface GenerateLeadsResult {

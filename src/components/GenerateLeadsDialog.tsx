@@ -17,11 +17,11 @@ import { generateLeads, GenerateLeadsParams } from "@/lib/api/leadGenerator"
 import { LeadGeneratorProgress } from "./LeadGeneratorProgress"
 
 interface GenerateLeadsDialogProps {
-  organizationId: string
+  userId: string
   onLeadsGenerated: () => void
 }
 
-export function GenerateLeadsDialog({ organizationId, onLeadsGenerated }: GenerateLeadsDialogProps) {
+export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsDialogProps) {
   const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [method, setMethod] = useState<'google_maps' | 'social_media'>('google_maps')
@@ -65,7 +65,7 @@ export function GenerateLeadsDialog({ organizationId, onLeadsGenerated }: Genera
         location,
         maxLeads,
         emailProvider: method === 'social_media' ? emailProvider : undefined,
-        orgId: organizationId,
+        userId,
       }
 
       // Simulate progress updates

@@ -202,7 +202,7 @@ export default function Templates() {
     try {
       // Check usage limit before generating (user-centric)
       if (dailyUsage) {
-        const limitCheck = await checkUsageLimit('template', { orgId: selectedOrg?.id })
+        const limitCheck = await checkUsageLimit('template')
 
         if (!limitCheck.allowed) {
           const errorMsg = formatUsageLimitError(limitCheck.error!)
@@ -229,7 +229,7 @@ export default function Templates() {
       // Increment usage counter after successful generation (user-centric)
       if (dailyUsage) {
         try {
-          const incrementResult = await incrementUsage('template', 1, { orgId: selectedOrg?.id })
+          const incrementResult = await incrementUsage('template', 1)
           if (incrementResult.success) {
             // Reload usage to update UI
             await loadDailyUsage()
@@ -308,7 +308,6 @@ export default function Templates() {
         body: templateBody,
         company_info: settings || undefined,
         additional_context: additionalContext || undefined,
-        orgId: selectedOrg?.id,
       })
       toast.success('Template saved!')
       await loadTemplates() // Reload templates

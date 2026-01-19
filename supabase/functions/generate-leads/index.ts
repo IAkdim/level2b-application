@@ -12,7 +12,7 @@ interface GenerateLeadsRequest {
   location: string
   maxLeads: number
   emailProvider?: string
-  orgId: string
+  userId: string
 }
 
 interface Lead {
@@ -33,7 +33,6 @@ serve(async (req) => {
 
   const startTime = Date.now()
   let userId: string | undefined
-  let orgId: string | undefined
 
   try {
     const supabaseClient = createClient(
@@ -64,15 +63,14 @@ serve(async (req) => {
     userId = user.id
 
     const body: GenerateLeadsRequest = await req.json()
-    const { method, niche, location, maxLeads, emailProvider, orgId: requestOrgId } = body
-    orgId = requestOrgId
+    const { method, niche, location, maxLeads, emailProvider } = body
 
     console.log('Starting lead generation:', { method, niche, location, maxLeads })
 
     // ✅ RATE LIMITING CHECK
     const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc(
       'get_hourly_rate_limit',
-      { p_user_id: userId, p_org_id: orgId }
+      { p_user_id: userId, p_org_id: null }
     )
 
     if (rateLimitError) {
@@ -97,19 +95,18 @@ serve(async (req) => {
     }
 
     // Save leads to database
-    const savedLeads = await saveLeadsToDatabase(supabaseClient, leads, orgId, method)
+    const savedLeads = await saveLeadsToDatabase(supabaseClient, leads, userId, method)
 
     // ✅ INCREMENT RATE LIMIT
     await supabaseAdmin.rpc('increment_rate_limit', {
       p_user_id: userId,
-      p_org_id: orgId,
+      p_org_id: null,
       p_leads_count: savedLeads.length
     })
 
     // ✅ LOG API USAGE (success)
     const duration = Date.now() - startTime
     await supabaseAdmin.from('api_usage_logs').insert({
-      organization_id: orgId,
       user_id: userId,
       endpoint: 'generate-leads',
       method: method,
@@ -136,7 +133,7 @@ serve(async (req) => {
     console.error('Error generating leads:', error)
 
     // ✅ LOG API USAGE (failure)
-    if (userId && orgId) {
+    if (userId) {
       try {
         const supabaseAdmin = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
@@ -145,7 +142,6 @@ serve(async (req) => {
         
         const duration = Date.now() - startTime
         await supabaseAdmin.from('api_usage_logs').insert({
-          organization_id: orgId,
           user_id: userId,
           endpoint: 'generate-leads',
           method: 'unknown',
@@ -378,7 +374,7 @@ function extractNameFromText(text: string): string | undefined {
 async function saveLeadsToDatabase(
   supabaseClient: any,
   leads: Lead[],
-  orgId: string,
+  userId: string,
   method: string
 ): Promise<any[]> {
   const savedLeads = []
@@ -388,7 +384,7 @@ async function saveLeadsToDatabase(
       const { data, error } = await supabaseClient
         .from('leads')
         .insert({
-          organization_id: orgId,
+          user_id: userId,
           company: lead.company,
           contact_name: lead.contact_name,
           email: lead.email,
