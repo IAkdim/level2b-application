@@ -153,45 +153,27 @@ export function FirstVisitModal() {
 
         // Check for templates (now index 1)
         if (tasks[1].checkType === 'templates' && !tasks[1].completed) {
-          const { data: orgs } = await supabase
-            .from('user_organizations')
-            .select('org_id')
+          const { count } = await supabase
+            .from('email_templates')
+            .select('*', { count: 'exact', head: true })
             .eq('user_id', session.user.id)
-            .limit(1)
-            .single()
 
-          if (orgs?.org_id) {
-            const { count } = await supabase
-              .from('templates')
-              .select('*', { count: 'exact', head: true })
-              .eq('organization_id', orgs.org_id)
-
-            if (count && count > 0) {
-              updatedTasks[1].completed = true
-              hasChanges = true
-            }
+          if (count && count > 0) {
+            updatedTasks[1].completed = true
+            hasChanges = true
           }
         }
 
         // Check for leads (now index 2)
         if (tasks[2].checkType === 'leads' && !tasks[2].completed) {
-          const { data: orgs } = await supabase
-            .from('user_organizations')
-            .select('org_id')
+          const { count } = await supabase
+            .from('leads')
+            .select('*', { count: 'exact', head: true })
             .eq('user_id', session.user.id)
-            .limit(1)
-            .single()
 
-          if (orgs?.org_id) {
-            const { count } = await supabase
-              .from('leads')
-              .select('*', { count: 'exact', head: true })
-              .eq('org_id', orgs.org_id)
-
-            if (count && count > 0) {
-              updatedTasks[2].completed = true
-              hasChanges = true
-            }
+          if (count && count > 0) {
+            updatedTasks[2].completed = true
+            hasChanges = true
           }
         }
 

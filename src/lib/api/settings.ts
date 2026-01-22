@@ -44,7 +44,6 @@ export function saveCompanySettings(settings: CompanySettings): void {
 
 /**
  * Check if company settings are complete for template generation
- * Works with both CompanySettings (localStorage) and OrganizationSettings (Supabase)
  */
 export function validateSettingsForTemplateGeneration(
   settings: CompanySettings | { company_name?: string; product_service?: string; target_audience?: string } | null

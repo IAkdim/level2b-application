@@ -125,7 +125,7 @@ export function CompanySettingsForm({ showOnlyCalendly = false }: CompanySetting
 
     if (calendlyConnected === 'true') {
       toast.success('Calendly successfully connected!')
-      // Clean up URL and trigger reload through selectedOrganization change
+      // Clean up URL after Calendly connection
       window.history.replaceState({}, '', window.location.pathname)
     }
 

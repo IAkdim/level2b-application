@@ -1,15 +1,91 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
-import { useEffect, useState, useCallback } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import { useAuth } from "@/contexts/AuthContext"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TrendingUp, TrendingDown, Mail, Calendar, Download, RefreshCw, Users, Target, CheckCircle2, BarChart3 } from "lucide-react"
+import { useState, useMemo } from "react"
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts'
+import {
+  useAnalyticsSummary,
+  useLeadFunnelMetrics,
+  useLeadsOverTime,
+  useEmailMetricsOverTime,
+  useLeadSourceDistribution,
+  useConversionFunnel,
+  useActivityMetrics,
+  type TimeInterval,
+  type DateRange,
+} from "@/hooks/useAnalytics"
 
-interface MetricData {
-  label: string
-  value: string
-  icon: any
+// Date range presets
+const DATE_RANGE_PRESETS = {
+  '7d': { label: 'Last 7 days', days: 7 },
+  '14d': { label: 'Last 14 days', days: 14 },
+  '30d': { label: 'Last 30 days', days: 30 },
+  '90d': { label: 'Last 90 days', days: 90 },
+  '180d': { label: 'Last 6 months', days: 180 },
+  '365d': { label: 'Last year', days: 365 },
+} as const
+
+// Helper to get date range from preset
+function getDateRangeFromPreset(preset: string): DateRange {
+  const days = DATE_RANGE_PRESETS[preset as keyof typeof DATE_RANGE_PRESETS]?.days || 30
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days)
+
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0]
+  }
 }
+
+// Helper to get readable status label
+function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    'new': 'New',
+    'contacted': 'Contacted',
+    'replied': 'Replied',
+    'qualified': 'Qualified',
+    'meeting_scheduled': 'Meeting Scheduled',
+    'proposal': 'Proposal',
+    'negotiation': 'Negotiation',
+    'won': 'Won',
+    'closed': 'Closed',
+    'lost': 'Lost'
+  }
+  return labels[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
+}
+
+// Chart colors
+const COLORS = {
+  primary: '#3b82f6',
+  secondary: '#06b6d4',
+  success: '#22c55e',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  muted: '#6b7280',
+}
+
+const PIE_COLORS = [
+  '#3b82f6', '#06b6d4', '#8b5cf6', '#22c55e',
+  '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'
+]
 
 const STATUS_COLORS: Record<string, string> = {
   'new': '#3b82f6',
@@ -660,4 +736,45 @@ function formatPeriodLabel(period: string, interval: TimeInterval): string {
     // Fall through
   }
   return period
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="animate-pulse flex space-x-2">
+        <div className="h-32 w-8 bg-muted rounded"></div>
+        <div className="h-24 w-8 bg-muted rounded"></div>
+        <div className="h-40 w-8 bg-muted rounded"></div>
+        <div className="h-28 w-8 bg-muted rounded"></div>
+        <div className="h-36 w-8 bg-muted rounded"></div>
+      </div>
+    </div>
+  )
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="text-center">
+        <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-30" />
+        <p>{message}</p>
+      </div>
+    </div>
+  )
+}
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+
+  return (
+    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+      <p className="font-medium text-sm mb-1">{label}</p>
+      {payload.map((entry: any, index: number) => (
+        <p key={index} className="text-sm" style={{ color: entry.color }}>
+          {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
+          {entry.payload?.percentage !== undefined && ` (${entry.payload.percentage}%)`}
+        </p>
+      ))}
+    </div>
+  )
 }
