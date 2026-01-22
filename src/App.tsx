@@ -22,8 +22,7 @@ const LeadDetail = lazy(() => import("@/pages/LeadDetail").then(m => ({ default:
 const EmailThreads = lazy(() => import("@/pages/EmailThreads").then(m => ({ default: m.EmailThreads })))
 const Templates = lazy(() => import("@/pages/Templates"))
 const Meetings = lazy(() => import("@/pages/Meetings").then(m => ({ default: m.Meetings })))
-// @ts-ignore
-const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.default })));
+const Analytics = lazy(() => import("@/pages/Analytics").then(m => ({ default: m.Analytics })))
 const ApiMonitoring = lazy(() => import("@/pages/ApiMonitoring"))
 const Configuration = lazy(() => import("@/pages/Configuration").then(m => ({ default: m.Configuration })))
 const Profile = lazy(() => import("@/pages/Profile").then(m => ({ default: m.Profile })))
