@@ -30,7 +30,10 @@ export {
   getTrackedEmails,
   getTrackedEmailByMessageId,
   getTrackedEmailsByThreadId,
-  deleteEmailTracking
+  deleteEmailTracking,
+  linkOpenTrackingToMetadata,
+  getLeadAssociationsByMessageIds,
+  getLeadAssociationsByThreadIds
 } from './emailTracking'
 
 // Provider interface (for extending with new providers)

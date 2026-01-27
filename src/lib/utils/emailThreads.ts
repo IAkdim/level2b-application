@@ -31,6 +31,9 @@ export interface EmailThread {
   isOpened?: boolean;
   firstOpenedAt?: Date;
   openCount?: number;
+  // Lead association
+  leadId?: string | null;
+  leadIds?: string[]; // Multiple leads if thread has emails to different leads
 }
 
 export interface EmailThreadMessage {
@@ -356,4 +359,23 @@ export function enrichThreadsWithOpenTracking(
       openCount: totalOpens,
     };
   });
+}
+
+/**
+ * Enriches threads with lead associations from email_tracking_metadata
+ * Call this after groupEmailsIntoThreads to add lead information
+ */
+export function enrichThreadsWithLeadAssociations(
+  threads: EmailThread[],
+  leadAssociationsByThread: Map<string, string[]>
+): EmailThread[] {
+  return threads.map((thread) => {
+    const leadIds = leadAssociationsByThread.get(thread.id) || []
+
+    return {
+      ...thread,
+      leadId: leadIds.length > 0 ? leadIds[0] : null,
+      leadIds: leadIds.length > 0 ? leadIds : undefined
+    }
+  })
 }

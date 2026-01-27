@@ -216,3 +216,89 @@ export async function deleteEmailTracking(id: string): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Get lead associations for message IDs
+ * Returns a map of message_id -> lead_id
+ */
+export async function getLeadAssociationsByMessageIds(
+  messageIds: string[],
+  provider: 'gmail' | 'outlook' = 'gmail'
+): Promise<Map<string, string>> {
+  try {
+    if (messageIds.length === 0) return new Map()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return new Map()
+
+    const { data, error } = await supabase
+      .from('email_tracking_metadata')
+      .select('message_id, lead_id')
+      .eq('user_id', user.id)
+      .eq('provider', provider)
+      .in('message_id', messageIds)
+      .not('lead_id', 'is', null)
+
+    if (error) {
+      console.error('Error fetching lead associations:', error)
+      return new Map()
+    }
+
+    const map = new Map<string, string>()
+    data?.forEach(row => {
+      if (row.lead_id) {
+        map.set(row.message_id, row.lead_id)
+      }
+    })
+
+    console.log(`Found ${map.size} lead associations for ${messageIds.length} messages`)
+    return map
+  } catch (error) {
+    console.error('Exception in getLeadAssociationsByMessageIds:', error)
+    return new Map()
+  }
+}
+
+/**
+ * Get lead associations for thread IDs
+ * Returns a map of thread_id -> lead_id[]
+ */
+export async function getLeadAssociationsByThreadIds(
+  threadIds: string[],
+  provider: 'gmail' | 'outlook' = 'gmail'
+): Promise<Map<string, string[]>> {
+  try {
+    if (threadIds.length === 0) return new Map()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return new Map()
+
+    const { data, error } = await supabase
+      .from('email_tracking_metadata')
+      .select('thread_id, lead_id')
+      .eq('user_id', user.id)
+      .eq('provider', provider)
+      .in('thread_id', threadIds)
+      .not('lead_id', 'is', null)
+
+    if (error) {
+      console.error('Error fetching lead associations by thread:', error)
+      return new Map()
+    }
+
+    const map = new Map<string, string[]>()
+    data?.forEach(row => {
+      if (row.lead_id) {
+        const existing = map.get(row.thread_id) || []
+        existing.push(row.lead_id)
+        map.set(row.thread_id, existing)
+      }
+    })
+
+    console.log(`Found lead associations for ${map.size}/${threadIds.length} threads`)
+    return map
+  } catch (error) {
+    console.error('Exception in getLeadAssociationsByThreadIds:', error)
+    return new Map()
+  }
+}

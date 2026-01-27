@@ -23,10 +23,11 @@ import {
   getAllLabels,
   getThreadStats,
   enrichThreadsWithOpenTracking,
+  enrichThreadsWithLeadAssociations,
   type EmailThread,
   type MessageOpenStats,
 } from "@/lib/utils/emailThreads";
-import { emailService, type Email } from "@/lib/api/email";
+import { emailService, type Email, getLeadAssociationsByThreadIds } from "@/lib/api/email";
 import { getEmailOpenStatsBulk } from "@/lib/api/emailTracking";
 import {
   generateSalesReply,
@@ -50,6 +51,7 @@ export function EmailThreads() {
   const [rawSentEmails, setRawSentEmails] = useState<Email[]>([]);
   const [rawReplies, setRawReplies] = useState<Email[]>([]);
   const [openTrackingStats, setOpenTrackingStats] = useState<MessageOpenStats[]>([]);
+  const [leadAssociations, setLeadAssociations] = useState<Map<string, string[]>>(new Map());
   const [selectedSourceLabel, setSelectedSourceLabel] = useState<string>("");
 
   // UI state
@@ -67,15 +69,22 @@ export function EmailThreads() {
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
 
-  // Derived: unified threads (with open tracking enrichment)
+  // Derived: unified threads (with enrichments)
   const threads = useMemo(() => {
-    const baseThreads = groupEmailsIntoThreads(rawSentEmails, rawReplies, user?.email);
+    let result = groupEmailsIntoThreads(rawSentEmails, rawReplies, user?.email);
+
     // Enrich with open tracking data if available
     if (openTrackingStats.length > 0) {
-      return enrichThreadsWithOpenTracking(baseThreads, openTrackingStats);
+      result = enrichThreadsWithOpenTracking(result, openTrackingStats);
     }
-    return baseThreads;
-  }, [rawSentEmails, rawReplies, user?.email, openTrackingStats]);
+
+    // Enrich with lead associations if available
+    if (leadAssociations.size > 0) {
+      result = enrichThreadsWithLeadAssociations(result, leadAssociations);
+    }
+
+    return result;
+  }, [rawSentEmails, rawReplies, user?.email, openTrackingStats, leadAssociations]);
 
   // Derived: filtered threads
   const filteredThreads = useMemo(() => {
@@ -217,6 +226,18 @@ export function EmailThreads() {
         } catch (trackingError) {
           // Tracking data is optional - don't fail the whole load
           console.warn('Could not fetch open tracking stats:', trackingError);
+        }
+      }
+
+      // Fetch lead associations for all threads
+      const allThreadIds = [...new Set([...sent, ...replies].map(e => e.threadId))];
+      if (allThreadIds.length > 0) {
+        try {
+          const associations = await getLeadAssociationsByThreadIds(allThreadIds);
+          setLeadAssociations(associations);
+        } catch (leadError) {
+          // Lead associations are optional - don't fail the whole load
+          console.warn('Could not fetch lead associations:', leadError);
         }
       }
     } catch (error) {

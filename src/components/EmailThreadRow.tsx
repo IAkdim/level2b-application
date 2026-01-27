@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils/formatters";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, User } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { EmailThread } from "@/lib/utils/emailThreads";
 
 interface EmailThreadRowProps {
@@ -128,6 +129,18 @@ export function EmailThreadRow({
 
           {/* Open status indicator */}
           {getOpenStatusIndicator()}
+
+          {/* Lead association indicator */}
+          {thread.leadId && (
+            <Link
+              to={`/leads?id=${thread.leadId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center hover:text-primary transition-colors"
+              title="Associated with a lead - click to view"
+            >
+              <User className="h-3 w-3 text-primary" />
+            </Link>
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
