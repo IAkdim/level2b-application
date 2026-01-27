@@ -94,17 +94,36 @@ stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook
 
 ## 5. Environment Variables
 
-### Supabase Edge Functions (set via Supabase Dashboard or CLI):
+### ⚠️ CRITICAL: Supabase Edge Functions Secrets
+
+> **These secrets MUST be set or subscriptions will not work correctly!**
+>
+> If `STRIPE_PRICE_STARTER` and `STRIPE_PRICE_PRO` are not set, the webhook
+> will fail to map Stripe price IDs to plan tiers, and subscriptions may be
+> rejected or logged as errors.
 
 ```bash
 # In Supabase Dashboard: Settings → Edge Functions → Secrets
 # Or via CLI:
 supabase secrets set STRIPE_SECRET_KEY=sk_live_YOUR_KEY
 supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_YOUR_SECRET
+
+# CRITICAL: These MUST match your actual Stripe price IDs exactly!
+# Get these from: Stripe Dashboard → Products → Your Product → Price ID
 supabase secrets set STRIPE_PRICE_STARTER=price_YOUR_STARTER_PRICE_ID
 supabase secrets set STRIPE_PRICE_PRO=price_YOUR_PRO_PRICE_ID
+
 supabase secrets set APP_URL=https://your-app-domain.com
 ```
+
+**How to find your Price IDs:**
+1. Go to [Stripe Dashboard → Products](https://dashboard.stripe.com/products)
+2. Click on your product (e.g., "Level2B Starter")
+3. Find the price and copy the ID (starts with `price_`)
+4. The ID looks like: `price_1ABC123xyz456...`
+
+**Verification:** After setting secrets, check the Edge Function logs to confirm
+the price IDs are being read correctly.
 
 ### Frontend (.env file):
 

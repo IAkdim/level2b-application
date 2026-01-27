@@ -331,33 +331,21 @@ The "body" field must be 100% ready to send - NO brackets, NO placeholders, NO [
       console.log('[REPLY] Removed signature/closing from body')
 
       const ctaTemplates: Record<string, string> = {
-        en: `\n\nI would love to discuss this further with you. Please feel free to book a time that works best for you:\n${context.calendlyLink}`,
-        nl: `\n\nIk bespreek dit graag verder met je. Plan gerust een moment in dat jou het beste uitkomt:\n${context.calendlyLink}`,
-        de: `\n\nIch würde dies gerne weiter mit Ihnen besprechen. Buchen Sie gerne einen Termin, der Ihnen am besten passt:\n${context.calendlyLink}`,
-        fr: `\n\nJ'aimerais en discuter davantage avec vous. N'hésitez pas à réserver un créneau qui vous convient le mieux:\n${context.calendlyLink}`,
-        es: `\n\nMe encantaría discutir esto más a fondo contigo. No dudes en reservar un horario que te funcione mejor:\n${context.calendlyLink}`,
-        it: `\n\nMi piacerebbe discuterne ulteriormente con te. Sentiti libero di prenotare un orario che funziona meglio per te:\n${context.calendlyLink}`,
-        pt: `\n\nGostaria de discutir isso mais detalhadamente contigo. Sinta-se à vontade para marcar um horário que funcione melhor para ti:\n${context.calendlyLink}`,
+        en: `\n\nI would love to discuss this further with you. Please feel free to book a time that works best for you:\n${context.calendlyLink}\n\nBest,\n${context.senderName}`,
+        nl: `\n\nIk bespreek dit graag verder met je. Plan gerust een moment in dat jou het beste uitkomt:\n${context.calendlyLink}\n\nGroeten,\n${context.senderName}`,
+        de: `\n\nIch würde dies gerne weiter mit Ihnen besprechen. Buchen Sie gerne einen Termin, der Ihnen am besten passt:\n${context.calendlyLink}\n\nMit freundlichen Grüßen,\n${context.senderName}`,
+        fr: `\n\nJ'aimerais en discuter davantage avec vous. N'hésitez pas à réserver un créneau qui vous convient le mieux:\n${context.calendlyLink}\n\nCordialement,\n${context.senderName}`,
+        es: `\n\nMe encantaría discutir esto más a fondo contigo. No dudes en reservar un horario que te funcione mejor:\n${context.calendlyLink}\n\nSaludos,\n${context.senderName}`,
+        it: `\n\nMi piacerebbe discuterne ulteriormente con te. Sentiti libero di prenotare un orario che funziona meglio per te:\n${context.calendlyLink}\n\nCordiali saluti,\n${context.senderName}`,
+        pt: `\n\nGostaria de discutir isso mais detalhadamente contigo. Sinta-se à vontade para marcar um horário que funcione melhor para ti:\n${context.calendlyLink}\n\nCumprimentos,\n${context.senderName}`,
       }
       
       const ctaBlock = ctaTemplates[targetLanguage] || ctaTemplates['en']
       console.log(`[REPLY] Using CTA template for language: ${targetLanguage}`)
       
-      // Add signature after Calendly link
-      const signatureTemplates: Record<string, string> = {
-        en: `\n\nBest,\n${context.userName || 'there'}`,
-        nl: `\n\nMet vriendelijke groet,\n${context.userName || 'daar'}`,
-        de: `\n\nMit freundlichen Grüßen,\n${context.userName || 'dort'}`,
-        fr: `\n\nCordialement,\n${context.userName || 'là'}`,
-        es: `\n\nSaludos,\n${context.userName || 'allí'}`,
-        it: `\n\nCordiali saluti,\n${context.userName || 'lì'}`,
-        pt: `\n\nCordialmente,\n${context.userName || 'lá'}`,
-      }
-      
-      const signature = signatureTemplates[targetLanguage] || signatureTemplates['en']
-      
-      // Structure: [cleaned body] + [CTA with Calendly] + [signature]
-      result.body = cleanedBody + ctaBlock + signature
+      // Structure: [cleaned body] + [CTA with Calendly]
+      // Note: No additional signature needed - the CTA serves as natural closing
+      result.body = cleanedBody + ctaBlock
       
       console.log('[REPLY] ✓ CTA INJECTED - Positive reply contains Calendly link + signature')
       

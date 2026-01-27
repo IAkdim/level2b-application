@@ -14,19 +14,69 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
-// Price ID to Plan Tier mapping
-// These should match your Stripe price IDs
-const PRICE_TO_TIER: Record<string, { tier: string; leadsLimit: number; emailDomainsLimit: number }> = {
-  [Deno.env.get("STRIPE_PRICE_STARTER") || "price_starter"]: {
+// ============================================================================
+// CRITICAL: Price ID to Plan Tier mapping
+// ============================================================================
+// These MUST be set as Supabase secrets. Without them, subscriptions will fail.
+// Set via: supabase secrets set STRIPE_PRICE_STARTER=price_xxx STRIPE_PRICE_PRO=price_xxx
+
+const STRIPE_PRICE_STARTER = Deno.env.get("STRIPE_PRICE_STARTER")
+const STRIPE_PRICE_PRO = Deno.env.get("STRIPE_PRICE_PRO")
+
+// Validate required environment variables at startup
+if (!STRIPE_PRICE_STARTER || !STRIPE_PRICE_PRO) {
+  console.error("CRITICAL: Missing required Stripe price ID environment variables!")
+  console.error("STRIPE_PRICE_STARTER:", STRIPE_PRICE_STARTER ? "SET" : "MISSING")
+  console.error("STRIPE_PRICE_PRO:", STRIPE_PRICE_PRO ? "SET" : "MISSING")
+}
+
+interface PlanConfig {
+  tier: "starter" | "pro" | "enterprise"
+  leadsLimit: number
+  emailDomainsLimit: number
+}
+
+// Build the price mapping only if env vars are set
+const PRICE_TO_TIER: Record<string, PlanConfig> = {}
+
+if (STRIPE_PRICE_STARTER) {
+  PRICE_TO_TIER[STRIPE_PRICE_STARTER] = {
     tier: "starter",
     leadsLimit: 1000,
     emailDomainsLimit: 1,
-  },
-  [Deno.env.get("STRIPE_PRICE_PRO") || "price_pro"]: {
+  }
+}
+
+if (STRIPE_PRICE_PRO) {
+  PRICE_TO_TIER[STRIPE_PRICE_PRO] = {
     tier: "pro",
     leadsLimit: -1, // Unlimited
     emailDomainsLimit: -1, // Unlimited
-  },
+  }
+}
+
+/**
+ * Get plan configuration for a Stripe price ID.
+ * CRITICAL: Returns null for unknown prices - callers MUST handle this.
+ * Never silently default to starter - that's the bug we're fixing!
+ */
+function getPlanConfigForPrice(priceId: string | undefined): PlanConfig | null {
+  if (!priceId) {
+    console.error("getPlanConfigForPrice: No price ID provided")
+    return null
+  }
+  
+  const config = PRICE_TO_TIER[priceId]
+  
+  if (!config) {
+    console.error(`CRITICAL: Unknown Stripe price ID: ${priceId}`)
+    console.error("Known price IDs:", Object.keys(PRICE_TO_TIER))
+    console.error("This subscription will NOT be processed until the price ID is configured.")
+    return null
+  }
+  
+  console.log(`Price ID ${priceId} mapped to tier: ${config.tier}`)
+  return config
 }
 
 serve(async (req) => {
@@ -101,7 +151,22 @@ serve(async (req) => {
         // Fetch the full subscription details
         const subscription = await stripe.subscriptions.retrieve(subscriptionId)
         const priceId = subscription.items.data[0]?.price.id
-        const planConfig = PRICE_TO_TIER[priceId] || { tier: "starter", leadsLimit: 1000, emailDomainsLimit: 1 }
+        
+        // CRITICAL: Use safe lookup - do NOT default to starter
+        const planConfig = getPlanConfigForPrice(priceId)
+        
+        if (!planConfig) {
+          console.error(`CRITICAL: Cannot process checkout - unknown price ID: ${priceId}`)
+          console.error(`User ${userId} paid but subscription cannot be created until price mapping is fixed.`)
+          // Store the raw subscription data so we can fix it later
+          await supabase.from("stripe_webhook_events").update({
+            processing_error: `Unknown price ID: ${priceId}. Subscription created in Stripe but not synced to app.`
+          }).eq("stripe_event_id", event.id)
+          
+          // Still return 200 to Stripe - we logged the error and will fix manually
+          // But do NOT create a subscription with wrong tier
+          break
+        }
 
         // Create or update customer record
         await supabase.from("stripe_customers").upsert({
@@ -297,7 +362,17 @@ async function handleSubscriptionChange(
 ) {
   const customerId = subscription.customer as string
   const priceId = subscription.items.data[0]?.price.id
-  const planConfig = PRICE_TO_TIER[priceId] || { tier: "starter", leadsLimit: 1000, emailDomainsLimit: 1 }
+  
+  // CRITICAL: Use safe lookup - do NOT default to starter
+  const planConfig = getPlanConfigForPrice(priceId)
+
+  if (!planConfig) {
+    console.error(`CRITICAL: Cannot update subscription - unknown price ID: ${priceId}`)
+    console.error(`Stripe subscription ${subscription.id} has price ${priceId} which is not mapped.`)
+    console.error("This subscription will NOT be updated until the price mapping is fixed.")
+    // Do NOT update with wrong tier - fail explicitly
+    return
+  }
 
   // Find the user by customer ID
   const { data: customer } = await supabase
@@ -308,6 +383,22 @@ async function handleSubscriptionChange(
 
   if (!customer) {
     console.error(`No customer found for Stripe customer ${customerId}`)
+    return
+  }
+
+  // IMPORTANT: Check if user already has a higher tier (prevent downgrades from race conditions)
+  const { data: existingSub } = await supabase
+    .from("subscriptions")
+    .select("plan_tier, stripe_subscription_id")
+    .eq("user_id", customer.user_id)
+    .single()
+
+  // If this is a different subscription event for the same user, 
+  // only process if it's for their current subscription or an upgrade
+  if (existingSub && existingSub.stripe_subscription_id !== subscription.id) {
+    console.log(`Subscription ${subscription.id} is not the active subscription for user ${customer.user_id}`)
+    console.log(`Active subscription is ${existingSub.stripe_subscription_id}`)
+    // This could be an old subscription event - skip to prevent overwriting
     return
   }
 

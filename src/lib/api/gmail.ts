@@ -2,6 +2,21 @@ import { supabase } from "@/lib/supabaseClient"
 import { analyzeSentiment, type SentimentAnalysis } from "./claude-secure"
 import { AuthenticationError } from "./reauth"
 import { rateLimiter } from "./rateLimiter"
+import { prepareEmailWithTracking, type PreparedEmail } from "./emailTracking"
+
+/**
+ * Hash an email address for privacy in tracking
+ */
+function hashEmailForTracking(email: string): string {
+  const normalized = email.toLowerCase().trim()
+  let hash = 0
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36)
+}
 
 interface GmailMessage {
   id: string
@@ -498,17 +513,25 @@ export async function getRecentEmailsByLabel(
  * @param body - Body van de email (plain text of HTML)
  * @param labelName - Optioneel: Label om aan de verzonden email toe te voegen (bijv. "Outreach2024")
  * @param isHtml - Of de body HTML is (standaard false)
- * @returns Message ID van de verzonden email
+ * @param enableTracking - Enable open tracking (default true, converts to HTML if needed)
+ * @returns Object with message ID and tracking info
  */
+export interface SendEmailResult {
+  messageId: string | null
+  trackingId: string | null
+  hasTracking: boolean
+}
+
 export async function sendEmail(
   to: string,
   subject: string,
   body: string,
   labelName?: string,
-  isHtml: boolean = false
+  isHtml: boolean = false,
+  enableTracking: boolean = true
 ): Promise<string | null> {
   try {
-    console.log("sendEmail called with:", { to, subject: subject.substring(0, 50), labelName, isHtml });
+    console.log("sendEmail called with:", { to, subject: subject.substring(0, 50), labelName, isHtml, enableTracking });
     
     // Check rate limit first
     const { data: { session } } = await supabase.auth.getSession()
@@ -538,14 +561,26 @@ export async function sendEmail(
       throw new AuthenticationError("Cannot determine sender email. Please re-authenticate.")
     }
     
-    // Maak email in RFC 2822 format
+    // Prepare email with tracking pixel if enabled
+    const prepared: PreparedEmail = prepareEmailWithTracking(body, to, enableTracking)
+    const processedBody = prepared.body
+    const contentType = prepared.isHtml || isHtml ? 'text/html' : 'text/plain'
+    
+    console.log("Email prepared:", { 
+      hasTracking: prepared.hasTracking, 
+      trackingId: prepared.trackingId?.substring(0, 8),
+      isHtml: prepared.isHtml 
+    });
+    
+    // Maak email in RFC 2822 format with tracking-enabled body
     const emailLines = [
       `From: ${fromEmail}`,
       `To: ${to}`,
       `Subject: ${subject}`,
-      `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8`,
+      `Content-Type: ${contentType}; charset=utf-8`,
+      `X-Tracking-Id: ${prepared.trackingId}`, // Custom header for internal tracking
       ``,
-      body
+      processedBody
     ]
     
     const email = emailLines.join('\r\n')
@@ -584,7 +619,7 @@ export async function sendEmail(
     const data = await response.json()
     const messageId = data.id
     
-    console.log("Email sent successfully, message ID:", messageId);
+    console.log("Email sent successfully, message ID:", messageId, "tracking ID:", prepared.trackingId);
     
     // Voeg label toe indien opgegeven
     if (labelName && messageId) {
@@ -596,6 +631,39 @@ export async function sendEmail(
         await addLabelToMessage(messageId, labelId)
         console.log(`Label '${labelName}' toegevoegd aan verzonden email`)
       }
+    }
+    
+    // Store tracking info in database for open tracking
+    if (prepared.hasTracking && session?.user?.id) {
+      try {
+        const { error: trackingError } = await supabase
+          .from('email_tracking')
+          .insert({
+            user_id: session.user.id,
+            tracking_id: prepared.trackingId,
+            gmail_message_id: messageId,
+            recipient_email: to,
+            recipient_email_hash: hashEmailForTracking(to),
+            subject: subject,
+            label_name: labelName || null,
+            sent_at: new Date().toISOString()
+          })
+        
+        if (trackingError) {
+          console.warn('Failed to store tracking info:', trackingError.message)
+          // Don't fail the send if tracking storage fails
+        } else {
+          console.log(`Tracking stored: trackingId=${prepared.trackingId}, gmailId=${messageId}`)
+        }
+      } catch (err) {
+        console.warn('Error storing tracking info:', err)
+        // Don't fail the send
+      }
+    }
+    
+    // Log tracking info for debugging (tracking ID is embedded in the email pixel)
+    if (prepared.hasTracking) {
+      console.log(`Email tracking enabled: trackingId=${prepared.trackingId}, recipient=${to}`)
     }
     
     return messageId

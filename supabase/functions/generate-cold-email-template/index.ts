@@ -403,7 +403,6 @@ ${sanitizedInfo.companyDescription ? `<company_description>${sanitizedInfo.compa
 ${sanitizedInfo.industry ? `<industry>${sanitizedInfo.industry}</industry>` : ''}
 ${uspsText !== 'N/A' ? `<unique_selling_points>\n${uspsText}\n</unique_selling_points>` : ''}
 ${sanitizedInfo.additionalContext ? `<additional_context>\n${sanitizedInfo.additionalContext}\n</additional_context>` : ''}
-${sanitizedInfo.calendlyLink ? `<calendly_url>${sanitizedInfo.calendlyLink}</calendly_url>` : ''}
 <target_language>${languageName}</target_language>
 </company_data>
 
@@ -432,7 +431,7 @@ EMAIL REQUIREMENTS:
    - If it's products: emphasize benefits and use cases
    - If it's consulting: emphasize solutions and experience
 
-5. CTA at the end${sanitizedInfo.calendlyLink ? ` with the FULL Calendly link:\n   "${sanitizedInfo.calendlyLink}"` : ''}
+5. CTA at the end with a question or call-to-action (NO meeting links - just invite a response)
 
 6. NO greeting, NO name, NO signature
 

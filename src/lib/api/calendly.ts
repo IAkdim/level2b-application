@@ -24,8 +24,11 @@ export async function initiateCalendlyOAuth(): Promise<string> {
     throw new Error('Not authenticated')
   }
 
+  // Pass the current origin so the callback knows where to redirect
+  const redirectUrl = window.location.origin
+
   const { data, error } = await supabase.functions.invoke('calendly-oauth-init', {
-    body: { userId: user.id },
+    body: { redirectUrl },
   })
 
   if (error) {
@@ -56,9 +59,8 @@ export async function getCalendlyEventTypes(): Promise<CalendlyEventType[]> {
     throw new Error(rateCheck.message || 'Too many Calendly API requests. Please try again later.')
   }
 
-  const { data, error } = await supabase.functions.invoke('calendly-get-event-types', {
-    body: { userId: session.user.id },
-  })
+  // User ID is extracted from JWT on the server side
+  const { data, error } = await supabase.functions.invoke('calendly-get-event-types')
 
   if (error) {
     console.error('Error fetching Calendly event types:', error)

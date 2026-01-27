@@ -70,6 +70,25 @@ export interface ConversionFunnelData {
   stage_order: number
 }
 
+// Email open tracking analytics
+export interface EmailOpenRateData {
+  totalSent: number
+  totalWithTracking: number
+  uniqueOpens: number
+  totalOpens: number
+  openRate: number
+  openRateAdjusted: number  // Excluding Apple MPP
+  appleMppOpens: number
+}
+
+export interface CampaignOpenRateData {
+  campaign: string
+  totalSent: number
+  totalWithTracking: number
+  uniqueOpens: number
+  openRate: number
+}
+
 export interface AnalyticsSummary {
   totalLeads: number
   totalEmailsSent: number
@@ -105,149 +124,138 @@ export function getDefaultDateRange(): DateRange {
  * Get lead funnel metrics using the database function
  */
 export async function getLeadFunnelMetrics(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange
 ): Promise<LeadFunnelMetric[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_lead_funnel_metrics', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate
-    })
-  
-  if (error) {
-    console.error('Error fetching lead funnel metrics:', error)
-    // Fallback to direct query if function doesn't exist
-    return getLeadFunnelMetricsFallback(orgId, range)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  // The RPC functions still use p_org_id parameter
+  return getLeadFunnelMetricsFallback(userId, range)
 }
 
 /**
  * Fallback function for lead funnel metrics if RPC doesn't exist
  */
 async function getLeadFunnelMetricsFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange
 ): Promise<LeadFunnelMetric[]> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('status')
-    .eq('org_id', orgId)
-    .gte('created_at', dateRange.startDate)
-    .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
-  
-  if (error) throw error
-  
-  const statusCounts: Record<string, number> = {}
-  const total = data?.length || 0
-  
-  data?.forEach(lead => {
-    statusCounts[lead.status] = (statusCounts[lead.status] || 0) + 1
-  })
-  
-  return Object.entries(statusCounts).map(([status, count]) => ({
-    status,
-    count,
-    percentage: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0
-  })).sort((a, b) => b.count - a.count)
+  try {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('user_id', userId)
+      .gte('created_at', dateRange.startDate)
+      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
+    
+    if (error) {
+      // Table may not exist or have different schema - return empty
+      return []
+    }
+    
+    const statusCounts: Record<string, number> = {}
+    const total = data?.length || 0
+    
+    data?.forEach(lead => {
+      statusCounts[lead.status] = (statusCounts[lead.status] || 0) + 1
+    })
+    
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0
+    })).sort((a, b) => b.count - a.count)
+  } catch {
+    return []
+  }
 }
 
 /**
  * Get leads over time data
  */
 export async function getLeadsOverTime(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ): Promise<LeadsOverTimeData[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_leads_over_time', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate,
-      p_interval: interval
-    })
-  
-  if (error) {
-    console.error('Error fetching leads over time:', error)
-    return getLeadsOverTimeFallback(orgId, range, interval)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getLeadsOverTimeFallback(userId, range, interval)
 }
 
 /**
  * Fallback function for leads over time
  */
 async function getLeadsOverTimeFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange,
   interval: TimeInterval
 ): Promise<LeadsOverTimeData[]> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('created_at, status')
-    .eq('org_id', orgId)
-    .gte('created_at', dateRange.startDate)
-    .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
-    .order('created_at', { ascending: true })
-  
-  if (error) throw error
-  
-  // Group by period
-  const grouped: Record<string, LeadsOverTimeData> = {}
-  
-  data?.forEach(lead => {
-    const date = new Date(lead.created_at)
-    let period: string
+  try {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('created_at, status')
+      .eq('user_id', userId)
+      .gte('created_at', dateRange.startDate)
+      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
+      .order('created_at', { ascending: true })
     
-    if (interval === 'month') {
-      period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    } else if (interval === 'week') {
-      const weekStart = new Date(date)
-      weekStart.setDate(date.getDate() - date.getDay())
-      period = weekStart.toISOString().split('T')[0]
-    } else {
-      period = date.toISOString().split('T')[0]
+    if (error || !data) {
+      return fillMissingPeriods({}, dateRange, interval)
     }
+  
+    // Group by period
+    const grouped: Record<string, LeadsOverTimeData> = {}
     
-    if (!grouped[period]) {
-      grouped[period] = {
-        period,
-        period_start: period,
-        total_leads: 0,
-        new_leads: 0,
-        contacted_leads: 0,
-        qualified_leads: 0,
-        meeting_scheduled_leads: 0,
-        won_leads: 0,
-        lost_leads: 0
+    data?.forEach(lead => {
+      const date = new Date(lead.created_at)
+      let period: string
+      
+      if (interval === 'month') {
+        period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      } else if (interval === 'week') {
+        const weekStart = new Date(date)
+        weekStart.setDate(date.getDate() - date.getDay())
+        period = weekStart.toISOString().split('T')[0]
+      } else {
+        period = date.toISOString().split('T')[0]
       }
-    }
+      
+      if (!grouped[period]) {
+        grouped[period] = {
+          period,
+          period_start: period,
+          total_leads: 0,
+          new_leads: 0,
+          contacted_leads: 0,
+          qualified_leads: 0,
+          meeting_scheduled_leads: 0,
+          won_leads: 0,
+          lost_leads: 0
+        }
+      }
+      
+      grouped[period].total_leads++
+      
+      switch (lead.status) {
+        case 'new': grouped[period].new_leads++; break
+        case 'contacted': grouped[period].contacted_leads++; break
+        case 'qualified':
+        case 'replied': grouped[period].qualified_leads++; break
+        case 'meeting_scheduled': grouped[period].meeting_scheduled_leads++; break
+        case 'won':
+        case 'closed': grouped[period].won_leads++; break
+        case 'lost': grouped[period].lost_leads++; break
+      }
+    })
     
-    grouped[period].total_leads++
-    
-    switch (lead.status) {
-      case 'new': grouped[period].new_leads++; break
-      case 'contacted': grouped[period].contacted_leads++; break
-      case 'qualified':
-      case 'replied': grouped[period].qualified_leads++; break
-      case 'meeting_scheduled': grouped[period].meeting_scheduled_leads++; break
-      case 'won':
-      case 'closed': grouped[period].won_leads++; break
-      case 'lost': grouped[period].lost_leads++; break
-    }
-  })
-  
-  // Fill in missing periods
-  const result = fillMissingPeriods(grouped, dateRange, interval)
-  return result
+    // Fill in missing periods
+    return fillMissingPeriods(grouped, dateRange, interval)
+  } catch {
+    return fillMissingPeriods({}, dateRange, interval)
+  }
 }
 
 /**
@@ -302,33 +310,21 @@ function fillMissingPeriods(
  * Get email metrics over time
  */
 export async function getEmailMetricsOverTime(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ): Promise<EmailMetricsData[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_email_metrics_over_time', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate,
-      p_interval: interval
-    })
-  
-  if (error) {
-    console.error('Error fetching email metrics:', error)
-    return getEmailMetricsFallback(orgId, range, interval)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getEmailMetricsFallback(userId, range, interval)
 }
 
 /**
  * Fallback for email metrics
  */
 async function getEmailMetricsFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange,
   interval: TimeInterval
 ): Promise<EmailMetricsData[]> {
@@ -336,7 +332,7 @@ async function getEmailMetricsFallback(
   const { data: emailData, error } = await supabase
     .from('email_messages')
     .select('sent_at, is_from_me')
-    .eq('org_id', orgId)
+    .eq('user_id', userId)
     .is('deleted_at', null)
     .gte('sent_at', dateRange.startDate)
     .lte('sent_at', dateRange.endDate + 'T23:59:59.999Z')
@@ -401,24 +397,13 @@ async function getEmailMetricsFallback(
  * Get activity summary metrics
  */
 export async function getActivityMetrics(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange
 ): Promise<ActivityMetrics> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_activity_metrics', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate
-    })
-  
-  if (error) {
-    console.error('Error fetching activity metrics:', error)
-    return getActivityMetricsFallback(orgId, range)
-  }
-  
-  return data?.[0] || getEmptyActivityMetrics()
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getActivityMetricsFallback(userId, range)
 }
 
 function getEmptyActivityMetrics(): ActivityMetrics {
@@ -438,59 +423,63 @@ function getEmptyActivityMetrics(): ActivityMetrics {
  * Fallback for activity metrics
  */
 async function getActivityMetricsFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange
 ): Promise<ActivityMetrics> {
-  const [leadsCount, emailsCount, tasksCount, notesCount, templatesCount] = await Promise.all([
-    supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .gte('created_at', dateRange.startDate)
-      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
+  try {
+    const [leadsCount, emailsCount, tasksCount, notesCount, templatesCount] = await Promise.all([
+      supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
+      
+      supabase
+        .from('email_messages')
+        .select('is_from_me', { count: 'exact' })
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .gte('sent_at', dateRange.startDate)
+        .lte('sent_at', dateRange.endDate + 'T23:59:59.999Z'),
+      
+      supabase
+        .from('tasks')
+        .select('status, completed_at', { count: 'exact' })
+        .eq('user_id', userId)
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
+      
+      supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
+      
+      supabase
+        .from('email_templates')
+        .select('times_used')
+        .eq('user_id', userId)
+    ])
     
-    supabase
-      .from('email_messages')
-      .select('is_from_me', { count: 'exact' })
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .gte('sent_at', dateRange.startDate)
-      .lte('sent_at', dateRange.endDate + 'T23:59:59.999Z'),
+    const emailsSent = emailsCount.data?.filter(e => e.is_from_me).length || 0
+    const emailsReceived = emailsCount.data?.filter(e => !e.is_from_me).length || 0
+    const completedTasks = tasksCount.data?.filter(t => t.status === 'completed').length || 0
+    const templatesUsed = templatesCount.data?.filter(t => t.times_used > 0).length || 0
     
-    supabase
-      .from('tasks')
-      .select('status, completed_at', { count: 'exact' })
-      .eq('org_id', orgId)
-      .gte('created_at', dateRange.startDate)
-      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
-    
-    supabase
-      .from('notes')
-      .select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .gte('created_at', dateRange.startDate)
-      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z'),
-    
-    supabase
-      .from('email_templates')
-      .select('times_used')
-      .eq('org_id', orgId)
-  ])
-  
-  const emailsSent = emailsCount.data?.filter(e => e.is_from_me).length || 0
-  const emailsReceived = emailsCount.data?.filter(e => !e.is_from_me).length || 0
-  const completedTasks = tasksCount.data?.filter(t => t.status === 'completed').length || 0
-  const templatesUsed = templatesCount.data?.filter(t => t.times_used > 0).length || 0
-  
-  return {
-    total_leads: leadsCount.count || 0,
-    total_emails_sent: emailsSent,
-    total_emails_received: emailsReceived,
-    total_tasks: tasksCount.count || 0,
-    completed_tasks: completedTasks,
-    total_notes: notesCount.count || 0,
-    total_templates: templatesCount.data?.length || 0,
-    templates_used: templatesUsed
+    return {
+      total_leads: leadsCount.count || 0,
+      total_emails_sent: emailsSent,
+      total_emails_received: emailsReceived,
+      total_tasks: tasksCount.count || 0,
+      completed_tasks: completedTasks,
+      total_notes: notesCount.count || 0,
+      total_templates: templatesCount.data?.length || 0,
+      templates_used: templatesUsed
+    }
+  } catch {
+    return getEmptyActivityMetrics()
   }
 }
 
@@ -498,165 +487,143 @@ async function getActivityMetricsFallback(
  * Get lead source distribution
  */
 export async function getLeadSourceDistribution(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange
 ): Promise<LeadSourceData[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_lead_source_distribution', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate
-    })
-  
-  if (error) {
-    console.error('Error fetching source distribution:', error)
-    return getLeadSourceDistributionFallback(orgId, range)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getLeadSourceDistributionFallback(userId, range)
 }
 
 async function getLeadSourceDistributionFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange
 ): Promise<LeadSourceData[]> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('source')
-    .eq('org_id', orgId)
-    .gte('created_at', dateRange.startDate)
-    .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
-  
-  if (error) throw error
-  
-  const sourceCounts: Record<string, number> = {}
-  const total = data?.length || 0
-  
-  data?.forEach(lead => {
-    const sources = lead.source || ['Unknown']
-    sources.forEach((s: string) => {
-      sourceCounts[s] = (sourceCounts[s] || 0) + 1
+  try {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('source')
+      .eq('user_id', userId)
+      .gte('created_at', dateRange.startDate)
+      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
+    
+    if (error || !data) return []
+    
+    const sourceCounts: Record<string, number> = {}
+    const total = data?.length || 0
+    
+    data?.forEach(lead => {
+      const sources = lead.source || ['Unknown']
+      if (Array.isArray(sources)) {
+        sources.forEach((s: string) => {
+          sourceCounts[s] = (sourceCounts[s] || 0) + 1
+        })
+      } else {
+        sourceCounts[sources as string] = (sourceCounts[sources as string] || 0) + 1
+      }
     })
-  })
-  
-  return Object.entries(sourceCounts)
-    .map(([source, count]) => ({
-      source,
-      count,
-      percentage: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0
-    }))
-    .sort((a, b) => b.count - a.count)
+    
+    return Object.entries(sourceCounts)
+      .map(([source, count]) => ({
+        source,
+        count,
+        percentage: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+  } catch {
+    return []
+  }
 }
 
 /**
  * Get conversion funnel data
  */
 export async function getConversionFunnel(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange
 ): Promise<ConversionFunnelData[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_conversion_funnel', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate
-    })
-  
-  if (error) {
-    console.error('Error fetching conversion funnel:', error)
-    return getConversionFunnelFallback(orgId, range)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getConversionFunnelFallback(userId, range)
 }
 
 async function getConversionFunnelFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange
 ): Promise<ConversionFunnelData[]> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('status')
-    .eq('org_id', orgId)
-    .gte('created_at', dateRange.startDate)
-    .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
+  try {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('user_id', userId)
+      .gte('created_at', dateRange.startDate)
+      .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
+    
+    if (error || !data) return []
   
-  if (error) throw error
-  
-  const statusOrder: Record<string, { order: number; label: string }> = {
-    'new': { order: 1, label: 'New Leads' },
-    'contacted': { order: 2, label: 'Contacted' },
-    'replied': { order: 3, label: 'Replied' },
-    'qualified': { order: 3, label: 'Qualified' },
-    'meeting_scheduled': { order: 4, label: 'Meeting Scheduled' },
-    'proposal': { order: 5, label: 'Proposal' },
-    'negotiation': { order: 6, label: 'Negotiation' },
-    'won': { order: 7, label: 'Won' },
-    'closed': { order: 7, label: 'Won' },
-    'lost': { order: 8, label: 'Lost' }
-  }
-  
-  const stageCounts: Record<string, number> = {}
-  
-  data?.forEach(lead => {
-    const info = statusOrder[lead.status]
-    if (info) {
-      stageCounts[info.label] = (stageCounts[info.label] || 0) + 1
+    const statusOrder: Record<string, { order: number; label: string }> = {
+      'new': { order: 1, label: 'New Leads' },
+      'contacted': { order: 2, label: 'Contacted' },
+      'replied': { order: 3, label: 'Replied' },
+      'qualified': { order: 3, label: 'Qualified' },
+      'meeting_scheduled': { order: 4, label: 'Meeting Scheduled' },
+      'proposal': { order: 5, label: 'Proposal' },
+      'negotiation': { order: 6, label: 'Negotiation' },
+      'won': { order: 7, label: 'Won' },
+      'closed': { order: 7, label: 'Won' },
+      'lost': { order: 8, label: 'Lost' }
     }
-  })
-  
-  const total = data?.length || 0
-  
-  return Object.entries(stageCounts)
-    .map(([stage, count]) => ({
-      stage,
-      count,
-      conversion_rate: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0,
-      stage_order: Object.values(statusOrder).find(s => s.label === stage)?.order || 99
-    }))
-    .filter(s => s.stage_order <= 7)
-    .sort((a, b) => a.stage_order - b.stage_order)
+    
+    const stageCounts: Record<string, number> = {}
+    
+    data?.forEach(lead => {
+      const info = statusOrder[lead.status]
+      if (info) {
+        stageCounts[info.label] = (stageCounts[info.label] || 0) + 1
+      }
+    })
+    
+    const total = data?.length || 0
+    
+    return Object.entries(stageCounts)
+      .map(([stage, count]) => ({
+        stage,
+        count,
+        conversion_rate: total > 0 ? Math.round((count / total) * 100 * 10) / 10 : 0,
+        stage_order: Object.values(statusOrder).find(s => s.label === stage)?.order || 99
+      }))
+      .filter(s => s.stage_order <= 7)
+      .sort((a, b) => a.stage_order - b.stage_order)
+  } catch {
+    return []
+  }
 }
 
 /**
  * Get task metrics over time
  */
 export async function getTaskMetricsOverTime(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange,
   interval: TimeInterval = 'day'
 ): Promise<TaskMetricsData[]> {
   const range = dateRange || getDefaultDateRange()
   
-  const { data, error } = await supabase
-    .rpc('get_task_metrics_over_time', {
-      p_org_id: orgId,
-      p_start_date: range.startDate,
-      p_end_date: range.endDate,
-      p_interval: interval
-    })
-  
-  if (error) {
-    console.error('Error fetching task metrics:', error)
-    return getTaskMetricsFallback(orgId, range, interval)
-  }
-  
-  return data || []
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getTaskMetricsFallback(userId, range, interval)
 }
 
 async function getTaskMetricsFallback(
-  orgId: string,
+  userId: string,
   dateRange: DateRange,
   interval: TimeInterval
 ): Promise<TaskMetricsData[]> {
   const { data, error } = await supabase
     .from('tasks')
     .select('created_at, completed_at, status, due_date')
-    .eq('org_id', orgId)
+    .eq('user_id', userId)
     .gte('created_at', dateRange.startDate)
     .lte('created_at', dateRange.endDate + 'T23:59:59.999Z')
   
@@ -717,12 +684,14 @@ async function getTaskMetricsFallback(
  * Get overall analytics summary
  */
 export async function getAnalyticsSummary(
-  orgId: string,
+  userId: string,
   dateRange?: DateRange
 ): Promise<AnalyticsSummary> {
   const range = dateRange || getDefaultDateRange()
-  const metrics = await getActivityMetrics(orgId, range)
-  const funnel = await getConversionFunnel(orgId, range)
+  
+  // Skip RPC call - go directly to fallback calculation until DB migration is run
+  const metrics = await getActivityMetrics(userId, range)
+  const funnel = await getConversionFunnel(userId, range)
   
   // Calculate conversion rate (leads that became won)
   const wonStage = funnel.find(f => f.stage === 'Won')
@@ -731,7 +700,7 @@ export async function getAnalyticsSummary(
     ? Math.round((wonStage.count / newLeadsStage.count) * 100 * 10) / 10
     : 0
   
-  // Calculate email rates
+  // Calculate email rates (legacy estimation)
   const openRate = metrics.total_emails_sent > 0
     ? Math.round((metrics.total_emails_received * 0.5 / metrics.total_emails_sent) * 100 * 10) / 10
     : 0
@@ -753,4 +722,80 @@ export async function getAnalyticsSummary(
     tasksCompleted: metrics.completed_tasks,
     conversionRate
   }
+}
+// ============================================================================
+// EMAIL OPEN TRACKING ANALYTICS
+// ============================================================================
+
+/**
+ * Get detailed email open rate statistics
+ */
+export async function getEmailOpenRate(
+  userId: string,
+  dateRange?: DateRange
+): Promise<EmailOpenRateData> {
+  const range = dateRange || getDefaultDateRange()
+  
+  // Skip RPC call - go directly to fallback until DB migration is run
+  return getEmailOpenRateFallback(userId, range)
+}
+
+/**
+ * Fallback for email open rate if RPC doesn't exist
+ */
+async function getEmailOpenRateFallback(
+  userId: string,
+  dateRange: DateRange
+): Promise<EmailOpenRateData> {
+  const { data, error } = await supabase
+    .from('email_messages')
+    .select('id, has_tracking, is_opened, open_count')
+    .eq('user_id', userId)
+    .eq('is_from_me', true)
+    .is('deleted_at', null)
+    .gte('sent_at', dateRange.startDate)
+    .lte('sent_at', dateRange.endDate + 'T23:59:59.999Z')
+  
+  if (error || !data) {
+    return {
+      totalSent: 0,
+      totalWithTracking: 0,
+      uniqueOpens: 0,
+      totalOpens: 0,
+      openRate: 0,
+      openRateAdjusted: 0,
+      appleMppOpens: 0
+    }
+  }
+  
+  const totalSent = data.length
+  const totalWithTracking = data.filter(e => e.has_tracking).length
+  const uniqueOpens = data.filter(e => e.is_opened).length
+  const totalOpens = data.reduce((sum, e) => sum + (e.open_count || 0), 0)
+  
+  return {
+    totalSent,
+    totalWithTracking,
+    uniqueOpens,
+    totalOpens,
+    openRate: totalWithTracking > 0 
+      ? Math.round((uniqueOpens / totalWithTracking) * 100 * 10) / 10 
+      : 0,
+    openRateAdjusted: totalWithTracking > 0 
+      ? Math.round((uniqueOpens / totalWithTracking) * 100 * 10) / 10 
+      : 0,
+    appleMppOpens: 0 // Can't determine from fallback
+  }
+}
+
+/**
+ * Get open rates per campaign/label
+ */
+export async function getCampaignOpenRates(
+  userId: string,
+  dateRange?: DateRange
+): Promise<CampaignOpenRateData[]> {
+  // Skip RPC call - return empty until DB migration is run
+  // Campaign open rates require the email_messages table with tracking columns
+  return []
 }

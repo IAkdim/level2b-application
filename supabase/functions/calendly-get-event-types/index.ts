@@ -1,11 +1,5 @@
 // Supabase Edge Function: calendly-get-event-types
-// Fetches available event types (scheduling links) from Calendly
-//
-// ⚠️  DEPRECATED: This function requires organization support which has been removed.
-// This function is kept for reference but will not work without organizations.
-// To re-enable, you would need to:
-// 1. Restore organization tables in the database
-// 2. Update to work with user-based approach instead of org-based
+// Fetches available event types (scheduling links) from Calendly for the current user
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -34,38 +28,72 @@ Deno.serve(async (req) => {
   try {
     console.log('Get Calendly event types function invoked')
 
-    // Get auth header
+    // Get auth header and verify user
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('Missing authorization header')
     }
 
-    const { orgId } = await req.json()
+    // Create client with user's JWT to verify authentication
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser()
     
-    if (!orgId) {
-      throw new Error('orgId is required')
+    if (authError || !user) {
+      throw new Error('Authentication failed')
     }
 
-    // Get organization settings with Calendly token
+    // Get user settings with Calendly token using service role
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const { data: settings, error: settingsError } = await supabase
-      .from('organization_settings')
-      .select('calendly_access_token, calendly_user_uri')
-      .eq('org_id', orgId)
+      .from('user_settings')
+      .select('calendly_access_token')
+      .eq('user_id', user.id)
       .single()
 
     if (settingsError || !settings) {
-      throw new Error('Organization settings not found')
+      // No settings yet, return empty array (not an error)
+      console.log('No user settings found, returning empty event types')
+      return new Response(
+        JSON.stringify({ eventTypes: [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    if (!settings.calendly_access_token || !settings.calendly_user_uri) {
-      throw new Error('Calendly not connected for this organization')
+    if (!settings.calendly_access_token) {
+      // Calendly not connected, return empty array
+      console.log('Calendly not connected, returning empty event types')
+      return new Response(
+        JSON.stringify({ eventTypes: [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+
+    // First get the user's URI from Calendly
+    console.log('Fetching Calendly user info...')
+    const userResponse = await fetch('https://api.calendly.com/users/me', {
+      headers: {
+        'Authorization': `Bearer ${settings.calendly_access_token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!userResponse.ok) {
+      if (userResponse.status === 401) {
+        throw new Error('Calendly token expired. Please reconnect.')
+      }
+      throw new Error('Failed to fetch Calendly user info')
+    }
+
+    const userData = await userResponse.json()
+    const calendlyUserUri = userData.resource.uri
 
     // Fetch event types from Calendly
     console.log('Fetching event types from Calendly...')
-    const eventTypesUrl = `https://api.calendly.com/event_types?user=${settings.calendly_user_uri}&active=true`
+    const eventTypesUrl = `https://api.calendly.com/event_types?user=${encodeURIComponent(calendlyUserUri)}&active=true`
     
     const response = await fetch(eventTypesUrl, {
       headers: {
@@ -78,7 +106,6 @@ Deno.serve(async (req) => {
       const errorText = await response.text()
       console.error('Failed to fetch event types:', errorText)
       
-      // If token expired, return specific error
       if (response.status === 401) {
         throw new Error('Calendly token expired. Please reconnect.')
       }
