@@ -26,13 +26,7 @@ import {
   type EmailThread,
   type MessageOpenStats,
 } from "@/lib/utils/emailThreads";
-import {
-  getGmailLabels,
-  getRepliesByLabel,
-  getEmailsByLabel,
-  sendEmail,
-  type Email,
-} from "@/lib/api/gmail";
+import { emailService, type Email } from "@/lib/api/email";
 import { getEmailOpenStatsBulk } from "@/lib/api/emailTracking";
 import {
   generateSalesReply,
@@ -115,7 +109,7 @@ export function EmailThreads() {
 
   const loadLabels = async () => {
     try {
-      const labels = await getGmailLabels();
+      const labels = await emailService.getLabels();
 
       // Filter system labels
       const systemLabelPrefixes = [
@@ -163,11 +157,11 @@ export function EmailThreads() {
       
       if (selectedSourceLabel === "__ALL__") {
         // Load emails from ALL custom labels
-        const allSentPromises = availableLabels.map(label => 
-          getEmailsByLabel(label.name, 50).catch(() => [])
+        const allSentPromises = availableLabels.map(label =>
+          emailService.getEmailsByLabel(label.name, 50).catch(() => [])
         );
-        const allRepliesPromises = availableLabels.map(label => 
-          getRepliesByLabel(label.name, false, false).catch(() => [])
+        const allRepliesPromises = availableLabels.map(label =>
+          emailService.getRepliesByLabel(label.name, false, false).catch(() => [])
         );
         
         const sentResults = await Promise.all(allSentPromises);
@@ -197,8 +191,8 @@ export function EmailThreads() {
       } else {
         // Load emails from specific label
         [sent, replies] = await Promise.all([
-          getEmailsByLabel(selectedSourceLabel, 100),
-          getRepliesByLabel(selectedSourceLabel, false, false),
+          emailService.getEmailsByLabel(selectedSourceLabel, 100),
+          emailService.getRepliesByLabel(selectedSourceLabel, false, false),
         ]);
       }
 
@@ -330,7 +324,12 @@ export function EmailThreads() {
 
     setIsSendingReply(true);
     try {
-      await sendEmail(to, subject, body, selectedSourceLabel);
+      await emailService.sendEmail({
+        to,
+        subject,
+        body,
+        label: selectedSourceLabel
+      });
       toast.success(`Reply sent to ${to}`);
       setIsDetailOpen(false);
       await loadEmails(); // Refresh to show sent reply

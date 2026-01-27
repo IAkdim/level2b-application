@@ -14,7 +14,7 @@ import type {
 } from './types'
 import { GmailProvider } from './gmailProvider'
 import { OutlookProvider } from './outlookProvider'
-import { saveEmailTracking } from './emailTracking'
+import { saveEmailTracking, linkOpenTrackingToMetadata } from './emailTracking'
 
 class EmailService {
   private provider: IEmailProvider | null = null
@@ -52,13 +52,16 @@ class EmailService {
 
   /**
    * Send a single email and track it
+   * Coordinates both tracking systems: email_tracking_metadata + email_tracking
    */
   async sendEmail(request: SendEmailRequest): Promise<SendEmailResult> {
     const provider = await this.getProvider()
+
+    // Send email via provider (gmail.ts will store open tracking in email_tracking table)
     const result = await provider.sendEmail(request)
 
-    // Save tracking metadata to Supabase
-    await saveEmailTracking({
+    // Save correlation metadata to email_tracking_metadata (PRIMARY table)
+    const metadata = await saveEmailTracking({
       threadId: result.threadId,
       messageId: result.messageId,
       provider: this.providerType!,
@@ -67,25 +70,45 @@ class EmailService {
       sentAt: result.sentAt
     })
 
+    // Link email_tracking record to email_tracking_metadata if both exist
+    // Note: email_tracking only exists if open tracking was enabled in gmail.ts
+    if (metadata?.id) {
+      // Query email_tracking for this message (gmail.ts stores by gmail_message_id)
+      const { data: openTracking } = await supabase
+        .from('email_tracking')
+        .select('tracking_id')
+        .eq('gmail_message_id', result.messageId)
+        .single()
+
+      if (openTracking?.tracking_id) {
+        // Link the two tables
+        await linkOpenTrackingToMetadata(openTracking.tracking_id, metadata.id)
+      }
+    }
+
     return result
   }
 
   /**
    * Send multiple emails in batch and track them
+   * Coordinates both tracking systems for all emails
    */
   async sendBatchEmails(
     requests: SendEmailRequest[],
     onProgress?: (current: number, total: number, success: number, failed: number) => void
   ): Promise<SendEmailResult[]> {
     const provider = await this.getProvider()
+
+    // Send all emails via provider
     const results = await provider.sendBatchEmails(requests, onProgress)
 
-    // Save all tracking metadata
+    // Save all tracking metadata and link to open tracking
     for (let i = 0; i < results.length; i++) {
       const result = results[i]
       const request = requests[i]
 
-      await saveEmailTracking({
+      // Save correlation metadata
+      const metadata = await saveEmailTracking({
         threadId: result.threadId,
         messageId: result.messageId,
         provider: this.providerType!,
@@ -93,6 +116,19 @@ class EmailService {
         leadId: request.leadId,
         sentAt: result.sentAt
       })
+
+      // Link to open tracking if it exists
+      if (metadata?.id) {
+        const { data: openTracking } = await supabase
+          .from('email_tracking')
+          .select('tracking_id')
+          .eq('gmail_message_id', result.messageId)
+          .single()
+
+        if (openTracking?.tracking_id) {
+          await linkOpenTrackingToMetadata(openTracking.tracking_id, metadata.id)
+        }
+      }
     }
 
     return results

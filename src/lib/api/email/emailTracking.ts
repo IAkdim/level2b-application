@@ -8,6 +8,7 @@ import type { EmailTrackingMetadata } from './types'
 
 /**
  * Save email tracking metadata after sending an email
+ * Returns the metadata record which can be linked to email_tracking table
  */
 export async function saveEmailTracking(data: {
   threadId: string
@@ -44,10 +45,38 @@ export async function saveEmailTracking(data: {
       return null
     }
 
+    console.log('Saved email_tracking_metadata:', result.id, 'for message:', data.messageId)
     return result
   } catch (error) {
     console.error('Exception in saveEmailTracking:', error)
     return null
+  }
+}
+
+/**
+ * Link email_tracking record to email_tracking_metadata
+ * Call this after open tracking record is created in email_tracking table
+ */
+export async function linkOpenTrackingToMetadata(
+  trackingId: string,
+  metadataId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('email_tracking')
+      .update({ tracking_metadata_id: metadataId })
+      .eq('tracking_id', trackingId)
+
+    if (error) {
+      console.error('Error linking tracking to metadata:', error)
+      return false
+    }
+
+    console.log('Linked email_tracking', trackingId, 'to metadata', metadataId)
+    return true
+  } catch (error) {
+    console.error('Exception linking tracking:', error)
+    return false
   }
 }
 
