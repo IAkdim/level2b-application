@@ -2,22 +2,32 @@
 import { supabase } from '@/lib/supabaseClient'
 
 export interface GenerateLeadsParams {
-  method: 'google_maps' | 'social_media'
   niche: string
   location: string
   maxLeads: number
-  emailProvider?: string
-  userId: string
+}
+
+export interface GenerateLeadsMeta {
+  totalFound: number
+  duplicatesFiltered: number
+  durationMs: number
 }
 
 export interface GenerateLeadsResult {
   success: boolean
   leadsGenerated: number
   leads: any[]
+  meta?: GenerateLeadsMeta
 }
 
 /**
- * Generate leads using AI
+ * Generate leads using Google Places API
+ * 
+ * Features:
+ * - Automatic retry with exponential backoff
+ * - Duplicate detection
+ * - Quality filtering
+ * - Rate limit enforcement
  */
 export async function generateLeads(params: GenerateLeadsParams): Promise<GenerateLeadsResult> {
   const { data, error } = await supabase.functions.invoke('generate-leads', {

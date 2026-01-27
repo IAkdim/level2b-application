@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -242,7 +243,6 @@ export function Leads() {
               )}
               {user && (
                 <GenerateLeadsDialog
-                  userId={user.id}
                   onLeadsGenerated={refetch}
                 />
               )}
