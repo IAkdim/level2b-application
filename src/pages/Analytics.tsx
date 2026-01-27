@@ -1,9 +1,74 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays } from "lucide-react"
-import { useEffect, useState, useCallback } from "react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TrendingUp, TrendingDown, Mail, Calendar, Download, Filter, CalendarDays, Eye, RefreshCw, Users, Target, CheckCircle2, BarChart3 } from "lucide-react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/contexts/AuthContext"
+import {
+  useAnalyticsSummary,
+  useLeadFunnelMetrics,
+  useLeadsOverTime,
+  useEmailMetricsOverTime,
+  useLeadSourceDistribution,
+  useConversionFunnel,
+  useActivityMetrics,
+  type DateRange,
+  type TimeInterval,
+  DATE_RANGE_PRESETS,
+  getDateRangeFromPreset
+} from "@/hooks/useAnalytics"
+
+// Chart colors
+const COLORS = {
+  primary: '#3b82f6',
+  secondary: '#8b5cf6',
+  success: '#22c55e',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  muted: '#94a3b8',
+}
+
+const PIE_COLORS = [
+  '#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444',
+  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
+]
+
+// Status label mapping
+function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    'new': 'New',
+    'contacted': 'Contacted',
+    'replied': 'Replied',
+    'qualified': 'Qualified',
+    'meeting_scheduled': 'Meeting',
+    'proposal': 'Proposal',
+    'negotiation': 'Negotiation',
+    'won': 'Won',
+    'closed': 'Closed',
+    'lost': 'Lost'
+  }
+  return labels[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
+}
+
+// Recharts imports
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from 'recharts'
 
 interface MetricData {
   label: string
@@ -175,7 +240,7 @@ export function Analytics() {
       </div>
 
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard
           label="Total Leads"
           value={summary?.totalLeads ?? 0}
@@ -187,6 +252,14 @@ export function Analytics() {
           value={summary?.totalEmailsSent ?? 0}
           icon={Mail}
           isLoading={summaryLoading}
+        />
+        <MetricCard
+          label="Open Rate"
+          value={`${summary?.emailOpenRate ?? 0}%`}
+          icon={Eye}
+          trend={summary?.emailOpenRate && summary.emailOpenRate > 25 ? 'up' : 'neutral'}
+          isLoading={summaryLoading}
+          tooltip="Percentage of tracked emails opened by recipients. May undercount due to image blocking."
         />
         <MetricCard
           label="Reply Rate"
@@ -586,6 +659,43 @@ export function Analytics() {
 
 // Helper Components
 
+function ChartSkeleton() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-muted/20 rounded animate-pulse">
+      <div className="text-muted-foreground text-sm">Loading chart...</div>
+    </div>
+  )
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+      <BarChart3 className="h-12 w-12 mb-2 opacity-30" />
+      <p className="text-sm">{message}</p>
+    </div>
+  )
+}
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null
+  
+  return (
+    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+      <p className="font-medium text-sm mb-2">{label}</p>
+      {payload.map((entry: any, index: number) => (
+        <div key={index} className="flex items-center gap-2 text-sm">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: entry.color || entry.stroke }}
+          />
+          <span className="text-muted-foreground">{entry.name}:</span>
+          <span className="font-medium">{entry.value?.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 interface MetricCardProps {
   label: string
   value: number | string
@@ -661,3 +771,5 @@ function formatPeriodLabel(period: string, interval: TimeInterval): string {
   }
   return period
 }
+
+export default Analytics

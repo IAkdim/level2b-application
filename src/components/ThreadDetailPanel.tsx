@@ -5,13 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Send, Sparkles, Loader2, Clock, Mail, MessageSquare } from "lucide-react";
+import { ArrowLeft, Send, Sparkles, Loader2, Clock, Mail, MessageSquare, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EmailThread, EmailThreadMessage } from "@/lib/utils/emailThreads";
 import type { Language } from "@/types/crm";
+import { toast } from "sonner";
+import { formatRelativeTime } from "@/lib/utils/formatters";
 
 interface ThreadDetailPanelProps {
   thread: EmailThread | null;
@@ -24,6 +26,7 @@ interface ThreadDetailPanelProps {
   ) => Promise<{ subject: string; body: string } | null>;
   isSending?: boolean;
   isGenerating?: boolean;
+  isAnalyzingSentiment?: boolean;
 }
 
 /**
@@ -38,6 +41,7 @@ export function ThreadDetailPanel({
   onGenerateAIReply,
   isSending = false,
   isGenerating = false,
+  isAnalyzingSentiment = false,
 }: ThreadDetailPanelProps) {
   const [replyBody, setReplyBody] = useState("");
   const [replySubject, setReplySubject] = useState("");
@@ -45,11 +49,49 @@ export function ThreadDetailPanel({
   const [showFullMessage, setShowFullMessage] = useState<string | null>(null);
 
   const handleGenerateReply = async () => {
-    if (!thread) return;
-    const result = await onGenerateAIReply(thread, replyLanguage);
-    if (result) {
-      setReplySubject(result.subject);
-      setReplyBody(result.body);
+    console.log('[ThreadDetailPanel] handleGenerateReply called', {
+      hasThread: !!thread,
+      isAnalyzingSentiment,
+      hasSentiment: !!thread?.sentiment,
+      replyLanguage,
+    });
+
+    if (!thread) {
+      console.log('[ThreadDetailPanel] No thread, returning early');
+      return;
+    }
+    
+    // Check if sentiment analysis is missing or in progress
+    if (isAnalyzingSentiment) {
+      console.log('[ThreadDetailPanel] Sentiment analysis in progress, showing toast');
+      toast.info("Please wait", {
+        description: "Sentiment analysis is in progress...",
+      });
+      return;
+    }
+    
+    if (!thread.sentiment) {
+      console.log('[ThreadDetailPanel] No sentiment on thread, showing error toast');
+      toast.error("Sentiment analysis required", {
+        description: "Please wait for the email to be analyzed before generating a reply.",
+      });
+      return;
+    }
+    
+    console.log('[ThreadDetailPanel] Calling onGenerateAIReply with sentiment:', thread.sentiment.sentiment);
+    try {
+      const result = await onGenerateAIReply(thread, replyLanguage);
+      console.log('[ThreadDetailPanel] onGenerateAIReply result:', result);
+      if (result) {
+        setReplySubject(result.subject);
+        setReplyBody(result.body);
+      }
+      // Don't show duplicate error - parent component handles its own toasts
+    } catch (error) {
+      console.error('[ThreadDetailPanel] Error in onGenerateAIReply:', error);
+      toast.error("Failed to generate reply", {
+        description: "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
@@ -108,6 +150,9 @@ export function ThreadDetailPanel({
               <SheetTitle className="text-base font-semibold truncate">
                 {thread.contactName}
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                Email conversation with {thread.contactName}
+              </SheetDescription>
               <p className="text-xs text-muted-foreground truncate">
                 {thread.contactEmail}
                 {thread.company && ` · ${thread.company}`}
@@ -225,13 +270,19 @@ export function ThreadDetailPanel({
               variant="outline"
               size="sm"
               onClick={handleGenerateReply}
-              disabled={isGenerating || !thread.sentiment}
+              disabled={isGenerating || isAnalyzingSentiment}
               className="text-xs"
+              title={isAnalyzingSentiment ? "Analyzing email sentiment..." : !thread.sentiment ? "Sentiment required - click to retry" : "Generate AI reply based on email context"}
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                   Generating...
+                </>
+              ) : isAnalyzingSentiment ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Analyzing...
                 </>
               ) : (
                 <>
@@ -297,6 +348,47 @@ export function ThreadDetailPanel({
 /**
  * Single message bubble in the chat view
  */
+/**
+ * Strips HTML tags and extracts plain text for display
+ * Handles tracking pixels and HTML email formatting
+ */
+function stripHtmlForDisplay(html: string): string {
+  // Check if this is HTML content
+  const isHtml = /<[a-z][\s\S]*>/i.test(html);
+  if (!isHtml) return html;
+
+  // Remove tracking pixel images (1x1 transparent pixels)
+  let text = html.replace(/<img[^>]*(?:track|width="1"|height="1"|1px)[^>]*>/gi, '');
+  
+  // Remove DOCTYPE, html, head, style, script tags and their content
+  text = text.replace(/<!DOCTYPE[^>]*>/gi, '');
+  text = text.replace(/<head[\s\S]*?<\/head>/gi, '');
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, '');
+  
+  // Convert <br> and </p> to newlines
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  
+  // Remove remaining HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+  
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/gi, ' ');
+  text = text.replace(/&amp;/gi, '&');
+  text = text.replace(/&lt;/gi, '<');
+  text = text.replace(/&gt;/gi, '>');
+  text = text.replace(/&quot;/gi, '"');
+  text = text.replace(/&#39;/gi, "'");
+  
+  // Clean up multiple newlines and whitespace
+  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.trim();
+  
+  return text;
+}
+
 function MessageBubble({
   message,
   isExpanded,
@@ -307,13 +399,17 @@ function MessageBubble({
   onToggleExpand: () => void;
 }) {
   const isOutgoing = message.isOutgoing;
+  
+  // Convert HTML to plain text for display
+  const plainTextBody = stripHtmlForDisplay(message.body);
+  
   const maxPreviewLength = 300;
-  const needsTruncation = message.body.length > maxPreviewLength;
+  const needsTruncation = plainTextBody.length > maxPreviewLength;
   const displayBody = isExpanded
-    ? message.body
+    ? plainTextBody
     : needsTruncation
-    ? message.body.substring(0, maxPreviewLength) + "..."
-    : message.body;
+    ? plainTextBody.substring(0, maxPreviewLength) + "..."
+    : plainTextBody;
 
   return (
     <div
@@ -373,13 +469,46 @@ function MessageBubble({
         )}
       </div>
 
-      {/* Timestamp */}
+      {/* Timestamp and open status for outgoing messages */}
       <span className="text-[10px] text-muted-foreground mt-1 px-1 flex items-center gap-1">
         <Clock className="h-2.5 w-2.5" />
         {message.date.toLocaleTimeString("en-US", {
           hour: "numeric",
           minute: "2-digit",
         })}
+        {/* Open tracking indicator for outgoing messages */}
+        {isOutgoing && (
+          <>
+            <span className="mx-1">·</span>
+            {message.isOpened ? (
+              <span 
+                className="inline-flex items-center text-green-600 dark:text-green-500" 
+                title={message.firstOpenedAt 
+                  ? `Opened ${formatRelativeTime(message.firstOpenedAt.toISOString())}${message.openCount && message.openCount > 1 ? ` (${message.openCount}×)` : ''}`
+                  : 'Opened'}
+              >
+                <Eye className="h-2.5 w-2.5 mr-0.5" />
+                <span className="text-[10px]">Opened</span>
+              </span>
+            ) : message.hasTracking ? (
+              <span 
+                className="inline-flex items-center text-muted-foreground/50" 
+                title="Not opened yet"
+              >
+                <EyeOff className="h-2.5 w-2.5 mr-0.5" />
+                <span className="text-[10px]">Not opened</span>
+              </span>
+            ) : (
+              <span 
+                className="inline-flex items-center text-muted-foreground/30" 
+                title="Tracking enabled"
+              >
+                <EyeOff className="h-2.5 w-2.5 mr-0.5" />
+                <span className="text-[10px]">Sent</span>
+              </span>
+            )}
+          </>
+        )}
       </span>
 
       {/* Sentiment badge for incoming messages */}

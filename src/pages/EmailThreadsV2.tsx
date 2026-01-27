@@ -22,7 +22,9 @@ import {
   searchThreads,
   getAllLabels,
   getThreadStats,
+  enrichThreadsWithOpenTracking,
   type EmailThread,
+  type MessageOpenStats,
 } from "@/lib/utils/emailThreads";
 import {
   getGmailLabels,
@@ -31,6 +33,7 @@ import {
   sendEmail,
   type Email,
 } from "@/lib/api/gmail";
+import { getEmailOpenStatsBulk } from "@/lib/api/emailTracking";
 import {
   generateSalesReply,
   type EmailReplyContext,
@@ -43,6 +46,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { cn } from "@/lib/utils";
 import type { Language } from "@/types/crm";
+import { analyzeSentiment } from "@/lib/api/claude-secure";
 
 export function EmailThreads() {
   const { user } = useAuth();
@@ -51,6 +55,7 @@ export function EmailThreads() {
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
   const [rawSentEmails, setRawSentEmails] = useState<Email[]>([]);
   const [rawReplies, setRawReplies] = useState<Email[]>([]);
+  const [openTrackingStats, setOpenTrackingStats] = useState<MessageOpenStats[]>([]);
   const [selectedSourceLabel, setSelectedSourceLabel] = useState<string>("");
 
   // UI state
@@ -62,15 +67,21 @@ export function EmailThreads() {
   const [filterLabel, setFilterLabel] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
 
   // Reply state
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
 
-  // Derived: unified threads
+  // Derived: unified threads (with open tracking enrichment)
   const threads = useMemo(() => {
-    return groupEmailsIntoThreads(rawSentEmails, rawReplies, user?.email);
-  }, [rawSentEmails, rawReplies, user?.email]);
+    const baseThreads = groupEmailsIntoThreads(rawSentEmails, rawReplies, user?.email);
+    // Enrich with open tracking data if available
+    if (openTrackingStats.length > 0) {
+      return enrichThreadsWithOpenTracking(baseThreads, openTrackingStats);
+    }
+    return baseThreads;
+  }, [rawSentEmails, rawReplies, user?.email, openTrackingStats]);
 
   // Derived: filtered threads
   const filteredThreads = useMemo(() => {
@@ -147,14 +158,73 @@ export function EmailThreads() {
 
     setIsLoading(true);
     try {
-      const [sent, replies] = await Promise.all([
-        getEmailsByLabel(selectedSourceLabel, 100),
-        getRepliesByLabel(selectedSourceLabel, false, false),
-      ]);
+      let sent: Email[] = [];
+      let replies: Email[] = [];
+      
+      if (selectedSourceLabel === "__ALL__") {
+        // Load emails from ALL custom labels
+        const allSentPromises = availableLabels.map(label => 
+          getEmailsByLabel(label.name, 50).catch(() => [])
+        );
+        const allRepliesPromises = availableLabels.map(label => 
+          getRepliesByLabel(label.name, false, false).catch(() => [])
+        );
+        
+        const sentResults = await Promise.all(allSentPromises);
+        const repliesResults = await Promise.all(allRepliesPromises);
+        
+        // Combine and deduplicate by message ID
+        const seenSentIds = new Set<string>();
+        const seenReplyIds = new Set<string>();
+        
+        for (const emails of sentResults) {
+          for (const email of emails) {
+            if (!seenSentIds.has(email.id)) {
+              seenSentIds.add(email.id);
+              sent.push(email);
+            }
+          }
+        }
+        
+        for (const emails of repliesResults) {
+          for (const email of emails) {
+            if (!seenReplyIds.has(email.id)) {
+              seenReplyIds.add(email.id);
+              replies.push(email);
+            }
+          }
+        }
+      } else {
+        // Load emails from specific label
+        [sent, replies] = await Promise.all([
+          getEmailsByLabel(selectedSourceLabel, 100),
+          getRepliesByLabel(selectedSourceLabel, false, false),
+        ]);
+      }
 
       setRawSentEmails(sent);
       setRawReplies(replies);
       setLastRefresh(new Date());
+
+      // Fetch open tracking stats for sent emails
+      const sentMessageIds = sent.map(e => e.id);
+      if (sentMessageIds.length > 0) {
+        try {
+          const openStats = await getEmailOpenStatsBulk(sentMessageIds);
+          // Convert to MessageOpenStats format
+          const statsFormatted: MessageOpenStats[] = openStats.map(stat => ({
+            messageId: stat.gmailMessageId,
+            hasTracking: stat.hasTracking,
+            isOpened: stat.isOpened,
+            firstOpenedAt: stat.firstOpenedAt,
+            openCount: stat.openCount,
+          }));
+          setOpenTrackingStats(statsFormatted);
+        } catch (trackingError) {
+          // Tracking data is optional - don't fail the whole load
+          console.warn('Could not fetch open tracking stats:', trackingError);
+        }
+      }
     } catch (error) {
       console.error("Error loading emails:", error);
 
@@ -189,7 +259,7 @@ export function EmailThreads() {
     setIsRefreshing(false);
   };
 
-  const handleThreadClick = (thread: EmailThread) => {
+  const handleThreadClick = async (thread: EmailThread) => {
     setSelectedThread(thread);
     setIsDetailOpen(true);
 
@@ -201,6 +271,49 @@ export function EmailThreads() {
           r.threadId === thread.id ? { ...r, labelIds: r.labelIds.filter((l) => l !== "UNREAD") } : r
         )
       );
+    }
+
+    // If thread doesn't have sentiment, analyze the last incoming message
+    if (!thread.sentiment) {
+      const lastIncoming = [...thread.messages].reverse().find((m) => !m.isOutgoing);
+      
+      if (lastIncoming && (lastIncoming.body || lastIncoming.snippet)) {
+        setIsAnalyzingSentiment(true);
+        try {
+          console.log('[EmailThreadsV2] Analyzing sentiment for thread:', thread.id);
+          const sentiment = await analyzeSentiment(
+            lastIncoming.body || lastIncoming.snippet,
+            lastIncoming.subject
+          );
+          
+          if (!sentiment.error) {
+            console.log('[EmailThreadsV2] Sentiment analyzed:', sentiment.sentiment);
+            // Update the thread with the new sentiment
+            const updatedThread: EmailThread = {
+              ...thread,
+              sentiment: sentiment,
+            };
+            setSelectedThread(updatedThread);
+            
+            // Also update the raw replies to persist the sentiment
+            setRawReplies((prev) =>
+              prev.map((r) =>
+                r.id === lastIncoming.id ? { ...r, sentiment } : r
+              )
+            );
+          } else {
+            console.error('[EmailThreadsV2] Sentiment analysis error:', sentiment.error);
+            toast.error('Failed to analyze sentiment', {
+              description: sentiment.error,
+            });
+          }
+        } catch (error) {
+          console.error('[EmailThreadsV2] Error analyzing sentiment:', error);
+          toast.error('Failed to analyze email sentiment');
+        } finally {
+          setIsAnalyzingSentiment(false);
+        }
+      }
     }
   };
 
@@ -243,22 +356,32 @@ export function EmailThreads() {
     thread: EmailThread,
     language: Language
   ): Promise<{ subject: string; body: string } | null> => {
+    console.log('[EmailThreadsV2] handleGenerateAIReply called', {
+      threadId: thread.id,
+      sentiment: thread.sentiment?.sentiment,
+      language,
+    });
+    
     setIsGeneratingReply(true);
 
     try {
+      console.log('[EmailThreadsV2] Starting try block...');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[EmailThreadsV2] Session result:', session ? 'found' : 'null');
       if (!session) {
+        console.log('[EmailThreadsV2] No session!');
         toast.error("Not authenticated");
         return null;
       }
 
       // Get user profile
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("users")
         .select("full_name, email")
         .eq("id", session.user.id)
         .single();
 
+      console.log('[EmailThreadsV2] Profile result:', { profile, profileError });
       const userName = profile?.full_name || profile?.email?.split("@")[0] || "there";
 
       // Get user settings
@@ -266,11 +389,13 @@ export function EmailThreads() {
       let productService: string | undefined;
       let calendlyLink: string | undefined;
 
-      const { data: userSettings } = await supabase
+      const { data: userSettings, error: settingsError } = await supabase
         .from("user_settings")
         .select("company_name, product_service, calendly_scheduling_url")
         .eq("user_id", session.user.id)
         .single();
+
+      console.log('[EmailThreadsV2] User settings result:', { userSettings, settingsError, calendlyLink: userSettings?.calendly_scheduling_url });
 
       if (userSettings) {
         companyName = userSettings.company_name;
@@ -279,7 +404,9 @@ export function EmailThreads() {
       }
 
       // Check for Calendly link on positive sentiment
+      console.log('[EmailThreadsV2] Checking Calendly requirement:', { sentiment: thread.sentiment?.sentiment, hasCalendlyLink: !!calendlyLink });
       if (thread.sentiment?.sentiment === "positive" && !calendlyLink) {
+        console.log('[EmailThreadsV2] BLOCKED: Positive sentiment but no Calendly link!');
         toast.error("Calendly link not configured for positive replies");
         return null;
       }
@@ -289,6 +416,7 @@ export function EmailThreads() {
         .reverse()
         .find((m) => !m.isOutgoing);
 
+      console.log('[EmailThreadsV2] Last incoming message:', lastIncoming ? 'found' : 'NOT FOUND');
       if (!lastIncoming) {
         toast.error("No incoming message to reply to");
         return null;
@@ -307,9 +435,12 @@ export function EmailThreads() {
         language,
       };
 
+      console.log('[EmailThreadsV2] Calling generateSalesReply...');
       const result = await generateSalesReply(context);
+      console.log('[EmailThreadsV2] generateSalesReply result:', result);
 
       if (result.error) {
+        console.log('[EmailThreadsV2] Error from API:', result.error);
         toast.error(`Error: ${result.error}`);
         return null;
       }
@@ -351,11 +482,16 @@ export function EmailThreads() {
                     No labels found
                   </SelectItem>
                 ) : (
-                  availableLabels.map((label) => (
-                    <SelectItem key={label.id} value={label.name}>
-                      {label.name}
+                  <>
+                    <SelectItem value="__ALL__">
+                      📬 All campaigns
                     </SelectItem>
-                  ))
+                    {availableLabels.map((label) => (
+                      <SelectItem key={label.id} value={label.name}>
+                        {label.name}
+                      </SelectItem>
+                    ))}
+                  </>
                 )}
               </SelectContent>
             </Select>
@@ -489,6 +625,7 @@ export function EmailThreads() {
         onGenerateAIReply={handleGenerateAIReply}
         isSending={isSendingReply}
         isGenerating={isGeneratingReply}
+        isAnalyzingSentiment={isAnalyzingSentiment}
       />
     </div>
   );

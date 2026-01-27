@@ -302,6 +302,14 @@ export function EmailThreads() {
   const handleGenerateAIReply = async () => {
     if (!selectedEmail) return;
 
+    // Check if sentiment analysis is complete
+    if (!selectedEmail.sentiment) {
+      toast.error('Sentiment analysis required', {
+        description: 'Please wait for the email to be analyzed before generating a reply.',
+      });
+      return;
+    }
+
     setIsGeneratingReply(true);
     try {
       // Get current session for user data
@@ -1051,13 +1059,18 @@ export function EmailThreads() {
                     variant="outline"
                     size="sm"
                     onClick={handleGenerateAIReply}
-                    disabled={isGeneratingReply || !selectedEmail.sentiment}
-                    title={!selectedEmail.sentiment ? 'Analyze sentiment first' : ''}
+                    disabled={isGeneratingReply}
+                    title={!selectedEmail.sentiment ? 'Waiting for sentiment analysis...' : 'Generate AI reply based on email context'}
                   >
                     {isGeneratingReply ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         AI generating reply...
+                      </>
+                    ) : !selectedEmail.sentiment ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analyzing...
                       </>
                     ) : (
                       <>

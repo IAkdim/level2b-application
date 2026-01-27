@@ -1,11 +1,5 @@
 // Supabase Edge Function: calendly-oauth-callback
-// Handles the OAuth callback from Calendly and stores tokens
-//
-// ⚠️  DEPRECATED: This function requires organization support which has been removed.
-// This function is kept for reference but will not work without organizations.
-// To re-enable, you would need to:
-// 1. Restore organization tables in the database
-// 2. Update to work with user-based approach instead of org-based
+// Handles the OAuth callback from Calendly and stores tokens in user_settings
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -13,7 +7,21 @@ const CALENDLY_CLIENT_ID = Deno.env.get('CALENDLY_CLIENT_ID')
 const CALENDLY_CLIENT_SECRET = Deno.env.get('CALENDLY_CLIENT_SECRET')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const APP_URL = Deno.env.get('APP_URL') || 'http://localhost:5173'
+
+interface StateData {
+  userId: string
+  redirectUrl: string
+}
+
+function parseState(state: string): StateData {
+  try {
+    const decoded = atob(state)
+    return JSON.parse(decoded)
+  } catch {
+    // Fallback for old format (just userId)
+    return { userId: state, redirectUrl: 'http://localhost:5173' }
+  }
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -25,18 +33,25 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Default redirect URL in case of early errors
+  let appUrl = 'http://localhost:5173'
+
   try {
     console.log('Calendly OAuth callback invoked')
 
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state') // This is the orgId
+    const state = url.searchParams.get('state')
     const error = url.searchParams.get('error')
+
+    // Parse state to get userId and redirectUrl
+    if (state) {
+      const stateData = parseState(state)
+      appUrl = stateData.redirectUrl.replace(/\/$/, '')
+    }
 
     if (error) {
       console.error('OAuth error:', error)
-      // Redirect to app with error
-      const appUrl = APP_URL.replace(/\/$/, '') // Remove trailing slash if present
       return Response.redirect(`${appUrl}/configuration?calendly_error=${error}`, 302)
     }
 
@@ -44,7 +59,7 @@ Deno.serve(async (req) => {
       throw new Error('Missing code or state parameter')
     }
 
-    const orgId = state
+    const { userId } = parseState(state)
 
     if (!CALENDLY_CLIENT_ID || !CALENDLY_CLIENT_SECRET) {
       throw new Error('Calendly OAuth credentials not configured')
@@ -98,66 +113,88 @@ Deno.serve(async (req) => {
     const calendlyUserUri = userData.resource.uri
     console.log('Calendly user URI:', calendlyUserUri)
 
-    // Calculate token expiration
-    const expiresAt = new Date()
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in)
+    // Get the first event type to use as the scheduling URL
+    console.log('Fetching Calendly event types...')
+    const eventTypesResponse = await fetch('https://api.calendly.com/event_types?user=' + encodeURIComponent(calendlyUserUri), {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
-    // Store tokens in database using service role (bypasses RLS)
+    let schedulingUrl = ''
+    let eventTypeUri = ''
+    let eventTypeName = ''
+
+    if (eventTypesResponse.ok) {
+      const eventTypesData = await eventTypesResponse.json()
+      if (eventTypesData.collection && eventTypesData.collection.length > 0) {
+        const firstEventType = eventTypesData.collection[0]
+        schedulingUrl = firstEventType.scheduling_url || ''
+        eventTypeUri = firstEventType.uri || ''
+        eventTypeName = firstEventType.name || ''
+        console.log('Found event type:', eventTypeName, schedulingUrl)
+      }
+    }
+
+    // Store tokens in user_settings using service role (bypasses RLS)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Check if settings exist
+    // Check if user_settings exist for this user
     const { data: existingSettings } = await supabase
-      .from('organization_settings')
+      .from('user_settings')
       .select('id')
-      .eq('org_id', orgId)
+      .eq('user_id', userId)
       .single()
+
+    const calendlyData = {
+      calendly_access_token: tokenData.access_token,
+      calendly_refresh_token: tokenData.refresh_token,
+      calendly_scheduling_url: schedulingUrl,
+      calendly_event_type_uri: eventTypeUri,
+      calendly_event_type_name: eventTypeName,
+      updated_at: new Date().toISOString(),
+    }
+
+    console.log('Saving Calendly data to user_settings for user:', userId)
 
     if (existingSettings) {
       // Update existing settings
       const { error: updateError } = await supabase
-        .from('organization_settings')
-        .update({
-          calendly_access_token: tokenData.access_token,
-          calendly_refresh_token: tokenData.refresh_token,
-          calendly_token_expires_at: expiresAt.toISOString(),
-          calendly_user_uri: calendlyUserUri,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('org_id', orgId)
+        .from('user_settings')
+        .update(calendlyData)
+        .eq('user_id', userId)
 
       if (updateError) {
-        console.error('Failed to update settings:', updateError)
+        console.error('Failed to update user_settings:', updateError)
         throw updateError
       }
+      console.log('Updated existing user_settings')
     } else {
-      // Create new settings
+      // Create new user_settings
       const { error: insertError } = await supabase
-        .from('organization_settings')
+        .from('user_settings')
         .insert({
-          org_id: orgId,
-          calendly_access_token: tokenData.access_token,
-          calendly_refresh_token: tokenData.refresh_token,
-          calendly_token_expires_at: expiresAt.toISOString(),
-          calendly_user_uri: calendlyUserUri,
+          user_id: userId,
+          ...calendlyData,
         })
 
       if (insertError) {
-        console.error('Failed to insert settings:', insertError)
+        console.error('Failed to insert user_settings:', insertError)
         throw insertError
       }
+      console.log('Created new user_settings')
     }
 
-    console.log('Tokens stored successfully')
+    console.log('Tokens stored successfully in user_settings')
 
     // Redirect back to app with success
-    const appUrl = APP_URL.replace(/\/$/, '') // Remove trailing slash if present
-    return Response.redirect(`${appUrl}/configuration?calendly_connected=true&tab=company`, 302)
+    return Response.redirect(`${appUrl}/configuration?calendly_connected=true`, 302)
 
   } catch (error) {
     console.error('Error in calendly-oauth-callback:', error)
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const appUrl = APP_URL.replace(/\/$/, '') // Remove trailing slash if present
     
     return Response.redirect(`${appUrl}/configuration?calendly_error=${encodeURIComponent(errorMessage)}`, 302)
   }

@@ -1,17 +1,14 @@
 // Supabase Edge Function: calendly-oauth-init
-// Generates the Calendly OAuth authorization URL
-//
-// ⚠️  DEPRECATED: This function requires organization support which has been removed.
-// This function is kept for reference but will not work without organizations.
-// To re-enable, you would need to:
-// 1. Restore organization tables in the database
-// 2. Update to work with user-based approach instead of org-based
+// Generates the Calendly OAuth authorization URL for user-based authentication
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const CALENDLY_CLIENT_ID = Deno.env.get('CALENDLY_CLIENT_ID')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
 interface InitOAuthRequest {
-  orgId: string
+  redirectUrl?: string
 }
 
 Deno.serve(async (req) => {
@@ -27,6 +24,29 @@ Deno.serve(async (req) => {
   try {
     console.log('Calendly OAuth init function invoked')
 
+    // Verify JWT and get user
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('Missing authorization header')
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    })
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      throw new Error('Invalid or expired token')
+    }
+
+    console.log('Authenticated user:', user.id)
+
+    // Get redirectUrl from request body
+    const body: InitOAuthRequest = await req.json().catch(() => ({}))
+    const redirectUrl = body.redirectUrl || 'http://localhost:5173'
+
     if (!CALENDLY_CLIENT_ID) {
       throw new Error('CALENDLY_CLIENT_ID not configured')
     }
@@ -34,23 +54,21 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL) {
       throw new Error('SUPABASE_URL not configured')
     }
-
-    const { orgId }: InitOAuthRequest = await req.json()
-    
-    if (!orgId) {
-      throw new Error('orgId is required')
-    }
     
     // Construct redirect URI - must match EXACTLY what's configured in Calendly OAuth app
     const supabaseUrl = SUPABASE_URL.replace(/\/$/, '') // Remove trailing slash if present
     const redirectUri = `${supabaseUrl}/functions/v1/calendly-oauth-callback`
+    
+    // Encode userId and redirectUrl in state (base64 encoded JSON)
+    const stateData = JSON.stringify({ userId: user.id, redirectUrl })
+    const state = btoa(stateData)
     
     // Build OAuth URL
     const authUrl = new URL('https://auth.calendly.com/oauth/authorize')
     authUrl.searchParams.set('client_id', CALENDLY_CLIENT_ID)
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('redirect_uri', redirectUri)
-    authUrl.searchParams.set('state', orgId) // Use orgId as state to track which org is connecting
+    authUrl.searchParams.set('state', state)
     
     console.log('OAuth URL generated:', authUrl.toString())
     console.log('Redirect URI:', redirectUri)

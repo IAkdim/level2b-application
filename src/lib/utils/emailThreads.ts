@@ -26,6 +26,11 @@ export interface EmailThread {
   // Message counts
   sentCount: number;
   replyCount: number;
+  // Open tracking (aggregate for the thread)
+  hasTracking?: boolean;
+  isOpened?: boolean;
+  firstOpenedAt?: Date;
+  openCount?: number;
 }
 
 export interface EmailThreadMessage {
@@ -38,6 +43,11 @@ export interface EmailThreadMessage {
   snippet: string;
   date: Date;
   sentiment?: Email["sentiment"];
+  // Open tracking for individual message
+  hasTracking?: boolean;
+  isOpened?: boolean;
+  firstOpenedAt?: Date;
+  openCount?: number;
 }
 
 /**
@@ -280,4 +290,70 @@ export function getThreadStats(threads: EmailThread[]) {
     neutral: threads.filter((t) => t.sentiment?.sentiment === "neutral").length,
     negative: threads.filter((t) => t.sentiment?.sentiment === "negative").length,
   };
+}
+
+/**
+ * Open tracking stats for a message
+ */
+export interface MessageOpenStats {
+  messageId: string;
+  hasTracking: boolean;
+  isOpened: boolean;
+  firstOpenedAt: Date | null;
+  openCount: number;
+}
+
+/**
+ * Enriches threads with open tracking data from the database
+ * Call this after groupEmailsIntoThreads to add open status
+ */
+export function enrichThreadsWithOpenTracking(
+  threads: EmailThread[],
+  openStats: MessageOpenStats[]
+): EmailThread[] {
+  // Create a lookup map by message ID
+  const statsMap = new Map<string, MessageOpenStats>();
+  for (const stat of openStats) {
+    statsMap.set(stat.messageId, stat);
+  }
+
+  return threads.map((thread) => {
+    // Enrich each message with tracking data
+    const enrichedMessages = thread.messages.map((msg) => {
+      const stat = statsMap.get(msg.id);
+      if (stat) {
+        return {
+          ...msg,
+          hasTracking: stat.hasTracking,
+          isOpened: stat.isOpened,
+          firstOpenedAt: stat.firstOpenedAt || undefined,
+          openCount: stat.openCount,
+        };
+      }
+      return msg;
+    });
+
+    // Calculate thread-level tracking (aggregate from all outgoing messages)
+    const outgoingWithTracking = enrichedMessages.filter(
+      (m) => m.isOutgoing && m.hasTracking
+    );
+    const anyOpened = outgoingWithTracking.some((m) => m.isOpened);
+    const totalOpens = outgoingWithTracking.reduce(
+      (sum, m) => sum + (m.openCount || 0),
+      0
+    );
+    const firstOpen = outgoingWithTracking
+      .filter((m) => m.firstOpenedAt)
+      .map((m) => m.firstOpenedAt!)
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+
+    return {
+      ...thread,
+      messages: enrichedMessages,
+      hasTracking: outgoingWithTracking.length > 0,
+      isOpened: anyOpened,
+      firstOpenedAt: firstOpen,
+      openCount: totalOpens,
+    };
+  });
 }

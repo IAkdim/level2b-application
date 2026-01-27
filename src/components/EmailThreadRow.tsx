@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils/formatters";
+import { Eye, EyeOff } from "lucide-react";
 import type { EmailThread } from "@/lib/utils/emailThreads";
 
 interface EmailThreadRowProps {
@@ -11,7 +12,7 @@ interface EmailThreadRowProps {
 
 /**
  * Single row in the email thread list
- * Displays: unread dot, contact info, subject, preview, timestamp, tags
+ * Displays: unread dot, contact info, subject, preview, timestamp, open status, tags
  */
 export function EmailThreadRow({
   thread,
@@ -31,6 +32,52 @@ export function EmailThreadRow({
   };
 
   const sentimentIndicator = getSentimentIndicator();
+
+  // Get open status indicator
+  // Show for all threads with sent emails (tracking is enabled by default)
+  // Once database is set up, this will show actual open status
+  const getOpenStatusIndicator = () => {
+    // If we have tracking data from database, use it
+    if (thread.hasTracking) {
+      if (thread.isOpened) {
+        const openText = thread.firstOpenedAt 
+          ? `Opened ${formatRelativeTime(thread.firstOpenedAt.toISOString())}${thread.openCount && thread.openCount > 1 ? ` (${thread.openCount}×)` : ''}`
+          : 'Opened';
+        return (
+          <span 
+            className="inline-flex items-center text-green-600 dark:text-green-500" 
+            title={openText}
+          >
+            <Eye className="h-3 w-3" />
+          </span>
+        );
+      }
+      
+      return (
+        <span 
+          className="inline-flex items-center text-muted-foreground/50" 
+          title="Not opened yet"
+        >
+          <EyeOff className="h-3 w-3" />
+        </span>
+      );
+    }
+    
+    // Fallback: Show tracking icon for threads with sent emails
+    // (tracking is enabled by default, but we don't have DB confirmation yet)
+    if (thread.sentCount > 0) {
+      return (
+        <span 
+          className="inline-flex items-center text-muted-foreground/30" 
+          title="Tracking enabled (open status pending)"
+        >
+          <EyeOff className="h-3 w-3" />
+        </span>
+      );
+    }
+    
+    return null;
+  };
 
   return (
     <div
@@ -78,6 +125,9 @@ export function EmailThreadRow({
               {sentimentIndicator}
             </span>
           )}
+
+          {/* Open status indicator */}
+          {getOpenStatusIndicator()}
 
           {/* Spacer */}
           <div className="flex-1" />
