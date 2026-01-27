@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Mail, Tag, FileText, RefreshCw, CheckCircle2, Sparkles, Clock } from "lucide-react"
-import { sendBatchEmails, checkGmailAuthentication } from "@/lib/api/gmail"
+import { emailService } from "@/lib/api/email"
 import { getUserEmailTemplates, incrementTemplateUsage } from "@/lib/api/templates"
 import type { EmailTemplate } from "@/types/crm"
 import { checkUsageLimit, incrementUsage, formatUsageLimitError, getTimeUntilReset } from "@/lib/api/usageLimits"
@@ -153,7 +153,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           .replace(/\{name\}/g, lead.name)
           .replace(/\{company\}/g, lead.company || "uw bedrijf")
           .replace(/\{title\}/g, lead.title || "")
-        
+
         // Add email signature if configured
         if (userSettings?.email_signature) {
           const signature = userSettings.email_signature
@@ -176,18 +176,20 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           subject: personalizedSubject,
           body: personalizedBody,
           isHtml,
+          label: labelName || undefined,
+          leadId: lead.id,
         }
       })
 
-      // Send emails
-      console.log("Calling sendBatchEmails with label:", labelName || "none");
-      const messageIds = await sendBatchEmails(
-        emails, 
-        labelName || undefined,
+      // Send emails using new emailService
+      console.log("Calling emailService.sendBatchEmails with label:", labelName || "none");
+      const results = await emailService.sendBatchEmails(
+        emails,
         (current, total, success, failed) => {
           setSendingProgress({ current, total, success, failed })
         }
       )
+      const messageIds = results.map(r => r.messageId)
       console.log("Batch send completed. Message IDs:", messageIds);
 
       // Increment email usage counter for successful sends (user-centric)

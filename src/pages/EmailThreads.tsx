@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Mail, RefreshCw, Loader2, AlertCircle, Send, Sparkles, Trash2, X } from "lucide-react";
-import { getGmailLabels, getRepliesByLabel, getEmailsByLabel, sendEmail, deleteGmailLabel, type Email } from "@/lib/api/gmail";
+import { emailService, type Email } from "@/lib/api/email";
 import { generateSalesReply, type EmailReplyContext, analyzeSentiment } from "@/lib/api/claude-secure";
 import { isAuthenticationError, reAuthenticateWithGoogle } from "@/lib/api/reauth";
 import { formatRelativeTime } from "@/lib/utils/formatters";
@@ -56,7 +56,7 @@ export function EmailThreads() {
 
   const loadLabels = async () => {
     try {
-      const labels = await getGmailLabels();
+      const labels = await emailService.getLabels();
       
       // Filter systeemlabels - alleen user-created labels tonen
       const systemLabelPrefixes = ['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT', 'CHAT', 'CATEGORY_'];
@@ -91,11 +91,11 @@ export function EmailThreads() {
     setIsLoading(true);
     try {
       // Fetch ALL emails with the label (read + unread)
-      const sent = await getEmailsByLabel(selectedLabel, 100);
+      const sent = await emailService.getEmailsByLabel(selectedLabel, 100);
       setSentEmails(sent);
 
       // Haal reacties op emails met dit label (zonder sentiment analyse)
-      const repliesData = await getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
+      const repliesData = await emailService.getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
       setReplies(repliesData);
       
       setLastRefresh(new Date());
@@ -219,7 +219,7 @@ export function EmailThreads() {
     }
 
     try {
-      await deleteGmailLabel(labelId);
+      await emailService.deleteLabel(labelId);
       toast.success("Label deleted", {
         description: `The label "${labelName}" has been deleted successfully`
       });
@@ -413,12 +413,12 @@ export function EmailThreads() {
       const fromMatch = selectedEmail.from.match(/<(.+)>/);
       const recipientEmail = fromMatch ? fromMatch[1] : selectedEmail.from;
 
-      await sendEmail(
-        recipientEmail,
-        replySubject,
-        replyBody,
-        selectedLabel // Add label to sent reply
-      );
+      await emailService.sendEmail({
+        to: recipientEmail,
+        subject: replySubject,
+        body: replyBody,
+        label: selectedLabel // Add label to sent reply
+      });
 
       toast.success(`Reply sent to ${recipientEmail}`);
       setIsReplyDialogOpen(false);
