@@ -25,6 +25,7 @@ import { EditLeadDialog } from "@/components/EditLeadDialog"
 import { LeadsFilterSidebar } from "@/components/LeadsFilterSidebar"
 import { ImportLeadsDialog } from "@/components/ImportLeadsDialog"
 import { BulkEmailDialog } from "@/components/BulkEmailDialog"
+import { GenerateLeadsDialog } from "@/components/GenerateLeadsDialog"
 import { getDailyUsage, getTimeUntilReset, type DailyUsage } from "@/lib/api/usageLimits"
 import type { Lead, LeadStatus, Sentiment } from "@/types/crm"
 import { formatRelativeTime, getStatusVariant } from "@/lib/utils/formatters"
@@ -239,6 +240,11 @@ export function Leads() {
                     Delete {selectedLeads.size} Lead{selectedLeads.size !== 1 ? "s" : ""}
                   </Button>
                 </>
+              )}
+              {user && (
+                <GenerateLeadsDialog
+                  onLeadsGenerated={refetch}
+                />
               )}
               <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="mr-2 h-4 w-4" />
