@@ -86,7 +86,7 @@ export function WorkflowHub() {
         supabase.from('email_templates').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('activities').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('type', 'email'),
-        supabase.from('meetings').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('calendly_meetings').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         isCalendlyConnected().catch(() => false),
         getDailyUsage().catch(() => null)
       ])
@@ -112,7 +112,7 @@ export function WorkflowHub() {
           id: 'templates',
           number: 1,
           title: 'Create Email Template',
-          description: 'Use AI to generate personalized cold email templates',
+          description: 'Use AI to generate personalised cold email templates',
           icon: FileText,
           status: templatesCount > 0 ? 'completed' : 'current',
           action: templatesCount > 0 ? 'Manage Templates' : 'Create Template',
@@ -136,7 +136,7 @@ export function WorkflowHub() {
           id: 'send',
           number: 3,
           title: 'Send Outreach',
-          description: 'Send personalized emails to your leads',
+          description: 'Send personalised emails to your leads',
           icon: Send,
           status: leadsCount === 0 ? 'locked' : emailsSent > 0 ? 'completed' : 'current',
           action: emailsSent > 0 ? 'Send More' : 'Start Sending',

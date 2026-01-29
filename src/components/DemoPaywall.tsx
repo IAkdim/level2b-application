@@ -37,7 +37,7 @@ export function DemoPaywall({ trigger = 'limit_reached', lockedFeature }: DemoPa
     {
       icon: Mail,
       title: 'Unlimited Cold Emails',
-      description: 'Send personalized outreach at scale',
+      description: 'Send personalised outreach at scale',
       demoLimit: `${demoUsage.emails_limit} email`,
     },
     {

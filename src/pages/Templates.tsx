@@ -516,7 +516,7 @@ export default function Templates() {
                 Create Your First Email Template
               </h3>
               <p className="text-muted-foreground mb-6">
-                Use AI to generate personalized cold email templates that convert. 
+                Use AI to generate personalised cold email templates that convert. 
                 This is the first step in your outreach workflow.
               </p>
               
@@ -721,7 +721,7 @@ export default function Templates() {
               </Label>
               <Input
                 id="quick_company_name"
-                value={quickSettings.company_name}
+                value={quickSettings.company_name || ''}
                 onChange={(e) => setQuickSettings({ ...quickSettings, company_name: e.target.value })}
                 placeholder="e.g. Level2B Solutions"
               />
@@ -733,7 +733,7 @@ export default function Templates() {
               </Label>
               <Textarea
                 id="quick_product_service"
-                value={quickSettings.product_service}
+                value={quickSettings.product_service || ''}
                 onChange={(e) => setQuickSettings({ ...quickSettings, product_service: e.target.value })}
                 placeholder="Brief overview of what you offer"
                 rows={3}
@@ -746,7 +746,7 @@ export default function Templates() {
               </Label>
               <Input
                 id="quick_target_audience"
-                value={quickSettings.target_audience}
+                value={quickSettings.target_audience || ''}
                 onChange={(e) => setQuickSettings({ ...quickSettings, target_audience: e.target.value })}
                 placeholder="e.g. B2B SaaS companies with 10-50 employees"
               />

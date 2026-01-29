@@ -48,7 +48,7 @@ export function ThankYou() {
     {
       icon: Mail,
       title: 'Create email templates',
-      description: 'Generate personalized cold email copy',
+      description: 'Generate personalised cold email copy',
       href: '/outreach/templates',
     },
     {

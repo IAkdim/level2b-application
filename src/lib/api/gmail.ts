@@ -55,7 +55,7 @@ export interface Email {
 }
 
 /**
- * Haal de Gmail access token op van de huidige gebruiker
+ * Get the Gmail access token for the current user
  */
 async function getGmailAccessToken(): Promise<string | null> {
   try {
@@ -103,15 +103,15 @@ export async function checkGmailAuthentication(): Promise<void> {
 }
 
 /**
- * Decode base64url gecodeerde string
+ * Decode base64url encoded string
  */
 function decodeBase64Url(str: string): string {
   try {
-    // Vervang base64url characters met base64
+    // Replace base64url characters with base64
     const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
     // Decode base64
     const decoded = atob(base64)
-    // Decode URI component voor speciale characters
+    // Decode URI component for special characters
     return decodeURIComponent(escape(decoded))
   } catch (error) {
     console.error("Error decoding base64:", error)
@@ -120,15 +120,15 @@ function decodeBase64Url(str: string): string {
 }
 
 /**
- * Haal email body op uit Gmail message payload
+ * Extract email body from Gmail message payload
  */
 function getEmailBody(payload: GmailMessage['payload']): string {
-  // Probeer eerst de directe body
+  // Try direct body first
   if (payload.body?.data) {
     return decodeBase64Url(payload.body.data)
   }
   
-  // Zoek in parts voor text/plain of text/html
+  // Search in parts for text/plain or text/html
   if (payload.parts) {
     for (const part of payload.parts) {
       if (part.mimeType === 'text/plain' && part.body?.data) {
@@ -148,7 +148,7 @@ function getEmailBody(payload: GmailMessage['payload']): string {
 }
 
 /**
- * Haal een header waarde op uit de email
+ * Get a header value from the email
  */
 function getHeader(headers: Array<{ name: string; value: string }>, name: string): string {
   const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase())
@@ -156,10 +156,10 @@ function getHeader(headers: Array<{ name: string; value: string }>, name: string
 }
 
 /**
- * Haal emails op met een specifiek label
- * @param labelName - De naam van het Gmail label (bijv. "INBOX", "SENT", of een custom label)
- * @param maxResults - Maximum aantal emails om op te halen (standaard 10)
- * @returns Array van email objecten
+ * Fetch emails with a specific label
+ * @param labelName - The name of the Gmail label (e.g., "INBOX", "SENT", or a custom label)
+ * @param maxResults - Maximum number of emails to fetch (default 10)
+ * @returns Array of email objects
  */
 export async function getEmailsByLabel(
   labelName: string,
@@ -174,11 +174,11 @@ export async function getEmailsByLabel(
     
     console.log("Fetching emails with label:", labelName);
     
-    // Bereken datum van 24 uur geleden
+    // Calculate date from 24 hours ago
     const afterDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
     
-    // Stap 1: Zoek eerst het label ID op basis van de naam
+    // Step 1: Find the label ID based on the name
     const labelsResponse = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/labels',
       {
@@ -206,7 +206,7 @@ export async function getEmailsByLabel(
     
     console.log(`Found label "${labelName}" with ID:`, matchingLabel.id);
     
-    // Stap 2: Haal message IDs op met het label (laatste 24 uur)
+    // Step 2: Get message IDs with the label (last 24 hours)
     const query = encodeURIComponent(`after:${afterTimestamp}`)
     const listResponse = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${matchingLabel.id}&q=${query}&maxResults=${maxResults}`,
@@ -229,7 +229,7 @@ export async function getEmailsByLabel(
       return []
     }
     
-    // Stap 3: Haal details op voor elke message
+    // Step 3: Get details for each message
     const emailPromises = listData.messages.map(async (msg: { id: string }) => {
       const detailResponse = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
@@ -290,10 +290,10 @@ export async function getEmailsByLabel(
 
 /**
  * Fetch only new (unread) emails with a specific label
- * @param labelName - De naam van het Gmail label (bijv. "INBOX", "SENT", of een custom label)
- * @param maxResults - Maximum aantal emails om op te halen (standaard 10)
- * @param markAsRead - Markeer emails automatisch als gelezen na ophalen (standaard true)
- * @returns Array van ongelezen email objecten
+ * @param labelName - The name of the Gmail label (e.g., "INBOX", "SENT", or a custom label)
+ * @param maxResults - Maximum number of emails to fetch (default 10)
+ * @param markAsRead - Automatically mark emails as read after fetching (default true)
+ * @returns Array of unread email objects
  */
 export async function getUnreadEmailsByLabel(
   labelName: string,
@@ -309,7 +309,7 @@ export async function getUnreadEmailsByLabel(
     
     console.log("Fetching unread emails with label:", labelName);
     
-    // Stap 1: Zoek eerst het label ID op basis van de naam
+    // Step 1: Find the label ID based on the name
     const labelsResponse = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/labels',
       {
@@ -337,7 +337,7 @@ export async function getUnreadEmailsByLabel(
     
     console.log(`Found label "${labelName}" with ID:`, matchingLabel.id);
     
-    // Stap 2: Haal ongelezen message IDs op met het label
+    // Step 2: Get unread message IDs with the label
     const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${matchingLabel.id}&maxResults=${maxResults}`;
     console.log("Gmail API URL:", url);
     
@@ -361,7 +361,7 @@ export async function getUnreadEmailsByLabel(
       return []
     }
     
-    // Stap 2: Haal details op voor elke message
+    // Step 3: Get details for each message
     const emailPromises = listData.messages.map(async (msg: { id: string }) => {
       const detailResponse = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
@@ -417,11 +417,11 @@ export async function getUnreadEmailsByLabel(
 }
 
 /**
- * Haal emails op die na een bepaalde datum zijn ontvangen met een specifiek label
- * @param labelName - De naam van het Gmail label
- * @param afterDate - Datum waarna emails moeten zijn ontvangen
- * @param maxResults - Maximum aantal emails om op te halen (standaard 10)
- * @returns Array van email objecten
+ * Fetch emails received after a specific date with a specific label
+ * @param labelName - The name of the Gmail label
+ * @param afterDate - Date after which emails must be received
+ * @param maxResults - Maximum number of emails to fetch (default 10)
+ * @returns Array of email objects
  */
 export async function getRecentEmailsByLabel(
   labelName: string,
@@ -435,10 +435,10 @@ export async function getRecentEmailsByLabel(
       throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
-    // Format date as YYYY/MM/DD voor Gmail query
+    // Format date as YYYY/MM/DD for Gmail query
     const dateStr = afterDate.toISOString().split('T')[0].replace(/-/g, '/')
     
-    // Stap 1: Haal message IDs op die na de datum zijn en het label hebben
+    // Step 1: Get message IDs after the date with the label
     const query = encodeURIComponent(`after:${dateStr} label:${labelName}`)
     const listResponse = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${maxResults}`,
@@ -460,7 +460,7 @@ export async function getRecentEmailsByLabel(
       return []
     }
     
-    // Stap 2: Haal details op voor elke message
+    // Step 2: Get details for each message
     const emailPromises = listData.messages.map(async (msg: { id: string }) => {
       const detailResponse = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
@@ -507,12 +507,12 @@ export async function getRecentEmailsByLabel(
 }
 
 /**
- * Verstuur een email via Gmail API
- * @param to - Ontvanger email adres
- * @param subject - Onderwerp van de email
- * @param body - Body van de email (plain text of HTML)
- * @param labelName - Optioneel: Label om aan de verzonden email toe te voegen (bijv. "Outreach2024")
- * @param isHtml - Of de body HTML is (standaard false)
+ * Send an email via Gmail API
+ * @param to - Recipient email address
+ * @param subject - Subject of the email
+ * @param body - Body of the email (plain text or HTML)
+ * @param labelName - Optional: Label to add to the sent email (e.g., "Outreach2024")
+ * @param isHtml - Whether the body is HTML (default false)
  * @param enableTracking - Enable open tracking (default true, converts to HTML if needed)
  * @returns Object with message ID and tracking info
  */
@@ -551,7 +551,7 @@ export async function sendEmail(
     
     console.log("Access token retrieved successfully");
     
-    // Haal huidige gebruiker email op
+    // Get current user email
     const { data: { user } } = await supabase.auth.getUser()
     const fromEmail = user?.email || ""
     
@@ -572,7 +572,7 @@ export async function sendEmail(
       isHtml: prepared.isHtml 
     });
     
-    // Maak email in RFC 2822 format with tracking-enabled body
+    // Create email in RFC 2822 format with tracking-enabled body
     const emailLines = [
       `From: ${fromEmail}`,
       `To: ${to}`,
@@ -593,7 +593,7 @@ export async function sendEmail(
     
     console.log("Email encoded, sending to Gmail API...");
     
-    // Verstuur de email
+    // Send the email
     const response = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
       {
@@ -621,15 +621,15 @@ export async function sendEmail(
     
     console.log("Email sent successfully, message ID:", messageId, "tracking ID:", prepared.trackingId);
     
-    // Voeg label toe indien opgegeven
+    // Add label if specified
     if (labelName && messageId) {
       console.log("Adding label to message:", labelName);
-      // Eerst checken of label bestaat, anders aanmaken
+      // First check if label exists, otherwise create it
       const labelId = await ensureLabelExists(labelName)
       
       if (labelId) {
         await addLabelToMessage(messageId, labelId)
-        console.log(`Label '${labelName}' toegevoegd aan verzonden email`)
+        console.log(`Label '${labelName}' added to sent email`)
       }
     }
     
@@ -675,11 +675,11 @@ export async function sendEmail(
 }
 
 /**
- * Verstuur meerdere emails in batch
- * @param emails - Array van email objecten met to, subject, body
+ * Send multiple emails in batch
+ * @param emails - Array of email objects with to, subject, body
  * @param labelName - Optional: Label to add to all sent emails
  * @param onProgress - Optional: Callback function called after each email is sent
- * @returns Array van message IDs van verzonden emails
+ * @returns Array of message IDs of sent emails
  */
 export async function sendBatchEmails(
   emails: Array<{
@@ -697,7 +697,7 @@ export async function sendBatchEmails(
     
     console.log(`Starting batch send of ${emails.length} emails with label: ${labelName || 'none'}`);
     
-    // Verstuur emails sequentieel om rate limiting te voorkomen
+    // Send emails sequentially to avoid rate limiting
     for (let i = 0; i < emails.length; i++) {
       const email = emails[i];
       try {
@@ -713,9 +713,9 @@ export async function sendBatchEmails(
         
         if (messageId) {
           messageIds.push(messageId)
-          console.log(`✓ Email verzonden naar ${email.to}, message ID: ${messageId}`)
+          console.log(`✓ Email sent to ${email.to}, message ID: ${messageId}`)
         } else {
-          console.error(`✗ Email naar ${email.to} returned null message ID`)
+          console.error(`✗ Email to ${email.to} returned null message ID`)
           failedCount++
         }
         
@@ -724,7 +724,7 @@ export async function sendBatchEmails(
           onProgress(i + 1, emails.length, messageIds.length, failedCount)
         }
         
-        // Kleine delay tussen emails om rate limiting te voorkomen
+        // Small delay between emails to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100))
         
       } catch (error) {
@@ -750,8 +750,8 @@ export async function sendBatchEmails(
 }
 
 /**
- * Zorg ervoor dat een label bestaat, maak het aan als het niet bestaat
- * @param labelName - Naam van het label
+ * Ensure a label exists, create it if it doesn't
+ * @param labelName - Name of the label
  * @returns Label ID
  */
 async function ensureLabelExists(labelName: string): Promise<string | null> {
@@ -765,13 +765,13 @@ async function ensureLabelExists(labelName: string): Promise<string | null> {
     // Fetch all labels
     const labels = await getGmailLabels()
     
-    // Check of label al bestaat
+    // Check if label already exists
     const existingLabel = labels.find(l => l.name === labelName)
     if (existingLabel) {
       return existingLabel.id
     }
     
-    // Label bestaat niet, maak het aan
+    // Label doesn't exist, create it
     const response = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/labels',
       {
@@ -795,7 +795,7 @@ async function ensureLabelExists(labelName: string): Promise<string | null> {
     }
     
     const data = await response.json()
-    console.log(`Label '${labelName}' aangemaakt met ID: ${data.id}`)
+    console.log(`Label '${labelName}' created with ID: ${data.id}`)
     return data.id
     
   } catch (error) {
@@ -805,9 +805,9 @@ async function ensureLabelExists(labelName: string): Promise<string | null> {
 }
 
 /**
- * Voeg een label toe aan een message
- * @param messageId - ID van het bericht
- * @param labelId - ID van het label
+ * Add a label to a message
+ * @param messageId - ID of the message
+ * @param labelId - ID of the label
  * @returns Boolean indicating success
  */
 async function addLabelToMessage(messageId: string, labelId: string): Promise<boolean> {
@@ -847,9 +847,9 @@ async function addLabelToMessage(messageId: string, labelId: string): Promise<bo
 }
 
 /**
- * Haal reacties op een verzonden email op (emails in dezelfde thread)
- * @param threadId - Thread ID van de originele email
- * @returns Array van emails in de thread
+ * Get replies to a sent email (emails in the same thread)
+ * @param threadId - Thread ID of the original email
+ * @returns Array of emails in the thread
  */
 export async function getEmailThread(threadId: string): Promise<Email[]> {
   try {
@@ -895,7 +895,7 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
       }
     })
     
-    // Sorteer op datum (oudste eerst)
+    // Sort by date (oldest first)
     return emails.sort((a, b) => a.date.getTime() - b.date.getTime())
     
   } catch (error) {
@@ -906,10 +906,10 @@ export async function getEmailThread(threadId: string): Promise<Email[]> {
 
 /**
  * Fetch all replies to emails with a specific label
- * @param labelName - Label naam om reacties voor op te halen
+ * @param labelName - Label name to fetch replies for
  * @param onlyUnread - Only fetch unread replies (default true)
- * @param analyzeSentiments - Voer sentiment analyse uit op reacties (standaard true)
- * @returns Array van emails die reacties zijn op gelabelde emails
+ * @param analyzeSentiments - Perform sentiment analysis on replies (default true)
+ * @returns Array of emails that are replies to labelled emails
  */
 export async function getRepliesByLabel(
   labelName: string,
@@ -923,7 +923,7 @@ export async function getRepliesByLabel(
       throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
-    // Haal huidige gebruiker email op
+    // Get current user email
     const { data: { user } } = await supabase.auth.getUser()
     const myEmail = user?.email?.toLowerCase() || ""
     
@@ -957,10 +957,10 @@ export async function getRepliesByLabel(
         const isSentByMe = email.from.toLowerCase().includes(myEmail)
         const isInbox = email.labelIds.includes('INBOX')
         
-        // Een reply is:
-        // 1. NIET het originele email met het label
-        // 2. NIET van jou verstuurd (check from address)
-        // 3. IN je inbox (dus ontvangen)
+        // A reply is:
+        // 1. NOT the original email with the label
+        // 2. NOT sent by you (check from address)
+        // 3. IN your inbox (so received)
         // 4. Optional: only unread
         const isReply = !hasLabel && !isSentByMe && isInbox && (!onlyUnread || isUnread)
         
@@ -976,7 +976,7 @@ export async function getRepliesByLabel(
     
     console.log("Total replies found:", allReplies.length);
     
-    // Sorteer op datum (nieuwste eerst)
+    // Sort by date (newest first)
     const sortedReplies = allReplies.sort((a, b) => b.date.getTime() - a.date.getTime())
     
     // Remove duplicates: keep only the latest email per thread
@@ -990,7 +990,7 @@ export async function getRepliesByLabel(
     
     const uniqueReplies = Array.from(uniqueThreads.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
     
-    // Voer sentiment analyse uit als gewenst
+    // Perform sentiment analysis if requested
     if (analyzeSentiments && uniqueReplies.length > 0) {
       console.log(`Analyzing sentiment for ${uniqueReplies.length} replies...`);
       
@@ -1015,8 +1015,8 @@ export async function getRepliesByLabel(
 }
 
 /**
- * Markeer een email als gelezen
- * @param messageId - De ID van het bericht om als gelezen te markeren
+ * Mark an email as read
+ * @param messageId - The ID of the message to mark as read
  * @returns Boolean indicating success
  */
 export async function markEmailAsRead(messageId: string): Promise<boolean> {
@@ -1056,8 +1056,8 @@ export async function markEmailAsRead(messageId: string): Promise<boolean> {
 }
 
 /**
- * Markeer meerdere emails als gelezen
- * @param messageIds - Array van message IDs om als gelezen te markeren
+ * Mark multiple emails as read
+ * @param messageIds - Array of message IDs to mark as read
  * @returns Number of successfully marked emails
  */
 export async function markEmailsAsRead(messageIds: string[]): Promise<number> {
@@ -1068,7 +1068,7 @@ export async function markEmailsAsRead(messageIds: string[]): Promise<number> {
       throw new AuthenticationError("Google re-authentication required. Please re-connect your Gmail account.")
     }
     
-    // Gebruik batchModify voor efficiëntie (max 1000 messages per call)
+    // Use batchModify for efficiency (max 1000 messages per call)
     const response = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify',
       {

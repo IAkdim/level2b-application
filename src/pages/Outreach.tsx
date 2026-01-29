@@ -40,7 +40,7 @@ export default function OutreachLayout() {
               Outreach
             </h1>
             <p className="text-muted-foreground mt-1">
-              Create templates, add leads, and send personalized emails
+              Create templates, add leads, and send personalised emails
             </p>
           </div>
         </div>

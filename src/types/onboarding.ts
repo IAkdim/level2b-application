@@ -78,13 +78,13 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 2,
     title: "About your business",
-    description: "Tell us about your company so we can personalize your experience",
+    description: "Tell us about your company so we can personalise your experience",
     fields: ['business_type', 'company_size'],
   },
   {
     id: 3,
     title: "Who are you targeting?",
-    description: "Understanding your ideal customer helps us optimize your outreach",
+    description: "Understanding your ideal customer helps us optimise your outreach",
     fields: ['target_audience', 'industry'],
   },
   {
@@ -246,7 +246,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
   {
     id: 'create_template',
     title: 'Generate Email Template',
-    description: 'Use AI to generate a personalized cold email template.',
+    description: 'Use AI to generate a personalised cold email template.',
     targetSelector: '[data-walkthrough="generate-template-btn"]',
     position: 'bottom',
     action: 'click',

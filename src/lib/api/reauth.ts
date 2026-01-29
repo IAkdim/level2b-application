@@ -17,8 +17,8 @@ export function isAuthenticationError(error: unknown): boolean {
   if (error instanceof AuthenticationError) return true
   if (error instanceof Error) {
     const message = error.message.toLowerCase()
-    return message.includes('niet geautoriseerd') || 
-           message.includes('log opnieuw in') ||
+    return message.includes('not authorised') || 
+           message.includes('sign in again') ||
            message.includes('authentication') ||
            message.includes('unauthorized') ||
            message.includes('401')

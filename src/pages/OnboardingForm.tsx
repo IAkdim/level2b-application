@@ -238,7 +238,7 @@ export function OnboardingForm() {
               className="min-h-[120px] resize-none"
             />
             <p className="text-xs text-muted-foreground">
-              Be specific - this helps us personalize your outreach
+              Be specific - this helps us personalise your outreach
             </p>
           </div>
         )
@@ -341,10 +341,10 @@ export function OnboardingForm() {
             Quick Setup
           </div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Let's personalize Level2B for you
+            Let's personalise Level2B for you
           </h1>
           <p className="text-muted-foreground mt-2">
-            Answer a few questions so we can optimize your experience
+            Answer a few questions so we can optimise your experience
           </p>
         </div>
 
@@ -456,7 +456,7 @@ export function OnboardingForm() {
 
         {/* Privacy note */}
         <p className="text-center text-xs text-muted-foreground mt-8">
-          Your answers help us personalize your experience. 
+          Your answers help us personalise your experience. 
           We never share your data with third parties.
         </p>
       </div>

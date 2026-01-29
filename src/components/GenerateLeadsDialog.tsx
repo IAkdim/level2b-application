@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Sparkles, MapPin, Share2, Loader2 } from "lucide-react"
+import { Sparkles, MapPin, Loader2, CheckCircle2, Mail, Building2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -11,24 +11,35 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
-import { generateLeads, GenerateLeadsParams } from "@/lib/api/leadGenerator"
+import { generateLeads, GenerateLeadsParams, GenerateLeadsResult } from "@/lib/api/leadGenerator"
 import { LeadGeneratorProgress } from "./LeadGeneratorProgress"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface GenerateLeadsDialogProps {
-  userId: string
+  organizationId?: string // Kept for backwards compatibility, not used
   onLeadsGenerated: () => void
 }
 
-export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsDialogProps) {
+interface GenerationSummary {
+  leads: Array<{
+    company: string
+    email: string
+    phone?: string
+  }>
+  totalFound: number
+  duplicatesFiltered: number
+  durationMs: number
+}
+
+export function GenerateLeadsDialog({ onLeadsGenerated }: GenerateLeadsDialogProps) {
   const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [method, setMethod] = useState<'google_maps' | 'social_media'>('google_maps')
+  const [showSummary, setShowSummary] = useState(false)
+  const [summary, setSummary] = useState<GenerationSummary | null>(null)
   const [niche, setNiche] = useState('')
   const [location, setLocation] = useState('')
   const [maxLeads, setMaxLeads] = useState(10)
-  const [emailProvider, setEmailProvider] = useState('gmail.com')
   const [progress, setProgress] = useState({
     current: 0,
     total: 0,
@@ -46,8 +57,8 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
       return
     }
 
-    if (maxLeads < 1 || maxLeads > 10) {
-      toast.error('Number of leads must be between 1 and 10')
+    if (maxLeads < 1 || maxLeads > 50) {
+      toast.error('Number of leads must be between 1 and 50')
       return
     }
 
@@ -60,12 +71,9 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
 
     try {
       const params: GenerateLeadsParams = {
-        method,
         niche,
         location,
         maxLeads,
-        emailProvider: method === 'social_media' ? emailProvider : undefined,
-        userId,
       }
 
       // Simulate progress updates
@@ -75,8 +83,8 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
           
           const newCurrent = prev.current + 1
           const statuses = [
-            'Searching for businesses...',
-            'Analyzing results...',
+            'Searching Google Maps...',
+            'Finding businesses...',
             'Extracting contact information...',
             'Validating leads...',
             'Saving to database...',
@@ -100,19 +108,21 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
         status: 'Complete!',
       })
 
-      // Wait a moment to show completion
-      setTimeout(() => {
-        setGenerating(false)
-        setOpen(false)
-        toast.success(`Successfully generated ${result.leadsGenerated} leads!`)
-        onLeadsGenerated()
-        
-        // Reset form
-        setNiche('')
-        setLocation('')
-        setMaxLeads(10)
-        setProgress({ current: 0, total: 0, status: '' })
-      }, 1500)
+      // Show summary instead of closing immediately
+      setSummary({
+        leads: result.leads.map((lead: any) => ({
+          company: lead.company || lead.name,
+          email: lead.email,
+          phone: lead.phone,
+        })),
+        totalFound: result.meta?.totalFound || result.leadsGenerated,
+        duplicatesFiltered: result.meta?.duplicatesFiltered || 0,
+        durationMs: result.meta?.durationMs || 0,
+      })
+      
+      setGenerating(false)
+      setShowSummary(true)
+      onLeadsGenerated()
 
     } catch (error) {
       setGenerating(false)
@@ -121,55 +131,132 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
     }
   }
 
+  const handleClose = () => {
+    setOpen(false)
+    setShowSummary(false)
+    setSummary(null)
+    setNiche('')
+    setLocation('')
+    setMaxLeads(10)
+    setProgress({ current: 0, total: 0, status: '' })
+  }
+
+  const handleNewSearch = () => {
+    setShowSummary(false)
+    setSummary(null)
+    setProgress({ current: 0, total: 0, status: '' })
+  }
+
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) handleClose()
+        else setOpen(true)
+      }}>
         <DialogTrigger asChild>
-          <Button className="gap-2">
+          <Button className="gap-2" data-walkthrough="generate-lead-btn">
             <Sparkles className="h-4 w-4" />
             Generate Leads
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Generate Leads with AI</DialogTitle>
-            <DialogDescription>
-              Use AI to automatically find and collect leads from Google Maps or social media
-            </DialogDescription>
-          </DialogHeader>
+          {showSummary && summary ? (
+            // Summary View
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Lead Generation Complete!
+                </DialogTitle>
+                <DialogDescription>
+                  Found {summary.leads.length} leads with email addresses
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="bg-muted rounded-lg p-3">
+                    <div className="text-2xl font-bold text-green-600">{summary.leads.length}</div>
+                    <div className="text-xs text-muted-foreground">Leads Saved</div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <div className="text-2xl font-bold">{summary.totalFound}</div>
+                    <div className="text-xs text-muted-foreground">Places Found</div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <div className="text-2xl font-bold text-muted-foreground">{summary.duplicatesFiltered}</div>
+                    <div className="text-xs text-muted-foreground">Duplicates</div>
+                  </div>
+                </div>
+
+                {/* Time taken */}
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  Completed in {(summary.durationMs / 1000).toFixed(1)} seconds
+                </div>
+
+                {/* Leads List */}
+                {summary.leads.length > 0 && (
+                  <div className="border rounded-lg">
+                    <div className="bg-muted px-3 py-2 border-b">
+                      <h4 className="font-medium text-sm">Emails Found</h4>
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                      <div className="divide-y">
+                        {summary.leads.map((lead, index) => (
+                          <div key={index} className="px-3 py-2 hover:bg-muted/50">
+                            <div className="flex items-start gap-2">
+                              <Building2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-sm truncate">{lead.company}</div>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Mail className="h-3 w-3" />
+                                  <span className="truncate">{lead.email}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {summary.leads.length === 0 && (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No emails could be found from the businesses' websites.</p>
+                    <p className="text-sm">Try a different niche or location.</p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={handleNewSearch}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate More
+                  </Button>
+                  <Button className="flex-1" onClick={handleClose}>
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            // Form View
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Generate Leads from Google Maps
+                </DialogTitle>
+                <DialogDescription>
+                  Find businesses in a specific location and extract contact info from their websites
+                </DialogDescription>
+              </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Method Selection */}
-            <div className="space-y-3">
-              <Label>Generation Method</Label>
-              <RadioGroup value={method} onValueChange={(v: string) => setMethod(v as 'google_maps' | 'social_media')}>
-                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-muted/50 cursor-pointer">
-                  <RadioGroupItem value="google_maps" id="google_maps" />
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="google_maps" className="cursor-pointer flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Google Maps
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Find businesses in a specific location and extract contact info from their websites
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-muted/50 cursor-pointer">
-                  <RadioGroupItem value="social_media" id="social_media" />
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="social_media" className="cursor-pointer flex items-center gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Social Media
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Search LinkedIn and Twitter for professionals with email addresses
-                    </p>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
-
             {/* Niche Input */}
             <div className="space-y-2">
               <Label htmlFor="niche">Niche / Industry</Label>
@@ -192,33 +279,20 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
               />
             </div>
 
-            {/* Email Provider (Social Media only) */}
-            {method === 'social_media' && (
-              <div className="space-y-2">
-                <Label htmlFor="emailProvider">Email Provider</Label>
-                <Input
-                  id="emailProvider"
-                  placeholder="e.g. gmail.com, outlook.com, yahoo.com"
-                  value={emailProvider}
-                  onChange={(e) => setEmailProvider(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  We'll search for emails with this domain (e.g. @gmail.com)
-                </p>
-              </div>
-            )}
-
             {/* Max Leads */}
             <div className="space-y-2">
-              <Label htmlFor="maxLeads">Number of Leads (max 10)</Label>
+              <Label htmlFor="maxLeads">Number of Leads (max 50)</Label>
               <Input
                 id="maxLeads"
                 type="number"
                 min="1"
-                max="10"
+                max="50"
                 value={maxLeads}
-                onChange={(e) => setMaxLeads(parseInt(e.target.value) || 10)}
+                onChange={(e) => setMaxLeads(Math.min(50, Math.max(1, parseInt(e.target.value) || 10)))}
               />
+              <p className="text-xs text-muted-foreground">
+                Higher numbers take longer but support pagination for more results
+              </p>
             </div>
 
             {/* Generate Button */}
@@ -241,6 +315,8 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
               )}
             </Button>
           </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -250,7 +326,7 @@ export function GenerateLeadsDialog({ userId, onLeadsGenerated }: GenerateLeadsD
         current={progress.current}
         total={progress.total}
         status={progress.status}
-        method={method}
+        method="google_maps"
       />
     </>
   )
