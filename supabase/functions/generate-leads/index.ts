@@ -1,303 +1,121 @@
-/**
- * Lead Generation Edge Function v2.2
- * 
- * Google Maps Only - Production-ready implementation with:
- * - Email scraping from business websites (the main feature!)
- * - Retry logic with exponential backoff
- * - Duplicate detection before saving
- * - Business status filtering (excludes closed businesses)
- * - Comprehensive logging
- * - Optimized for Edge Function CPU limits
- * 
- * @version 2.2.0
- * @updated 2026-01-27
- */
-
-import { serve } from "https://deno.land/std@0.220.0/http/server.ts"
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// =============================================================================
-// CONFIGURATION
-// =============================================================================
-
-const CONFIG = {
-  // Timeouts - optimized for Edge Function CPU limits
-  FUNCTION_TIMEOUT_MS: 50000,
-  SCRAPE_TIMEOUT_MS: 3000,  // 3 seconds per website
-  API_TIMEOUT_MS: 8000,
-  
-  // Retry settings
-  MAX_RETRIES: 2,
-  BASE_DELAY_MS: 500,
-  RETRYABLE_STATUSES: ['OVER_QUERY_LIMIT', 'UNKNOWN_ERROR'],
-  RETRYABLE_HTTP_CODES: [429, 500, 502, 503, 504],
-  
-  // Lead quality
-  MIN_COMPANY_NAME_LENGTH: 2,
-  
-  // Email scraping paths to try (in order of priority)
-  CONTACT_PATHS: ['', '/contact', '/kontakt', '/about', '/contact-us', '/contactus'],
-  
-  // Email blacklist patterns
-  EMAIL_BLACKLIST: [
-    'example.com', 'test.com', 'localhost', 'domain.com',
-    'noreply', 'no-reply', 'donotreply', 'mailer-daemon',
-    'postmaster', 'webmaster', 'hostmaster', 'support@google',
-    'wixpress.com', 'squarespace.com', 'wordpress.com',
-    'sentry.io', 'github.com', 'placeholder', '@sentry.',
-    'schema.org', 'w3.org', 'facebook.com', 'twitter.com',
-    'instagram.com', 'linkedin.com', 'privacy@', 'gdpr@',
-    'abuse@', 'spam@', 'unsubscribe@', 'bounce@'
-  ],
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
 interface GenerateLeadsRequest {
+  method: 'google_maps' | 'social_media'
   niche: string
   location: string
   maxLeads: number
+  emailProvider?: string
+  userId: string
 }
 
 interface Lead {
   company: string
   contact_name?: string
-  email: string  // Required - the main point of lead generation
+  email?: string
   phone?: string
   website?: string
-  address?: string
+  linkedin_url?: string
   source: string
-  place_id?: string
-  business_status?: string
-  quality_score?: number
 }
-
-interface PlaceResult {
-  place_id: string
-  name: string
-  business_status?: string
-  website?: string
-  phone?: string
-  address?: string
-}
-
-interface LogContext {
-  [key: string]: unknown
-}
-
-// =============================================================================
-// LOGGING
-// =============================================================================
-
-function log(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: LogContext) {
-  const entry = { timestamp: new Date().toISOString(), level, message, ...context }
-  console.log(JSON.stringify(entry))
-}
-
-// =============================================================================
-// RETRY UTILITIES
-// =============================================================================
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  context: string,
-  maxRetries: number = CONFIG.MAX_RETRIES
-): Promise<T> {
-  let lastError: Error | null = null
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn()
-    } catch (error) {
-      lastError = error as Error
-      const errorMessage = (error as Error)?.message || String(error)
-      
-      const isRetryable = CONFIG.RETRYABLE_STATUSES.some(s => errorMessage.includes(s)) ||
-        ((error as any)?.status && CONFIG.RETRYABLE_HTTP_CODES.includes((error as any).status))
-      
-      if (!isRetryable || attempt === maxRetries) {
-        log('error', `${context} failed after ${attempt} attempts`, { error: errorMessage })
-        throw error
-      }
-      
-      const delay = CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1) + Math.random() * 500
-      log('warn', `${context} failed, retrying in ${Math.round(delay)}ms`, { attempt, maxRetries, error: errorMessage })
-      await new Promise(r => setTimeout(r, delay))
-    }
-  }
-  
-  throw lastError
-}
-
-async function fetchWithTimeout(
-  url: string, 
-  options: RequestInit = {}, 
-  timeoutMs: number = CONFIG.API_TIMEOUT_MS
-): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  
-  try {
-    return await fetch(url, { ...options, signal: controller.signal })
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-// =============================================================================
-// ENVIRONMENT HELPERS
-// =============================================================================
-
-function getRequiredEnv(key: string): string {
-  const value = Deno.env.get(key)
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`)
-  }
-  return value
-}
-
-// =============================================================================
-// MAIN HANDLER
-// =============================================================================
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   const startTime = Date.now()
   let userId: string | undefined
-  let supabaseAdmin: SupabaseClient | undefined
-
-  // Function timeout protection
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Function timeout exceeded')), CONFIG.FUNCTION_TIMEOUT_MS)
-  })
 
   try {
     const supabaseClient = createClient(
-      getRequiredEnv('SUPABASE_URL'),
-      getRequiredEnv('SUPABASE_ANON_KEY'),
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     )
 
-    supabaseAdmin = createClient(
-      getRequiredEnv('SUPABASE_URL'),
-      getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY')
+    // Create admin client for rate limiting (uses service role)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data: { user } } = await supabaseClient.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    // Verify authentication
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser()
+
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
     userId = user.id
 
     const body: GenerateLeadsRequest = await req.json()
-    const { niche, location, maxLeads } = body
+    const { method, niche, location, maxLeads, emailProvider } = body
 
-    // Input validation
-    if (!niche?.trim()) throw new Error('Niche is required')
-    if (!location?.trim()) throw new Error('Location is required')
-    if (maxLeads < 1 || maxLeads > 100) throw new Error('maxLeads must be between 1 and 100')
+    console.log('Starting lead generation:', { method, niche, location, maxLeads })
 
-    log('info', 'Starting lead generation', { niche, location, maxLeads, userId })
+    // ✅ RATE LIMITING CHECK
+    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc(
+      'get_hourly_rate_limit',
+      { p_user_id: userId, p_org_id: null }
+    )
 
-    // Rate limiting - check user's daily plan limits
-    let rateLimit: any = null
-    try {
-      const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc(
-        'get_hourly_rate_limit',
-        { p_user_id: userId, p_org_id: null }
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError)
+      throw new Error('Rate limit check failed')
+    }
+
+    const rateLimit = rateLimitData?.[0]
+    if (rateLimit && rateLimit.limit_remaining < maxLeads) {
+      throw new Error(
+        `Rate limit exceeded. You can generate ${rateLimit.limit_remaining} more leads this hour. ` +
+        `Limit resets at ${new Date(rateLimit.hour_start).getHours() + 1}:00.`
       )
-
-      if (!rateLimitError && rateLimitData?.[0]) {
-        rateLimit = rateLimitData[0]
-        log('info', 'Rate limit status', { 
-          dailyLimit: rateLimit.hourly_limit,
-          leadsGenerated: rateLimit.leads_generated,
-          remaining: rateLimit.limit_remaining 
-        })
-
-        if (rateLimit.hourly_limit === 0) {
-          throw new Error(
-            'Lead generation requires an active subscription. Please upgrade your plan to generate leads.'
-          )
-        }
-
-        if (rateLimit.limit_remaining < 1) {
-          throw new Error(
-            `Daily limit reached. Your limit resets at midnight UTC.`
-          )
-        }
-      }
-    } catch (error) {
-      // If rate limiting fails and it's a subscription error, rethrow
-      const errMsg = (error as Error)?.message || ''
-      if (errMsg.includes('subscription') || errMsg.includes('Daily limit')) {
-        throw error
-      }
-      // Otherwise just log and continue (rate limiting is optional)
-      log('warn', 'Rate limit check failed, continuing', { error: errMsg })
     }
 
-    // Generate leads with timeout protection
-    const generatePromise = (async () => {
-      // Get places from Google Maps with details
-      const places = await getPlacesWithDetails(niche, location, maxLeads * 3)  // Get more to filter down
-      log('info', `Found ${places.length} places with websites`, { niche, location })
+    let leads: Lead[] = []
 
-      // Scrape emails from websites (this is the key feature!)
-      const leads = await scrapeEmailsFromPlaces(places, location, maxLeads)
-      log('info', `Found ${leads.length} leads with emails`)
-
-      // Deduplicate against existing leads
-      const { unique, duplicates } = await findDuplicates(leads, userId!, supabaseClient)
-      
-      if (duplicates.length > 0) {
-        log('info', `Filtered ${duplicates.length} duplicate leads`)
-      }
-
-      // Save
-      const savedLeads = await saveLeadsToDatabase(supabaseClient, unique, userId!)
-      return { savedLeads, totalFound: places.length, duplicatesFiltered: duplicates.length }
-    })()
-
-    const { savedLeads, totalFound, duplicatesFiltered } = await Promise.race([generatePromise, timeoutPromise])
-
-    // Increment rate limit counter
-    if (savedLeads.length > 0) {
-      try {
-        await supabaseAdmin.rpc('increment_rate_limit', {
-          p_user_id: userId,
-          p_org_id: null,
-          p_leads_count: savedLeads.length
-        })
-      } catch (error) {
-        log('warn', 'Failed to increment rate limit', { error: (error as Error)?.message })
-      }
+    if (method === 'google_maps') {
+      leads = await generateFromGoogleMaps(niche, location, maxLeads)
+    } else if (method === 'social_media') {
+      leads = await generateFromSocialMedia(niche, location, maxLeads, emailProvider || 'gmail.com')
     }
 
-    // Log API usage for analytics
+    // Save leads to database
+    const savedLeads = await saveLeadsToDatabase(supabaseClient, leads, userId, method)
+
+    // ✅ INCREMENT RATE LIMIT
+    await supabaseAdmin.rpc('increment_rate_limit', {
+      p_user_id: userId,
+      p_org_id: null,
+      p_leads_count: savedLeads.length
+    })
+
+    // ✅ LOG API USAGE (success)
     const duration = Date.now() - startTime
-    try {
-      await logApiUsage(supabaseAdmin, {
-        userId, endpoint: 'generate-leads', method: 'google_maps', leadsRequested: maxLeads,
-        leadsGenerated: savedLeads.length, success: true, durationMs: duration,
-        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
-        userAgent: req.headers.get('user-agent'),
-      })
-    } catch (error) {
-      log('warn', 'Failed to log API usage', { error: (error as Error)?.message })
-    }
-
-    log('info', 'Lead generation completed', { 
-      leadsGenerated: savedLeads.length, totalFound, 
-      duplicatesFiltered, duration_ms: duration 
+    await supabaseAdmin.from('api_usage_logs').insert({
+      user_id: userId,
+      endpoint: 'generate-leads',
+      method: method,
+      leads_requested: maxLeads,
+      leads_generated: savedLeads.length,
+      success: true,
+      duration_ms: duration,
+      ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+      user_agent: req.headers.get('user-agent')
     })
 
     return new Response(
@@ -305,407 +123,321 @@ serve(async (req) => {
         success: true,
         leadsGenerated: savedLeads.length,
         leads: savedLeads,
-        meta: { totalFound, duplicatesFiltered, durationMs: duration }
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
     )
   } catch (error) {
-    const errorMessage = (error as Error)?.message || 'Unknown error'
-    log('error', 'Lead generation failed', { error: errorMessage })
+    console.error('Error generating leads:', error)
 
-    if (userId && supabaseAdmin) {
+    // ✅ LOG API USAGE (failure)
+    if (userId) {
       try {
-        await logApiUsage(supabaseAdmin, {
-          userId, endpoint: 'generate-leads', method: 'google_maps',
-          leadsRequested: 0, leadsGenerated: 0, success: false, errorMessage,
-          durationMs: Date.now() - startTime,
-          ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
-          userAgent: req.headers.get('user-agent'),
+        const supabaseAdmin = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+        
+        const duration = Date.now() - startTime
+        await supabaseAdmin.from('api_usage_logs').insert({
+          user_id: userId,
+          endpoint: 'generate-leads',
+          method: 'unknown',
+          leads_requested: 0,
+          leads_generated: 0,
+          success: false,
+          error_message: error.message || 'Unknown error',
+          duration_ms: duration,
+          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+          user_agent: req.headers.get('user-agent')
         })
       } catch (logError) {
-        log('error', 'Failed to log API usage', { error: (logError as Error)?.message })
+        console.error('Failed to log error:', logError)
       }
     }
 
     return new Response(
-      JSON.stringify({ error: errorMessage, success: false }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      JSON.stringify({
+        error: error.message || 'Failed to generate leads',
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
     )
   }
 })
 
-// =============================================================================
-// GOOGLE PLACES API
-// =============================================================================
-
-async function getPlacesWithDetails(niche: string, location: string, maxResults: number): Promise<PlaceResult[]> {
+async function generateFromGoogleMaps(
+  niche: string,
+  location: string,
+  maxLeads: number
+): Promise<Lead[]> {
+  const leads: Lead[] = []
+  
+  // Google Places API key from environment
   const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
   
   if (!apiKey) {
-    throw new Error('Google Maps API key not configured. Please add GOOGLE_MAPS_API_KEY in Supabase Edge Function secrets.')
+    console.warn('No Google Maps API key found, using mock data')
+    // Return mock data for testing
+    return generateMockLeads(niche, location, maxLeads, 'google_maps')
   }
 
-  const searchQuery = `${niche} in ${location}`
-  
-  // Using Places API (New) - Text Search endpoint
-  const url = 'https://places.googleapis.com/v1/places:searchText'
-  
-  const requestBody = {
-    textQuery: searchQuery,
-    maxResultCount: Math.min(20, maxResults), // Max 20 per request
-    languageCode: 'en',
-  }
-  
-  const data = await withRetry(async () => {
-    const response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.businessStatus,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress',
-      },
-      body: JSON.stringify(requestBody),
-    })
+  try {
+    // Step 1: Text search for businesses
+    const searchQuery = `${niche} in ${location}`
+    const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${apiKey}`
     
-    if (!response.ok) {
-      const errorText = await response.text()
-      let errorMessage = `HTTP ${response.status}`
-      try {
-        const errorJson = JSON.parse(errorText)
-        errorMessage = errorJson.error?.message || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      const err = new Error(`Google Places API error: ${errorMessage}`)
-      ;(err as any).status = response.status
-      throw err
+    const searchResponse = await fetch(searchUrl)
+    const searchData = await searchResponse.json()
+
+    if (searchData.status !== 'OK' || !searchData.results) {
+      throw new Error(`Google Maps search failed: ${searchData.status}. Please check your API key and quota.`)
     }
-    
-    return await response.json()
-  }, 'Places Text Search')
-  
-  if (!data.places?.length) return []
-  
-  // Filter and map results - only keep places with websites
-  return data.places
-    .filter((p: any) => 
-      p.websiteUri && // Must have a website to scrape for email
-      p.businessStatus !== 'CLOSED_PERMANENTLY' &&
-      p.businessStatus !== 'CLOSED_TEMPORARILY' &&
-      p.displayName?.text?.length >= CONFIG.MIN_COMPANY_NAME_LENGTH
-    )
-    .map((p: any) => ({
-      place_id: p.id,
-      name: p.displayName?.text || '',
-      business_status: p.businessStatus,
-      website: p.websiteUri,
-      phone: p.nationalPhoneNumber || p.internationalPhoneNumber,
-      address: p.formattedAddress,
-    }))
+
+    const places = searchData.results.slice(0, maxLeads)
+
+    // Step 2: Get details for each place
+    for (const place of places) {
+      try {
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,website,formatted_address&key=${apiKey}`
+        
+        const detailsResponse = await fetch(detailsUrl)
+        const detailsData = await detailsResponse.json()
+
+        if (detailsData.status === 'OK' && detailsData.result) {
+          const result = detailsData.result
+          let email = undefined
+
+          // Step 3: Try to scrape email from website
+          if (result.website) {
+            email = await scrapeEmailFromWebsite(result.website)
+          }
+
+          leads.push({
+            company: result.name || place.name,
+            email,
+            phone: result.formatted_phone_number,
+            website: result.website,
+            source: `Google Maps - ${location}`,
+          })
+
+          if (leads.length >= maxLeads) break
+        }
+      } catch (error) {
+        console.error('Error fetching place details:', error)
+      }
+    }
+  } catch (error) {
+    console.error('Error in Google Maps generation:', error)
+    throw error
+  }
+
+  return leads
 }
 
-// =============================================================================
-// EMAIL SCRAPING - The main feature!
-// =============================================================================
-
-async function scrapeEmailsFromPlaces(places: PlaceResult[], location: string, maxLeads: number): Promise<Lead[]> {
+async function generateFromSocialMedia(
+  niche: string,
+  location: string,
+  maxLeads: number,
+  emailProvider: string
+): Promise<Lead[]> {
   const leads: Lead[] = []
   
-  // Process places one at a time to avoid CPU overload
-  for (const place of places) {
-    if (leads.length >= maxLeads) break
-    
-    try {
-      const email = await scrapeEmailFromWebsite(place.website!)
-      
-      if (email) {
-        leads.push({
-          company: place.name,
-          email: email,
-          phone: place.phone,
-          website: place.website,
-          address: place.address,
-          source: `Google Maps - ${location}`,
-          place_id: place.place_id,
-          business_status: place.business_status,
-        })
-        log('debug', `Found email for ${place.name}`, { email })
-      }
-    } catch (error) {
-      log('debug', `Failed to scrape email from ${place.name}`, { error: (error as Error)?.message })
-    }
-  }
+  // Google Custom Search API key from environment
+  const apiKey = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY')
+  const searchEngineId = Deno.env.get('GOOGLE_CUSTOM_SEARCH_ENGINE_ID')
   
+  if (!apiKey || !searchEngineId) {
+    throw new Error('Google Custom Search not configured. Please add GOOGLE_CUSTOM_SEARCH_API_KEY and GOOGLE_CUSTOM_SEARCH_ENGINE_ID in Supabase Edge Function secrets.')
+  }
+
+  try {
+    // Search LinkedIn
+    const linkedInQuery = `site:linkedin.com/in "${niche}" "@${emailProvider}" "${location}"`
+    const linkedInLeads = await searchSocialMedia(linkedInQuery, apiKey, searchEngineId, Math.ceil(maxLeads / 2), 'linkedin.com')
+    leads.push(...linkedInLeads)
+
+    // Search Twitter/X if we need more leads
+    if (leads.length < maxLeads) {
+      const twitterQuery = `site:twitter.com "${niche}" "@${emailProvider}" "${location}"`
+      const twitterLeads = await searchSocialMedia(twitterQuery, apiKey, searchEngineId, maxLeads - leads.length, 'twitter.com')
+      leads.push(...twitterLeads)
+    }
+  } catch (error) {
+    console.error('Error in social media generation:', error)
+    throw error
+  }
+
+  return leads.slice(0, maxLeads)
+}
+
+async function searchSocialMedia(
+  query: string,
+  apiKey: string,
+  searchEngineId: string,
+  maxResults: number,
+  platform: string
+): Promise<Lead[]> {
+  const leads: Lead[] = []
+  
+  try {
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=${Math.min(maxResults, 10)}`
+    
+    const response = await fetch(searchUrl)
+    const data = await response.json()
+
+    if (data.items) {
+      for (const item of data.items) {
+        const email = extractEmailFromText(item.snippet + ' ' + item.title)
+        const name = extractNameFromText(item.title)
+
+        if (email || name) {
+          leads.push({
+            company: name || 'Unknown',
+            contact_name: name,
+            email,
+            linkedin_url: platform === 'linkedin.com' ? item.link : undefined,
+            source: `Social Media - ${platform}`,
+          })
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error searching social media:', error)
+  }
+
   return leads
 }
 
 async function scrapeEmailFromWebsite(websiteUrl: string): Promise<string | undefined> {
-  const baseUrl = cleanUrl(websiteUrl)
-  if (!baseUrl) return undefined
+  try {
+    // Add timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+    const response = await fetch(websiteUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    })
+    
+    clearTimeout(timeoutId)
+
+    if (!response.ok) return undefined
+
+    const html = await response.text()
+    
+    // Look for email in HTML
+    const email = extractEmailFromText(html)
+    return email
+  } catch (error) {
+    console.error('Error scraping website:', error)
+    return undefined
+  }
+}
+
+function extractEmailFromText(text: string): string | undefined {
+  // Match email pattern
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
+  const matches = text.match(emailRegex)
   
-  // Try multiple contact-related pages
-  for (const path of CONFIG.CONTACT_PATHS) {
-    try {
-      const url = path ? `${baseUrl}${path}` : baseUrl
-      const email = await scrapeEmailFromPage(url)
-      if (email) return email
-    } catch {
-      // Continue to next path
-    }
+  if (matches && matches.length > 0) {
+    // Filter out common noise emails
+    const filtered = matches.filter(email => 
+      !email.includes('example.com') &&
+      !email.includes('test.com') &&
+      !email.includes('noreply') &&
+      !email.includes('no-reply')
+    )
+    return filtered[0]
   }
   
   return undefined
 }
 
-async function scrapeEmailFromPage(url: string): Promise<string | undefined> {
-  try {
-    const response = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9,nl;q=0.8,de;q=0.7',
-      },
-    }, CONFIG.SCRAPE_TIMEOUT_MS)
-    
-    if (!response.ok) return undefined
-    
-    const html = await response.text()
-    
-    // Method 1: Check mailto: links (most reliable)
-    const mailtoMatch = html.match(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i)
-    if (mailtoMatch) {
-      const email = mailtoMatch[1].toLowerCase()
-      if (isValidEmail(email)) return email
-    }
-    
-    // Method 2: Look for emails in common patterns
-    const email = extractBestEmailFromHtml(html)
-    if (email) return email
-    
-    return undefined
-  } catch {
-    return undefined
+function extractNameFromText(text: string): string | undefined {
+  // Try to extract name from LinkedIn/Twitter title
+  // LinkedIn format: "Name - Job Title | LinkedIn"
+  const linkedInMatch = text.match(/^([^-|]+)/)
+  if (linkedInMatch) {
+    return linkedInMatch[1].trim()
   }
+
+  return undefined
 }
 
-function extractBestEmailFromHtml(html: string): string | undefined {
-  if (!html) return undefined
-  
-  // Remove script and style content to avoid false positives
-  const cleanHtml = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-  
-  // Find all email patterns
-  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
-  const matches = cleanHtml.match(emailRegex)
-  if (!matches) return undefined
-  
-  // Filter and score emails
-  const validEmails = matches
-    .map(e => e.toLowerCase())
-    .filter(isValidEmail)
-    .filter((e, i, arr) => arr.indexOf(e) === i)  // Unique
-  
-  if (validEmails.length === 0) return undefined
-  
-  // Score and sort by quality
-  const scored = validEmails.map(email => ({
-    email,
-    score: scoreEmail(email)
-  })).sort((a, b) => b.score - a.score)
-  
-  return scored[0]?.email
-}
+function generateMockLeads(
+  niche: string,
+  location: string,
+  maxLeads: number,
+  source: string
+): Lead[] {
+  const firstNames = ['John', 'Sarah', 'Michael', 'Emma', 'David', 'Lisa', 'James', 'Anna', 'Robert', 'Maria']
+  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Martinez', 'Wilson']
+  const domains = ['gmail.com', 'outlook.com', 'company.com', 'business.net', 'corp.io']
 
-function isValidEmail(email: string): boolean {
-  if (!email || email.length < 5 || email.length > 254) return false
-  
-  // Check blacklist
-  if (CONFIG.EMAIL_BLACKLIST.some(pattern => email.toLowerCase().includes(pattern))) {
-    return false
+  const leads: Lead[] = []
+
+  for (let i = 0; i < maxLeads; i++) {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)]
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
+    const domain = domains[Math.floor(Math.random() * domains.length)]
+    const companyName = `${niche} ${['Solutions', 'Services', 'Group', 'Co', 'Inc'][Math.floor(Math.random() * 5)]}`
+
+    leads.push({
+      company: companyName,
+      contact_name: `${firstName} ${lastName}`,
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${domain}`,
+      phone: `+1${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+      website: `https://www.${companyName.toLowerCase().replace(/\s+/g, '')}.com`,
+      source: `${source === 'google_maps' ? 'Google Maps' : 'Social Media'} - ${location} (Mock Data)`,
+    })
   }
-  
-  // Check TLD
-  const tldMatch = email.match(/\.([a-z]{2,})$/i)
-  if (!tldMatch) return false
-  
-  // Invalid file extensions that look like TLDs
-  const invalidTlds = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'css', 'js', 'json', 'xml', 'pdf', 'html', 'htm']
-  if (invalidTlds.includes(tldMatch[1].toLowerCase())) return false
-  
-  // Basic format validation
-  const parts = email.split('@')
-  if (parts.length !== 2) return false
-  if (parts[0].length < 1 || parts[1].length < 3) return false
-  
-  return true
+
+  return leads
 }
-
-function scoreEmail(email: string): number {
-  let score = 0
-  const localPart = email.split('@')[0].toLowerCase()
-  
-  // Prefer generic business emails
-  if (localPart === 'info') score += 20
-  if (localPart === 'contact') score += 20
-  if (localPart === 'hello') score += 15
-  if (localPart === 'sales') score += 10
-  if (localPart === 'office') score += 10
-  if (localPart === 'mail') score += 8
-  if (localPart === 'enquiries' || localPart === 'inquiries') score += 8
-  
-  // Personal-looking emails are also good
-  if (/^[a-z]+\.[a-z]+$/.test(localPart)) score += 5  // firstname.lastname
-  
-  // Shorter is usually better
-  if (localPart.length < 15) score += 5
-  if (localPart.length < 10) score += 3
-  
-  // Common business TLDs
-  if (email.endsWith('.com')) score += 3
-  if (email.endsWith('.nl')) score += 3
-  if (email.endsWith('.de')) score += 3
-  if (email.endsWith('.co.uk')) score += 3
-  
-  // Avoid numbered emails (info2@, admin1@)
-  if (/\d/.test(localPart)) score -= 5
-  
-  return score
-}
-
-function cleanUrl(url: string | undefined): string | undefined {
-  if (!url) return undefined
-  try {
-    const parsed = new URL(url)
-    return `${parsed.protocol}//${parsed.host}`.replace(/\/$/, '')
-  } catch {
-    return undefined
-  }
-}
-
-// =============================================================================
-// DEDUPLICATION
-// =============================================================================
-
-async function findDuplicates(
-  leads: Lead[], userId: string, supabase: SupabaseClient
-): Promise<{ unique: Lead[], duplicates: Lead[] }> {
-  const unique: Lead[] = []
-  const duplicates: Lead[] = []
-  
-  if (leads.length === 0) return { unique, duplicates }
-  
-  const emails = leads.map(l => l.email.toLowerCase())
-  
-  try {
-    const { data: emailMatches } = await supabase
-      .from('leads')
-      .select('email')
-      .eq('user_id', userId)
-      .in('email', emails)
-    
-    const existingEmails = new Set(
-      (emailMatches || []).map(m => m.email?.toLowerCase()).filter(Boolean)
-    )
-    
-    const seenEmails = new Set<string>()
-    
-    for (const lead of leads) {
-      const normalizedEmail = lead.email.toLowerCase()
-      
-      if (existingEmails.has(normalizedEmail) || seenEmails.has(normalizedEmail)) {
-        duplicates.push(lead)
-      } else {
-        unique.push(lead)
-        seenEmails.add(normalizedEmail)
-      }
-    }
-  } catch (error) {
-    log('warn', 'Duplicate check failed, proceeding without dedup', { error: (error as Error)?.message })
-    return { unique: leads, duplicates: [] }
-  }
-  
-  return { unique, duplicates }
-}
-
-// =============================================================================
-// DATABASE OPERATIONS
-// =============================================================================
 
 async function saveLeadsToDatabase(
-  supabaseClient: SupabaseClient, leads: Lead[], userId: string
+  supabaseClient: any,
+  leads: Lead[],
+  userId: string,
+  method: string
 ): Promise<any[]> {
-  if (leads.length === 0) return []
-  
-  const savedLeads: any[] = []
+  const savedLeads = []
 
-  // Build notes with address and website info
-  const buildNotes = (lead: Lead): string | null => {
-    const parts: string[] = []
-    if (lead.website) parts.push(`Website: ${lead.website}`)
-    if (lead.address) parts.push(`Address: ${lead.address}`)
-    return parts.length > 0 ? parts.join('\n') : null
-  }
-
-  const leadsToInsert = leads.map(lead => ({
-    user_id: userId,
-    company: lead.company,
-    name: lead.company,  // Use company name as lead name
-    email: lead.email,   // Required field
-    phone: lead.phone || null,
-    status: 'new',
-    source: [lead.source],
-    notes: buildNotes(lead),
-  }))
-
-  // Batch insert in chunks
-  const chunkSize = 20
-  for (let i = 0; i < leadsToInsert.length; i += chunkSize) {
-    const chunk = leadsToInsert.slice(i, i + chunkSize)
-    
+  for (const lead of leads) {
     try {
       const { data, error } = await supabaseClient
         .from('leads')
-        .insert(chunk)
+        .insert({
+          user_id: userId,
+          company: lead.company,
+          contact_name: lead.contact_name,
+          email: lead.email,
+          phone: lead.phone,
+          website: lead.website,
+          linkedin_url: lead.linkedin_url,
+          status: 'new',
+          source: lead.source,
+          tags: [method === 'google_maps' ? 'Google Maps Generated' : 'Social Media Generated', 'AI Generated'],
+        })
         .select()
+        .single()
 
       if (error) {
-        log('error', 'Failed to save leads chunk', { error: error.message, chunkIndex: i })
-      } else if (data) {
-        savedLeads.push(...data)
+        console.error('Error saving lead:', error)
+      } else {
+        savedLeads.push(data)
       }
     } catch (error) {
-      log('error', 'Exception saving leads chunk', { error: (error as Error)?.message })
+      console.error('Error saving lead:', error)
     }
   }
 
   return savedLeads
-}
-
-async function logApiUsage(
-  supabase: SupabaseClient,
-  data: {
-    userId: string; endpoint: string; method: string; leadsRequested: number
-    leadsGenerated: number; success: boolean; errorMessage?: string
-    durationMs: number; ipAddress: string | null; userAgent: string | null
-  }
-): Promise<void> {
-  try {
-    await supabase.from('api_usage_logs').insert({
-      user_id: data.userId,
-      endpoint: data.endpoint,
-      method: data.method,
-      leads_requested: data.leadsRequested,
-      leads_generated: data.leadsGenerated,
-      success: data.success,
-      error_message: data.errorMessage || null,
-      duration_ms: data.durationMs,
-      ip_address: data.ipAddress,
-      user_agent: data.userAgent,
-    })
-  } catch (error) {
-    // API usage logging is optional, don't throw
-  }
 }
