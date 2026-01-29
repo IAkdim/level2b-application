@@ -79,6 +79,8 @@ export async function getUserSettings(): Promise<UserSettings | null> {
 
 /**
  * Create or update user settings
+ * Uses a check-then-insert/update pattern for compatibility with databases
+ * that may not have the unique constraint on user_id
  */
 export async function upsertUserSettings(
   settings: Partial<UserSettings>
@@ -89,25 +91,48 @@ export async function upsertUserSettings(
     throw new Error('Not authenticated')
   }
 
+  // First check if settings already exist for this user
+  const { data: existing } = await supabase
+    .from('user_settings')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
   const settingsData = {
     user_id: user.id,
     ...settings
   }
 
-  const { data, error } = await supabase
-    .from('user_settings')
-    .upsert(settingsData, {
-      onConflict: 'user_id'
-    })
-    .select()
-    .single()
+  let data: UserSettings | null = null
+  let error: { message: string } | null = null
+
+  if (existing?.id) {
+    // Update existing record
+    const result = await supabase
+      .from('user_settings')
+      .update(settingsData)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    data = result.data
+    error = result.error
+  } else {
+    // Insert new record
+    const result = await supabase
+      .from('user_settings')
+      .insert(settingsData)
+      .select()
+      .single()
+    data = result.data
+    error = result.error
+  }
 
   if (error) {
     console.error('Error upserting user settings:', error)
     throw new Error(error.message)
   }
 
-  return data
+  return data as UserSettings
 }
 
 /**

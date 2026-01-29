@@ -58,16 +58,16 @@ export function EmailThreads() {
     try {
       const labels = await getGmailLabels();
       
-      // Filter systeemlabels - alleen user-created labels tonen
+      // Filter system labels - only show user-created labels
       const systemLabelPrefixes = ['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'STARRED', 'IMPORTANT', 'CHAT', 'CATEGORY_'];
       const systemLabelNames = ['Junk', 'Notes'];
       
       const customLabels = labels.filter((l) => {
-        // Filter op ID (systeem labels hebben uppercase IDs die starten met bekend prefixes)
+        // Filter on ID (system labels have uppercase IDs starting with known prefixes)
         const hasSystemPrefix = systemLabelPrefixes.some(prefix => l.id.startsWith(prefix));
-        // Filter op naam
+        // Filter on name
         const isSystemName = systemLabelNames.includes(l.name);
-        // Filter labels die eindigen op _STAR (zoals YELLOW_STAR, RED_STAR, etc.)
+        // Filter labels ending with _STAR (such as YELLOW_STAR, RED_STAR, etc.)
         const isStar = l.id.endsWith('_STAR');
         
         return !hasSystemPrefix && !isSystemName && !isStar && l.type !== 'system';
@@ -75,7 +75,7 @@ export function EmailThreads() {
       
       setAvailableLabels(customLabels);
       
-      // Auto-select laatst aangemaakte label (laatste in de lijst)
+      // Auto-select latest created label (last in list)
       if (customLabels.length > 0 && !selectedLabel) {
         const latestLabel = customLabels[customLabels.length - 1];
         setSelectedLabel(latestLabel.name);
@@ -94,7 +94,7 @@ export function EmailThreads() {
       const sent = await getEmailsByLabel(selectedLabel, 100);
       setSentEmails(sent);
 
-      // Haal reacties op emails met dit label (zonder sentiment analyse)
+      // Fetch replies to emails with this label (without sentiment analysis)
       const repliesData = await getRepliesByLabel(selectedLabel, false, false); // Fetch all replies, analyzeSentiments = false
       setReplies(repliesData);
       
@@ -224,7 +224,7 @@ export function EmailThreads() {
         description: `The label "${labelName}" has been deleted successfully`
       });
       
-      // Als de verwijderde label de geselecteerde was, clear de selectie
+      // If the deleted label was the selected one, clear the selection
       if (selectedLabel === labelName) {
         setSelectedLabel("");
         setReplies([]);
@@ -738,16 +738,16 @@ export function EmailThreads() {
                         onClick={handleAnalyzeSentiment}
                         disabled={isAnalyzingSentiment}
                         className="bg-primary"
-                      >
+                      >  
                         {isAnalyzingSentiment ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Analyseren...
+                            Analysing...
                           </>
                         ) : (
                           <>
                             <Sparkles className="mr-2 h-4 w-4" />
-                            Analyze Sentiment ({selectedEmailIds.size})
+                            Analyse Sentiment ({selectedEmailIds.size})
                           </>
                         )}
                       </Button>

@@ -303,13 +303,13 @@ export function EmailThreads() {
             );
           } else {
             console.error('[EmailThreadsV2] Sentiment analysis error:', sentiment.error);
-            toast.error('Failed to analyze sentiment', {
+            toast.error('Failed to analyse sentiment', {
               description: sentiment.error,
             });
           }
         } catch (error) {
           console.error('[EmailThreadsV2] Error analyzing sentiment:', error);
-          toast.error('Failed to analyze email sentiment');
+          toast.error('Failed to analyse email sentiment');
         } finally {
           setIsAnalyzingSentiment(false);
         }

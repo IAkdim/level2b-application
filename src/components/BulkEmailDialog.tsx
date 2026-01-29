@@ -89,12 +89,12 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       console.error('Error incrementing template usage:', error)
     }
     
-    toast.success('Template toegepast')
+    toast.success('Template applied')
   }
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
-      alert("Onderwerp en bericht zijn verplicht")
+      alert("Subject and message are required")
       return
     }
 
@@ -116,7 +116,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
         const errorMsg = formatUsageLimitError(limitCheck.error!)
         const resetTime = getTimeUntilReset()
         const dailyLimit = limitCheck.usage?.emailLimit || 50
-        toast.error(`Dagelijkse email limiet bereikt (${dailyLimit}). Reset over ${resetTime}`, {
+        toast.error(`Daily email limit reached (${dailyLimit}). Resets in ${resetTime}`, {
           description: errorMsg,
           duration: 5000
         })
@@ -128,8 +128,8 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       const emailsRemaining = limitCheck.usage?.emailsRemaining || 0
       const dailyLimit = limitCheck.usage?.emailLimit || 50
       if (selectedLeads.length > emailsRemaining) {
-        toast.error(`Kan niet ${selectedLeads.length} emails versturen`, {
-          description: `Nog maar ${emailsRemaining} emails beschikbaar vandaag (limiet: ${dailyLimit}). Reset over ${getTimeUntilReset()}`,
+        toast.error(`Cannot send ${selectedLeads.length} emails`, {
+          description: `Only ${emailsRemaining} emails remaining today (limit: ${dailyLimit}). Resets in ${getTimeUntilReset()}`,
           duration: 5000
         })
         setIsSending(false)
@@ -141,17 +141,17 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       // Get user info for signature
       const { data: { user } } = await supabase.auth.getUser()
       
-      // Personaliseer emails met lead data
+      // Personalise emails with lead data
       const emails = selectedLeads.map((lead) => {
         // Replace placeholders in subject and body
         let personalizedSubject = subject
           .replace(/\{name\}/g, lead.name)
-          .replace(/\{company\}/g, lead.company || "uw bedrijf")
+          .replace(/\{company\}/g, lead.company || "your company")
           .replace(/\{title\}/g, lead.title || "")
 
         let personalizedBody = body
           .replace(/\{name\}/g, lead.name)
-          .replace(/\{company\}/g, lead.company || "uw bedrijf")
+          .replace(/\{company\}/g, lead.company || "your company")
           .replace(/\{title\}/g, lead.title || "")
         
         // Add email signature if configured
@@ -222,8 +222,8 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
       
       // Check if it's an authentication error
       if (isAuthenticationError(error)) {
-        toast.info("Gmail opnieuw verbinden...", {
-          description: "Je wordt doorgestuurd naar Google om opnieuw in te loggen.",
+        toast.info("Reconnecting Gmail...", {
+          description: "You will be redirected to Google to sign in again.",
           duration: 3000
         })
         
@@ -232,8 +232,8 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           await reAuthenticateWithGoogle()
         } catch (reAuthError) {
           console.error("Re-authentication failed:", reAuthError)
-          toast.error("Re-authenticatie mislukt", {
-            description: "Probeer het later opnieuw of neem contact op met support.",
+          toast.error("Re-authentication failed", {
+            description: "Please try again later or contact support.",
             duration: 5000
           })
         }
@@ -278,10 +278,10 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Bulk Email Versturen
+              Send Bulk Email
             </DialogTitle>
             <DialogDescription>
-              Verstuur een gepersonaliseerde email naar {selectedLeads.length}{" "}
+              Send a personalised email to {selectedLeads.length}{" "}
               {selectedLeads.length === 1 ? "lead" : "leads"}
             </DialogDescription>
           </DialogHeader>
@@ -302,7 +302,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
                   disabled={isSending}
                 >
                   <Sparkles className="mr-2 h-3 w-3" />
-                  Maak nieuwe template
+                  Create new template
                 </Button>
               </div>
               <div className="grid gap-2 max-h-60 overflow-y-auto">
@@ -341,14 +341,14 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
                 disabled={isSending}
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                Maak nieuwe template
+                Create new template
               </Button>
             </div>
           )}
 
           {/* Selected Leads Preview */}
           <div className="space-y-2">
-            <Label>Ontvangers ({selectedLeads.length})</Label>
+            <Label>Recipients ({selectedLeads.length})</Label>
             <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-md max-h-32 overflow-y-auto">
               {selectedLeads.slice(0, 10).map((lead) => (
                 <Badge key={lead.id} variant="secondary" className="text-xs">
@@ -357,7 +357,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
               ))}
               {selectedLeads.length > 10 && (
                 <Badge variant="secondary" className="text-xs">
-                  +{selectedLeads.length - 10} meer
+                  +{selectedLeads.length - 10} more
                 </Badge>
               )}
             </div>
@@ -367,29 +367,29 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           <div className="space-y-2">
             <Label htmlFor="labelName" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
-              Gmail Label (optioneel)
+              Gmail Label (optional)
             </Label>
             <Input
               id="labelName"
-              placeholder="bijv. Outreach_2025"
+              placeholder="e.g. Outreach_2025"
               value={labelName}
               onChange={(e) => setLabelName(e.target.value)}
               disabled={isSending}
               autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
-              Label om aan verzonden emails toe te voegen voor tracking van reacties
+              Label to add to sent emails for tracking replies
             </p>
           </div>
 
           {/* Subject */}
           <div className="space-y-2">
             <Label htmlFor="subject">
-              Onderwerp <span className="text-destructive">*</span>
+              Subject <span className="text-destructive">*</span>
             </Label>
             <Input
               id="subject"
-              placeholder="Kennismakingsgesprek"
+              placeholder="Introduction meeting"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               disabled={isSending}
@@ -400,11 +400,11 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           {/* Body */}
           <div className="space-y-2">
             <Label htmlFor="body">
-              Bericht <span className="text-destructive">*</span>
+              Message <span className="text-destructive">*</span>
             </Label>
             <Textarea
               id="body"
-              placeholder="Beste {name},&#10;&#10;Ik zag dat je werkt bij {company}..."
+              placeholder="Dear {name},&#10;&#10;I noticed you work at {company}..."
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
@@ -412,7 +412,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
               autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
-              Gebruik placeholders: <code className="bg-muted px-1 py-0.5 rounded">
+              Use placeholders: <code className="bg-muted px-1 py-0.5 rounded">
                 {"{name}"}
               </code>,{" "}
               <code className="bg-muted px-1 py-0.5 rounded">{"{company}"}</code>,{" "}
@@ -432,7 +432,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
               htmlFor="isHtml"
               className="text-sm font-normal cursor-pointer"
             >
-              Email bevat HTML
+              Email contains HTML
             </Label>
           </div>
 
@@ -446,11 +446,11 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
               }`}
             >
               <p className="font-medium">
-                ✓ {sendResult.success} email{sendResult.success !== 1 ? "s" : ""} verzonden
+                ✓ {sendResult.success} email{sendResult.success !== 1 ? "s" : ""} sent
               </p>
               {sendResult.failed > 0 && (
                 <p className="text-sm mt-1">
-                  ✗ {sendResult.failed} email{sendResult.failed !== 1 ? "s" : ""} mislukt
+                  ✗ {sendResult.failed} email{sendResult.failed !== 1 ? "s" : ""} failed
                 </p>
               )}
             </div>
@@ -463,18 +463,18 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
             onClick={handleClose}
             disabled={isSending}
           >
-            Annuleren
+            Cancel
           </Button>
           <Button onClick={handleSend} disabled={isSending || !subject.trim() || !body.trim()}>
             {isSending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Versturen...
+                Sending...
               </>
             ) : (
               <>
                 <Mail className="mr-2 h-4 w-4" />
-                Verstuur {selectedLeads.length} Email{selectedLeads.length !== 1 ? "s" : ""}
+                Send {selectedLeads.length} Email{selectedLeads.length !== 1 ? "s" : ""}
               </>
             )}
           </Button>
@@ -490,26 +490,26 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
             {isComplete ? (
               <>
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                Verzenden voltooid!
+                Sending complete!
               </>
             ) : (
               <>
                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                Emails versturen...
+                Sending emails...
               </>
             )}
           </DialogTitle>
           <DialogDescription>
             {isComplete 
-              ? `${sendingProgress.success} email${sendingProgress.success !== 1 ? 's' : ''} succesvol verzonden`
-              : `Bezig met verzenden naar ${selectedLeads.length} ${selectedLeads.length === 1 ? 'lead' : 'leads'}`
+              ? `${sendingProgress.success} email${sendingProgress.success !== 1 ? 's' : ''} sent successfully`
+              : `Sending to ${selectedLeads.length} ${selectedLeads.length === 1 ? 'lead' : 'leads'}`
             }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Voortgang</span>
+            <span className="text-muted-foreground">Progress</span>
             <span className="font-medium">
               {sendingProgress.current} / {sendingProgress.total}
             </span>
@@ -522,11 +522,11 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
 
           <div className="flex justify-between text-sm pt-2">
             <span className="text-green-600 dark:text-green-400 font-medium">
-              ✓ {sendingProgress.success} geslaagd
+              ✓ {sendingProgress.success} succeeded
             </span>
             {sendingProgress.failed > 0 && (
               <span className="text-red-600 dark:text-red-400 font-medium">
-                ✗ {sendingProgress.failed} mislukt
+                ✗ {sendingProgress.failed} failed
               </span>
             )}
           </div>
@@ -542,7 +542,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
                 resetForm()
               }
             }}>
-              Sluiten
+              Close
             </Button>
           </DialogFooter>
         )}

@@ -1,5 +1,5 @@
 // src/lib/api/claude-secure.ts
-// SECURE versie - gebruikt backend API in plaats van directe Claude calls
+// SECURE version - uses backend API instead of direct Claude calls
 
 import { supabase } from '@/lib/supabaseClient'
 import { rateLimiter } from './rateLimiter'
@@ -14,7 +14,7 @@ export interface SentimentAnalysis {
 }
 
 /**
- * Analyseer de sentiment van een email reactie via SECURE backend
+ * Analyse the sentiment of an email reply via SECURE backend
  */
 export async function analyzeSentiment(
   emailBody: string,
