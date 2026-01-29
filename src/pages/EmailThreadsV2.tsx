@@ -27,7 +27,7 @@ import {
   type EmailThread,
   type MessageOpenStats,
 } from "@/lib/utils/emailThreads";
-import { emailService, type Email, getLeadAssociationsByThreadIds } from "@/lib/api/email";
+import { emailService, type Email, getLeadAssociationsByThreadIds, getTrackedThreadIds, getAllCampaignNames } from "@/lib/api/email";
 import { getEmailOpenStatsBulk } from "@/lib/api/emailTracking";
 import {
   generateSalesReply,
@@ -47,12 +47,16 @@ export function EmailThreads() {
   const { user } = useAuth();
 
   // Data state
-  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
   const [rawSentEmails, setRawSentEmails] = useState<Email[]>([]);
   const [rawReplies, setRawReplies] = useState<Email[]>([]);
   const [openTrackingStats, setOpenTrackingStats] = useState<MessageOpenStats[]>([]);
   const [leadAssociations, setLeadAssociations] = useState<Map<string, string[]>>(new Map());
-  const [selectedSourceLabel, setSelectedSourceLabel] = useState<string>("");
+  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
+
+  // Filter state (replacing label selection)
+  const [dateRange, setDateRange] = useState<string>("30d"); // 7d, 30d, 90d, all
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [selectedLeadFilter, setSelectedLeadFilter] = useState<string | null>(null);
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -104,106 +108,97 @@ export function EmailThreads() {
   // Derived: stats
   const stats = useMemo(() => getThreadStats(filteredThreads), [filteredThreads]);
 
-  // Load labels on mount
+  // Load campaigns on mount
   useEffect(() => {
-    loadLabels();
+    loadCampaigns();
   }, []);
 
-  // Load emails when source label changes
+  // Load emails when filters change
   useEffect(() => {
-    if (selectedSourceLabel) {
-      loadEmails();
-    }
-  }, [selectedSourceLabel]);
+    loadEmails();
+  }, [dateRange, selectedCampaign, selectedLeadFilter]);
 
-  const loadLabels = async () => {
+  /**
+   * Load available campaigns for filter
+   */
+  const loadCampaigns = async () => {
     try {
-      const labels = await emailService.getLabels();
-
-      // Filter system labels
-      const systemLabelPrefixes = [
-        "INBOX",
-        "SENT",
-        "DRAFT",
-        "SPAM",
-        "TRASH",
-        "UNREAD",
-        "STARRED",
-        "IMPORTANT",
-        "CHAT",
-        "CATEGORY_",
-      ];
-      const systemLabelNames = ["Junk", "Notes"];
-
-      const customLabels = labels.filter((l) => {
-        const hasSystemPrefix = systemLabelPrefixes.some((prefix) =>
-          l.id.startsWith(prefix)
-        );
-        const isSystemName = systemLabelNames.includes(l.name);
-        const isStar = l.id.endsWith("_STAR");
-        return !hasSystemPrefix && !isSystemName && !isStar && l.type !== "system";
-      });
-
-      setAvailableLabels(customLabels);
-
-      // Auto-select latest label
-      if (customLabels.length > 0 && !selectedSourceLabel) {
-        setSelectedSourceLabel(customLabels[customLabels.length - 1].name);
-      }
+      const campaigns = await getAllCampaignNames();
+      setAvailableCampaigns(campaigns);
     } catch (error) {
-      console.error("Error loading labels:", error);
-      toast.error("Failed to load Gmail labels");
+      console.error('Error loading campaigns:', error);
     }
   };
 
+  /**
+   * Load emails from database (label-free approach)
+   * Uses email_tracking_metadata to get thread IDs, then fetches details on-demand
+   */
   const loadEmails = async () => {
-    if (!selectedSourceLabel) return;
-
     setIsLoading(true);
     try {
-      let sent: Email[] = [];
-      let replies: Email[] = [];
-      
-      if (selectedSourceLabel === "__ALL__") {
-        // Load emails from ALL custom labels
-        const allSentPromises = availableLabels.map(label =>
-          emailService.getEmailsByLabel(label.name, 50).catch(() => [])
-        );
-        const allRepliesPromises = availableLabels.map(label =>
-          emailService.getRepliesByLabel(label.name, false, false).catch(() => [])
-        );
-        
-        const sentResults = await Promise.all(allSentPromises);
-        const repliesResults = await Promise.all(allRepliesPromises);
-        
-        // Combine and deduplicate by message ID
-        const seenSentIds = new Set<string>();
-        const seenReplyIds = new Set<string>();
-        
-        for (const emails of sentResults) {
-          for (const email of emails) {
-            if (!seenSentIds.has(email.id)) {
-              seenSentIds.add(email.id);
-              sent.push(email);
-            }
-          }
-        }
-        
-        for (const emails of repliesResults) {
-          for (const email of emails) {
-            if (!seenReplyIds.has(email.id)) {
-              seenReplyIds.add(email.id);
-              replies.push(email);
-            }
-          }
-        }
-      } else {
-        // Load emails from specific label
-        [sent, replies] = await Promise.all([
-          emailService.getEmailsByLabel(selectedSourceLabel, 100),
-          emailService.getRepliesByLabel(selectedSourceLabel, false, false),
-        ]);
+      // Calculate date range filter
+      let startDate: Date | undefined;
+      const now = new Date();
+
+      switch (dateRange) {
+        case "7d":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30d":
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case "90d":
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case "all":
+          startDate = undefined;
+          break;
       }
+
+      // Get tracked thread IDs from database
+      console.log('Fetching tracked thread IDs from database...');
+      const threadIds = await getTrackedThreadIds({
+        provider: 'gmail',
+        startDate,
+        campaignName: selectedCampaign || undefined,
+        leadId: selectedLeadFilter || undefined,
+        limit: 200, // Reasonable limit for performance
+      });
+
+      console.log(`Found ${threadIds.length} tracked threads`);
+
+      if (threadIds.length === 0) {
+        setRawSentEmails([]);
+        setRawReplies([]);
+        setLastRefresh(new Date());
+        return;
+      }
+
+      // Fetch thread details in batch from Gmail
+      console.log('Fetching thread details from Gmail...');
+      const threadsMap = await emailService.getEmailThreadsBatch(threadIds);
+
+      // Separate sent emails and replies
+      const allEmails: Email[] = [];
+      threadsMap.forEach((emails) => {
+        allEmails.push(...emails);
+      });
+
+      // Split by outgoing vs incoming
+      const sent: Email[] = [];
+      const replies: Email[] = [];
+
+      for (const email of allEmails) {
+        // Check if email is from the user (outgoing)
+        if (user?.email && email.from.toLowerCase().includes(user.email.toLowerCase())) {
+          sent.push(email);
+        } else {
+          replies.push(email);
+        }
+      }
+
+      console.log(`Loaded ${sent.length} sent emails, ${replies.length} replies`);
 
       setRawSentEmails(sent);
       setRawReplies(replies);
@@ -349,7 +344,7 @@ export function EmailThreads() {
         to,
         subject,
         body,
-        label: selectedSourceLabel
+        // Replies don't need campaign tracking - they're linked via thread
       });
       toast.success(`Reply sent to ${to}`);
       setIsDetailOpen(false);
@@ -491,28 +486,37 @@ export function EmailThreads() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Source label selector */}
-            <Select value={selectedSourceLabel} onValueChange={setSelectedSourceLabel}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select campaign..." />
+            {/* Campaign filter */}
+            {availableCampaigns.length > 0 && (
+              <Select
+                value={selectedCampaign || "all"}
+                onValueChange={(v) => setSelectedCampaign(v === "all" ? null : v)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All campaigns" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All campaigns</SelectItem>
+                  {availableCampaigns.map((campaign) => (
+                    <SelectItem key={campaign} value={campaign}>
+                      {campaign}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Date range filter */}
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[150px]">
+                <Clock className="h-4 w-4 mr-2" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {availableLabels.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No labels found
-                  </SelectItem>
-                ) : (
-                  <>
-                    <SelectItem value="__ALL__">
-                      📬 All campaigns
-                    </SelectItem>
-                    {availableLabels.map((label) => (
-                      <SelectItem key={label.id} value={label.name}>
-                        {label.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
               </SelectContent>
             </Select>
 
@@ -599,26 +603,17 @@ export function EmailThreads() {
               </div>
             ))}
           </div>
-        ) : !selectedSourceLabel ? (
-          // No label selected
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Mail className="h-12 w-12 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">Select a campaign</p>
-            <p className="text-sm text-muted-foreground">
-              Choose a Gmail label to view conversations
-            </p>
-          </div>
         ) : filteredThreads.length === 0 ? (
           // Empty state
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Inbox className="h-12 w-12 text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">
-              {debouncedSearch || filterLabel ? "No matching conversations" : "No conversations yet"}
+              {debouncedSearch || filterLabel ? "No matching conversations" : "No tracked emails found"}
             </p>
             <p className="text-sm text-muted-foreground">
               {debouncedSearch || filterLabel
-                ? "Try adjusting your filters"
-                : "Emails with this label will appear here"}
+                ? "Try adjusting your filters or date range"
+                : "Send emails via the app to see them tracked here"}
             </p>
           </div>
         ) : (

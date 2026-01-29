@@ -30,6 +30,8 @@ export {
   getTrackedEmails,
   getTrackedEmailByMessageId,
   getTrackedEmailsByThreadId,
+  getTrackedThreadIds,
+  getAllCampaignNames,
   deleteEmailTracking,
   linkOpenTrackingToMetadata,
   getLeadAssociationsByMessageIds,

@@ -50,6 +50,12 @@ export interface IEmailProvider {
   getEmailThread(threadId: string): Promise<Email[]>
 
   /**
+   * Get multiple threads in batch (more efficient than calling getEmailThread repeatedly)
+   * Returns a map of threadId -> Email[]
+   */
+  getEmailThreadsBatch(threadIds: string[]): Promise<Map<string, Email[]>>
+
+  /**
    * Get replies to emails with a specific label
    */
   getRepliesByLabel(

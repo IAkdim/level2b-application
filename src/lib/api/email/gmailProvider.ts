@@ -22,11 +22,12 @@ export class GmailProvider implements IEmailProvider {
   }
 
   async sendEmail(request: SendEmailRequest): Promise<SendEmailResult> {
+    // Send email WITHOUT applying Gmail label (campaign tracking is now database-only)
     const messageId = await gmail.sendEmail(
       request.to,
       request.subject,
       request.body,
-      request.label,
+      undefined, // No label - using campaign_name in database instead
       request.isHtml
     )
 
@@ -38,7 +39,7 @@ export class GmailProvider implements IEmailProvider {
     // Note: Gmail API returns threadId in the send response, but our current
     // implementation doesn't expose it. For now, we'll use messageId as threadId
     // until we refactor gmail.ts to return the full response.
-    
+
     return {
       messageId,
       threadId: messageId, // TODO: Get actual threadId from Gmail API response
@@ -57,8 +58,8 @@ export class GmailProvider implements IEmailProvider {
       isHtml: req.isHtml
     }))
 
-    const label = requests[0]?.label // Assuming all use same label
-    const messageIds = await gmail.sendBatchEmails(emails, label, onProgress)
+    // Send WITHOUT applying Gmail labels (campaign tracking is database-only now)
+    const messageIds = await gmail.sendBatchEmails(emails, undefined, onProgress)
 
     return messageIds.map(messageId => ({
       messageId,
@@ -81,6 +82,39 @@ export class GmailProvider implements IEmailProvider {
 
   async getEmailThread(threadId: string): Promise<Email[]> {
     return await gmail.getEmailThread(threadId)
+  }
+
+  async getEmailThreadsBatch(threadIds: string[]): Promise<Map<string, Email[]>> {
+    const map = new Map<string, Email[]>()
+
+    // Batch fetch threads (max 100 at a time for performance)
+    const BATCH_SIZE = 100
+
+    for (let i = 0; i < threadIds.length; i += BATCH_SIZE) {
+      const batch = threadIds.slice(i, i + BATCH_SIZE)
+
+      // Fetch threads in parallel within each batch
+      const promises = batch.map(async (threadId) => {
+        try {
+          const emails = await this.getEmailThread(threadId)
+          return { threadId, emails }
+        } catch (error) {
+          console.error(`Error fetching thread ${threadId}:`, error)
+          return { threadId, emails: [] }
+        }
+      })
+
+      const results = await Promise.all(promises)
+
+      results.forEach(({ threadId, emails }) => {
+        if (emails.length > 0) {
+          map.set(threadId, emails)
+        }
+      })
+    }
+
+    console.log(`Fetched ${map.size}/${threadIds.length} threads from Gmail`)
+    return map
   }
 
   async getRepliesByLabel(

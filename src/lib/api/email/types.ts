@@ -28,8 +28,8 @@ export interface SendEmailRequest {
   subject: string
   body: string
   isHtml?: boolean
-  label?: string       // Gmail label or Outlook category for tracking
-  leadId?: string      // Optional: associate with a lead
+  campaignName?: string  // Campaign identifier (provider-agnostic)
+  leadId?: string        // Optional: associate with a lead
 }
 
 /**
@@ -74,7 +74,7 @@ export interface EmailTrackingMetadata {
   thread_id: string
   message_id: string
   provider: 'gmail' | 'outlook'
-  sent_at: string      // ISO timestamp
-  label?: string
+  sent_at: string         // ISO timestamp
+  campaign_name?: string  // Campaign identifier
   created_at: string
 }

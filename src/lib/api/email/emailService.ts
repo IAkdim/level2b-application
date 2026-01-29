@@ -65,7 +65,7 @@ class EmailService {
       threadId: result.threadId,
       messageId: result.messageId,
       provider: this.providerType!,
-      label: request.label,
+      campaignName: request.campaignName,
       leadId: request.leadId,
       sentAt: result.sentAt
     })
@@ -112,7 +112,7 @@ class EmailService {
         threadId: result.threadId,
         messageId: result.messageId,
         provider: this.providerType!,
-        label: request.label,
+        campaignName: request.campaignName,
         leadId: request.leadId,
         sentAt: result.sentAt
       })
@@ -160,6 +160,15 @@ class EmailService {
   async getEmailThread(threadId: string): Promise<Email[]> {
     const provider = await this.getProvider()
     return await provider.getEmailThread(threadId)
+  }
+
+  /**
+   * Get multiple threads in batch (more efficient than calling getEmailThread repeatedly)
+   * Returns a map of threadId -> Email[]
+   */
+  async getEmailThreadsBatch(threadIds: string[]): Promise<Map<string, Email[]>> {
+    const provider = await this.getProvider()
+    return await provider.getEmailThreadsBatch(threadIds)
   }
 
   /**

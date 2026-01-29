@@ -56,6 +56,12 @@ export class OutlookProvider implements IEmailProvider {
     throw new Error('Outlook provider not implemented yet')
   }
 
+  async getEmailThreadsBatch(threadIds: string[]): Promise<Map<string, Email[]>> {
+    // TODO: Implement batch thread fetching
+    // Use $filter with conversationId for each thread
+    throw new Error('Outlook provider not implemented yet')
+  }
+
   async getRepliesByLabel(
     labelName: string,
     onlyUnread: boolean = true,

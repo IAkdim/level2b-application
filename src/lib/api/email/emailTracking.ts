@@ -14,7 +14,7 @@ export async function saveEmailTracking(data: {
   threadId: string
   messageId: string
   provider: 'gmail' | 'outlook'
-  label?: string
+  campaignName?: string
   leadId?: string
   sentAt?: Date
 }): Promise<EmailTrackingMetadata | null> {
@@ -33,7 +33,7 @@ export async function saveEmailTracking(data: {
         thread_id: data.threadId,
         message_id: data.messageId,
         provider: data.provider,
-        label: data.label,
+        campaign_name: data.campaignName,
         lead_id: data.leadId,
         sent_at: data.sentAt?.toISOString() || new Date().toISOString()
       })
@@ -85,7 +85,7 @@ export async function linkOpenTrackingToMetadata(
  */
 export async function getTrackedEmails(filters?: {
   leadId?: string
-  label?: string
+  campaignName?: string
   provider?: 'gmail' | 'outlook'
 }): Promise<EmailTrackingMetadata[]> {
   try {
@@ -105,8 +105,8 @@ export async function getTrackedEmails(filters?: {
       query = query.eq('lead_id', filters.leadId)
     }
 
-    if (filters?.label) {
-      query = query.eq('label', filters.label)
+    if (filters?.campaignName) {
+      query = query.eq('campaign_name', filters.campaignName)
     }
 
     if (filters?.provider) {
@@ -260,6 +260,36 @@ export async function getLeadAssociationsByMessageIds(
 }
 
 /**
+ * Get all unique campaign names for the current user
+ * Used for campaign filter dropdown
+ */
+export async function getAllCampaignNames(): Promise<string[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data, error } = await supabase
+      .from('email_tracking_metadata')
+      .select('campaign_name')
+      .eq('user_id', user.id)
+      .not('campaign_name', 'is', null)
+      .order('campaign_name')
+
+    if (error) {
+      console.error('Error fetching campaign names:', error)
+      return []
+    }
+
+    // Return unique campaign names
+    const campaigns = [...new Set(data?.map(d => d.campaign_name).filter(Boolean) || [])]
+    return campaigns as string[]
+  } catch (error) {
+    console.error('Exception in getAllCampaignNames:', error)
+    return []
+  }
+}
+
+/**
  * Get lead associations for thread IDs
  * Returns a map of thread_id -> lead_id[]
  */
@@ -300,5 +330,73 @@ export async function getLeadAssociationsByThreadIds(
   } catch (error) {
     console.error('Exception in getLeadAssociationsByThreadIds:', error)
     return new Map()
+  }
+}
+
+/**
+ * Get all tracked thread IDs for current user
+ * Replaces label-based filtering with database-driven approach
+ */
+export async function getTrackedThreadIds(filters?: {
+  leadId?: string
+  provider?: 'gmail' | 'outlook'
+  startDate?: Date
+  endDate?: Date
+  campaignName?: string
+  limit?: number
+  offset?: number
+}): Promise<string[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    let query = supabase
+      .from('email_tracking_metadata')
+      .select('thread_id')
+      .eq('user_id', user.id)
+      .order('sent_at', { ascending: false })
+
+    if (filters?.leadId) {
+      query = query.eq('lead_id', filters.leadId)
+    }
+
+    if (filters?.provider) {
+      query = query.eq('provider', filters.provider)
+    }
+
+    if (filters?.campaignName) {
+      query = query.eq('campaign_name', filters.campaignName)
+    }
+
+    if (filters?.startDate) {
+      query = query.gte('sent_at', filters.startDate.toISOString())
+    }
+
+    if (filters?.endDate) {
+      query = query.lte('sent_at', filters.endDate.toISOString())
+    }
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit)
+    }
+
+    if (filters?.offset) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 100) - 1)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching tracked thread IDs:', error)
+      return []
+    }
+
+    // Return unique thread IDs
+    const threadIds = [...new Set(data?.map(d => d.thread_id) || [])]
+    console.log(`Found ${threadIds.length} unique tracked threads`)
+    return threadIds
+  } catch (error) {
+    console.error('Exception in getTrackedThreadIds:', error)
+    return []
   }
 }

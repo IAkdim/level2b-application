@@ -32,7 +32,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const navigate = useNavigate()
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
-  const [labelName, setLabelName] = useState("")
+  const [campaignName, setCampaignName] = useState("")
   const [isHtml, setIsHtml] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
@@ -168,7 +168,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           subject: personalizedSubject,
           bodyLength: personalizedBody.length,
           isHtml,
-          label: labelName
+          campaign: campaignName
         });
 
         return {
@@ -176,13 +176,13 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
           subject: personalizedSubject,
           body: personalizedBody,
           isHtml,
-          label: labelName || undefined,
+          campaignName: campaignName || undefined,
           leadId: lead.id,
         }
       })
 
       // Send emails using new emailService
-      console.log("Calling emailService.sendBatchEmails with label:", labelName || "none");
+      console.log("Calling emailService.sendBatchEmails with campaign:", campaignName || "none");
       const results = await emailService.sendBatchEmails(
         emails,
         (current, total, success, failed) => {
@@ -259,7 +259,7 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
   const resetForm = () => {
     setSubject("")
     setBody("")
-    setLabelName("")
+    setCampaignName("")
     setIsHtml(false)
     setSendResult(null)
     setSendingProgress({ current: 0, total: 0, success: 0, failed: 0 })
@@ -365,22 +365,22 @@ export function BulkEmailDialog({ open, onOpenChange, selectedLeads, onEmailsSen
             </div>
           </div>
 
-          {/* Label Name */}
+          {/* Campaign Name */}
           <div className="space-y-2">
-            <Label htmlFor="labelName" className="flex items-center gap-2">
+            <Label htmlFor="campaignName" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
-              Gmail Label (optioneel)
+              Campaign Name (optional)
             </Label>
             <Input
-              id="labelName"
-              placeholder="bijv. Outreach_2025"
-              value={labelName}
-              onChange={(e) => setLabelName(e.target.value)}
+              id="campaignName"
+              placeholder="e.g. Q1_Outreach_2025"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
               disabled={isSending}
               autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
-              Label om aan verzonden emails toe te voegen voor tracking van reacties
+              Group related emails together for tracking and reporting
             </p>
           </div>
 
